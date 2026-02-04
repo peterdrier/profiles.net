@@ -54,22 +54,18 @@
                 <hr />
 
                 <dl class="row">
-                    <dt class="col-sm-3">Date of Birth</dt>
-                    <dd class="col-sm-9">@(Model.DateOfBirth?.ToString("d MMMM yyyy") ?? "Not provided")</dd>
-
                     <dt class="col-sm-3">Phone</dt>
-                    <dd class="col-sm-9">@(Model.PhoneNumber ?? "Not provided")</dd>
+                    <dd class="col-sm-9">@(Model.FormattedPhoneNumber ?? "Not provided")</dd>
 
-                    <dt class="col-sm-3">Address</dt>
+                    <dt class="col-sm-3">Location</dt>
                     <dd class="col-sm-9">
-                        @if (!string.IsNullOrEmpty(Model.AddressLine1))
+                        @if (!string.IsNullOrEmpty(Model.City) || !string.IsNullOrEmpty(Model.CountryCode))
                         {
-                            @Model.AddressLine1<br />
-                            @if (!string.IsNullOrEmpty(Model.AddressLine2))
+                            @Model.City
+                            @if (!string.IsNullOrEmpty(Model.City) && !string.IsNullOrEmpty(Model.CountryCode))
                             {
-                                @Model.AddressLine2<br />
+                                <text>, </text>
                             }
-                            @Model.City @Model.PostalCode<br />
                             @Model.CountryCode
                         }
                         else

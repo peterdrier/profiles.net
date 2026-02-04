@@ -63,12 +63,9 @@ public class ProfileController : Controller
             ProfilePictureUrl = user.ProfilePictureUrl,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
-            DateOfBirth = profile?.DateOfBirth?.ToDateTimeUnspecified(),
+            PhoneCountryCode = profile?.PhoneCountryCode,
             PhoneNumber = profile?.PhoneNumber,
-            AddressLine1 = profile?.AddressLine1,
-            AddressLine2 = profile?.AddressLine2,
             City = profile?.City,
-            PostalCode = profile?.PostalCode,
             CountryCode = profile?.CountryCode,
             Bio = profile?.Bio,
             HasPendingConsents = pendingConsents > 0,
@@ -99,12 +96,9 @@ public class ProfileController : Controller
             ProfilePictureUrl = user.ProfilePictureUrl,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
-            DateOfBirth = profile?.DateOfBirth?.ToDateTimeUnspecified(),
+            PhoneCountryCode = profile?.PhoneCountryCode,
             PhoneNumber = profile?.PhoneNumber,
-            AddressLine1 = profile?.AddressLine1,
-            AddressLine2 = profile?.AddressLine2,
             City = profile?.City,
-            PostalCode = profile?.PostalCode,
             CountryCode = profile?.CountryCode,
             Bio = profile?.Bio
         };
@@ -146,14 +140,9 @@ public class ProfileController : Controller
 
         profile.FirstName = model.FirstName;
         profile.LastName = model.LastName;
-        profile.DateOfBirth = model.DateOfBirth.HasValue
-            ? LocalDate.FromDateTime(model.DateOfBirth.Value)
-            : null;
+        profile.PhoneCountryCode = model.PhoneCountryCode;
         profile.PhoneNumber = model.PhoneNumber;
-        profile.AddressLine1 = model.AddressLine1;
-        profile.AddressLine2 = model.AddressLine2;
         profile.City = model.City;
-        profile.PostalCode = model.PostalCode;
         profile.CountryCode = model.CountryCode;
         profile.Bio = model.Bio;
         profile.UpdatedAt = now;

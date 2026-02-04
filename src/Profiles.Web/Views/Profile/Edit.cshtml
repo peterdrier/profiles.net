@@ -25,46 +25,51 @@
                         </div>
                     </div>
 
+                    <hr />
+                    <h5>Phone</h5>
+
                     <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label asp-for="DateOfBirth" class="form-label"></label>
-                            <input asp-for="DateOfBirth" type="date" class="form-control" />
-                            <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                        <div class="col-md-3">
+                            <label asp-for="PhoneCountryCode" class="form-label"></label>
+                            <select asp-for="PhoneCountryCode" class="form-select">
+                                <option value="">Select</option>
+                                <option value="+34">+34 (Spain)</option>
+                                <option value="+33">+33 (France)</option>
+                                <option value="+49">+49 (Germany)</option>
+                                <option value="+39">+39 (Italy)</option>
+                                <option value="+351">+351 (Portugal)</option>
+                                <option value="+44">+44 (UK)</option>
+                                <option value="+1">+1 (US/Canada)</option>
+                                <option value="+31">+31 (Netherlands)</option>
+                                <option value="+32">+32 (Belgium)</option>
+                                <option value="+41">+41 (Switzerland)</option>
+                                <option value="+43">+43 (Austria)</option>
+                                <option value="+48">+48 (Poland)</option>
+                                <option value="+52">+52 (Mexico)</option>
+                                <option value="+54">+54 (Argentina)</option>
+                                <option value="+55">+55 (Brazil)</option>
+                                <option value="+56">+56 (Chile)</option>
+                                <option value="+57">+57 (Colombia)</option>
+                            </select>
+                            <span asp-validation-for="PhoneCountryCode" class="text-danger"></span>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-9">
                             <label asp-for="PhoneNumber" class="form-label"></label>
-                            <input asp-for="PhoneNumber" class="form-control" />
+                            <input asp-for="PhoneNumber" class="form-control" placeholder="e.g., 612 345 678" />
                             <span asp-validation-for="PhoneNumber" class="text-danger"></span>
                         </div>
                     </div>
 
                     <hr />
-                    <h5>Address</h5>
-
-                    <div class="mb-3">
-                        <label asp-for="AddressLine1" class="form-label"></label>
-                        <input asp-for="AddressLine1" class="form-control" />
-                        <span asp-validation-for="AddressLine1" class="text-danger"></span>
-                    </div>
-
-                    <div class="mb-3">
-                        <label asp-for="AddressLine2" class="form-label"></label>
-                        <input asp-for="AddressLine2" class="form-control" />
-                        <span asp-validation-for="AddressLine2" class="text-danger"></span>
-                    </div>
+                    <h5>Location</h5>
 
                     <div class="row mb-3">
-                        <div class="col-md-5">
+                        <div class="col-md-6">
                             <label asp-for="City" class="form-label"></label>
                             <input asp-for="City" class="form-control" />
                             <span asp-validation-for="City" class="text-danger"></span>
                         </div>
-                        <div class="col-md-3">
-                            <label asp-for="PostalCode" class="form-label"></label>
-                            <input asp-for="PostalCode" class="form-control" />
-                            <span asp-validation-for="PostalCode" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label asp-for="CountryCode" class="form-label"></label>
                             <select asp-for="CountryCode" class="form-select">
                                 <option value="">Select country</option>
@@ -74,8 +79,18 @@
                                 <option value="IT">Italy</option>
                                 <option value="PT">Portugal</option>
                                 <option value="GB">United Kingdom</option>
+                                <option value="NL">Netherlands</option>
+                                <option value="BE">Belgium</option>
+                                <option value="CH">Switzerland</option>
+                                <option value="AT">Austria</option>
+                                <option value="PL">Poland</option>
                                 <option value="US">United States</option>
-                                <option value="OTHER">Other</option>
+                                <option value="CA">Canada</option>
+                                <option value="MX">Mexico</option>
+                                <option value="AR">Argentina</option>
+                                <option value="BR">Brazil</option>
+                                <option value="CL">Chile</option>
+                                <option value="CO">Colombia</option>
                             </select>
                             <span asp-validation-for="CountryCode" class="text-danger"></span>
                         </div>

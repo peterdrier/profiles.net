@@ -19,28 +19,18 @@ public class ProfileViewModel
     [Display(Name = "Last Name")]
     public string LastName { get; set; } = string.Empty;
 
-    [Display(Name = "Date of Birth")]
-    [DataType(DataType.Date)]
-    public DateTime? DateOfBirth { get; set; }
+    [Display(Name = "Country Code")]
+    [StringLength(5)]
+    [RegularExpression(@"^\+\d{1,4}$", ErrorMessage = "Please enter a valid country code (e.g., +34, +1)")]
+    public string? PhoneCountryCode { get; set; }
 
-    [Phone]
     [Display(Name = "Phone Number")]
+    [StringLength(20)]
+    [RegularExpression(@"^[\d\s\-]+$", ErrorMessage = "Please enter a valid phone number")]
     public string? PhoneNumber { get; set; }
-
-    [Display(Name = "Address Line 1")]
-    [StringLength(200)]
-    public string? AddressLine1 { get; set; }
-
-    [Display(Name = "Address Line 2")]
-    [StringLength(200)]
-    public string? AddressLine2 { get; set; }
 
     [StringLength(100)]
     public string? City { get; set; }
-
-    [Display(Name = "Postal Code")]
-    [StringLength(20)]
-    public string? PostalCode { get; set; }
 
     [Display(Name = "Country")]
     [StringLength(2)]
@@ -53,4 +43,12 @@ public class ProfileViewModel
     public string MembershipStatus { get; set; } = "None";
     public bool HasPendingConsents { get; set; }
     public int PendingConsentCount { get; set; }
+
+    /// <summary>
+    /// Gets the formatted phone number with country code.
+    /// </summary>
+    public string? FormattedPhoneNumber =>
+        !string.IsNullOrEmpty(PhoneCountryCode) && !string.IsNullOrEmpty(PhoneNumber)
+            ? $"{PhoneCountryCode} {PhoneNumber}"
+            : PhoneNumber;
 }

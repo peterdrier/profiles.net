@@ -20,20 +20,14 @@ public class ProfileConfiguration : IEntityTypeConfiguration<Profile>
             .HasMaxLength(256)
             .IsRequired();
 
+        builder.Property(p => p.PhoneCountryCode)
+            .HasMaxLength(5);
+
         builder.Property(p => p.PhoneNumber)
             .HasMaxLength(50);
 
-        builder.Property(p => p.AddressLine1)
-            .HasMaxLength(512);
-
-        builder.Property(p => p.AddressLine2)
-            .HasMaxLength(512);
-
         builder.Property(p => p.City)
             .HasMaxLength(256);
-
-        builder.Property(p => p.PostalCode)
-            .HasMaxLength(20);
 
         builder.Property(p => p.CountryCode)
             .HasMaxLength(2);

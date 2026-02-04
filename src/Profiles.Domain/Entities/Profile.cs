@@ -35,34 +35,19 @@ public class Profile
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Member's date of birth.
+    /// Phone country code (e.g., "+34" for Spain, "+1" for US).
     /// </summary>
-    public LocalDate? DateOfBirth { get; set; }
+    public string? PhoneCountryCode { get; set; }
 
     /// <summary>
-    /// Member's phone number.
+    /// Member's phone number (without country code).
     /// </summary>
     public string? PhoneNumber { get; set; }
-
-    /// <summary>
-    /// Member's address line 1.
-    /// </summary>
-    public string? AddressLine1 { get; set; }
-
-    /// <summary>
-    /// Member's address line 2.
-    /// </summary>
-    public string? AddressLine2 { get; set; }
 
     /// <summary>
     /// Member's city.
     /// </summary>
     public string? City { get; set; }
-
-    /// <summary>
-    /// Member's postal code.
-    /// </summary>
-    public string? PostalCode { get; set; }
 
     /// <summary>
     /// Member's country code (ISO 3166-1 alpha-2).
