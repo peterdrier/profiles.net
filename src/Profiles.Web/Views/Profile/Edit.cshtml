@@ -65,10 +65,10 @@
 
                     <div class="mb-3">
                         <label for="locationSearch" class="form-label">City</label>
-                        <input type="text" id="locationSearch" class="form-control"
-                               placeholder="Start typing your city..."
-                               value="@Model.LocationDisplay"
-                               autocomplete="off" />
+                        <gmp-place-autocomplete id="locationSearch"
+                                                placeholder="Start typing your city..."
+                                                style="width: 100%;">
+                        </gmp-place-autocomplete>
                         <div class="form-text">Search for your city to set your location.</div>
 
                         <input type="hidden" asp-for="City" id="City" />
@@ -115,75 +115,92 @@
 
     @if (!string.IsNullOrEmpty(ViewData["GoogleMapsApiKey"]?.ToString()))
     {
-        <script type="module">
-            import { APILoader } from 'https://unpkg.com/@@googlemaps/extended-component-library@@0.6';
-
-            const loader = new APILoader({
-                apiKey: '@ViewData["GoogleMapsApiKey"]',
-                version: 'weekly'
+        <script>
+            (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+                key: "@ViewData["GoogleMapsApiKey"]",
+                v: "weekly"
             });
+        </script>
+        <script>
+            async function initPlacesAutocomplete() {
+                try {
+                    // Load the places library
+                    await google.maps.importLibrary("places");
 
-            await loader.load();
+                    const autocomplete = document.getElementById('locationSearch');
+                    if (!autocomplete) {
+                        console.error('Autocomplete element not found');
+                        return;
+                    }
 
-            const input = document.getElementById("locationSearch");
+                    console.log('Autocomplete element found:', autocomplete);
+                    console.log('Autocomplete tagName:', autocomplete.tagName);
 
-            // Create the autocomplete element
-            const autocomplete = document.createElement('gmp-place-autocomplete');
-            autocomplete.id = 'place-autocomplete';
-            autocomplete.placeholder = 'Start typing your city...';
-            autocomplete.className = 'form-control';
-            autocomplete.style.cssText = 'width: 100%; height: 38px;';
+                    // Listen for place selection - event is 'gmp-select' with { placePrediction }
+                    autocomplete.addEventListener('gmp-select', async ({ placePrediction }) => {
+                        console.log('gmp-select event, placePrediction:', placePrediction);
 
-            // Set to only return cities
-            autocomplete.types = ['(cities)'];
+                        if (!placePrediction) {
+                            console.error('No placePrediction');
+                            return;
+                        }
 
-            // Replace the input with the autocomplete
-            input.parentNode.replaceChild(autocomplete, input);
+                        // Convert prediction to Place and fetch details
+                        const place = placePrediction.toPlace();
+                        await place.fetchFields({
+                            fields: ['location', 'addressComponents', 'id', 'displayName']
+                        });
 
-            // Set initial value if exists
-            const currentLocation = '@Model.LocationDisplay';
-            if (currentLocation) {
-                autocomplete.value = currentLocation;
+                        console.log('Place after fetchFields:', place);
+
+                        // Extract city and country
+                        let city = '';
+                        let countryCode = '';
+
+                        if (place.addressComponents) {
+                            for (const component of place.addressComponents) {
+                                console.log('Component:', component.types, component.longText, component.shortText);
+                                if (component.types.includes('locality')) {
+                                    city = component.longText;
+                                } else if (component.types.includes('administrative_area_level_1') && !city) {
+                                    city = component.longText;
+                                }
+                                if (component.types.includes('country')) {
+                                    countryCode = component.shortText;
+                                }
+                            }
+                        }
+
+                        // Populate hidden fields
+                        document.getElementById('City').value = city;
+                        document.getElementById('CountryCode').value = countryCode;
+                        document.getElementById('Latitude').value = place.location?.lat() || '';
+                        document.getElementById('Longitude').value = place.location?.lng() || '';
+                        document.getElementById('PlaceId').value = place.id || '';
+
+                        console.log('Location set:', city, countryCode, place.location?.lat(), place.location?.lng());
+                    });
+
+                    console.log('Places Autocomplete (New API) initialized');
+                } catch (error) {
+                    console.error('Error initializing Places Autocomplete:', error);
+                }
             }
 
-            // Listen for place selection
-            autocomplete.addEventListener('gmp-placeselect', async (event) => {
-                const place = event.place;
-
-                // Fetch full place details with only the fields we need
-                await place.fetchFields({
-                    fields: ['location', 'addressComponents', 'id']
-                });
-
-                // Extract city and country from address components
-                let city = '';
-                let countryCode = '';
-
-                if (place.addressComponents) {
-                    for (const component of place.addressComponents) {
-                        if (component.types.includes('locality')) {
-                            city = component.longText;
-                        } else if (component.types.includes('administrative_area_level_1') && !city) {
-                            city = component.longText;
-                        }
-                        if (component.types.includes('country')) {
-                            countryCode = component.shortText;
-                        }
-                    }
-                }
-
-                // Populate hidden fields
-                document.getElementById('City').value = city;
-                document.getElementById('CountryCode').value = countryCode;
-                document.getElementById('Latitude').value = place.location?.lat() || '';
-                document.getElementById('Longitude').value = place.location?.lng() || '';
-                document.getElementById('PlaceId').value = place.id || '';
-            });
+            initPlacesAutocomplete();
         </script>
         <style>
             gmp-place-autocomplete {
-                --gmp-mat-background-color: #fff;
-                --gmp-mat-input-font-size: 1rem;
+                display: block;
+                width: 100%;
+            }
+            gmp-place-autocomplete input {
+                width: 100%;
+                padding: 0.375rem 0.75rem;
+                font-size: 1rem;
+                border: 1px solid #ced4da;
+                border-radius: 0.375rem;
+                line-height: 1.5;
             }
         </style>
     }
