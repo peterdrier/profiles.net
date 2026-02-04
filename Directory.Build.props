@@ -27,12 +27,6 @@
     <NoWarn>$(NoWarn);CS1591;MA0048;MA0016;MA0026;MA0051;VSTHRD200</NoWarn>
   </PropertyGroup>
 
-  <!-- Test project defaults -->
-  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
-    <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-  </PropertyGroup>
-
   <!-- Analyzers -->
   <ItemGroup>
     <PackageReference Include="Roslynator.Analyzers">

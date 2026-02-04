@@ -6,6 +6,7 @@
     <Project Path="src/Profiles.Web/Profiles.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <File Path="tests/Directory.Build.props" />
     <Project Path="tests/Profiles.Domain.Tests/Profiles.Domain.Tests.csproj" />
     <Project Path="tests/Profiles.Application.Tests/Profiles.Application.Tests.csproj" />
     <Project Path="tests/Profiles.Integration.Tests/Profiles.Integration.Tests.csproj" />
