@@ -60,7 +60,7 @@
                         <dd class="col-sm-9">
                             @if (!string.IsNullOrEmpty(Model.FirstName) || !string.IsNullOrEmpty(Model.LastName))
                             {
-                                @Model.FirstName @Model.LastName
+                                @($"{Model.FirstName} {Model.LastName}")
                                 <small class="text-muted">(only visible to you and board)</small>
                             }
                             else
