@@ -115,55 +115,77 @@
 
     @if (!string.IsNullOrEmpty(ViewData["GoogleMapsApiKey"]?.ToString()))
     {
-        <script>
-            (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]);for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-                key: "@ViewData["GoogleMapsApiKey"]",
-                v: "weekly"
+        <script type="module">
+            import { APILoader } from 'https://unpkg.com/@@googlemaps/extended-component-library@@0.6';
+
+            const loader = new APILoader({
+                apiKey: '@ViewData["GoogleMapsApiKey"]',
+                version: 'weekly'
             });
-        </script>
-        <script>
-            async function initAutocomplete() {
-                const { Autocomplete } = await google.maps.importLibrary("places");
 
-                const input = document.getElementById("locationSearch");
-                const autocomplete = new Autocomplete(input, {
-                    types: ["(cities)"],
-                    fields: ["place_id", "geometry", "address_components", "formatted_address"]
-                });
+            await loader.load();
 
-                autocomplete.addListener("place_changed", () => {
-                    const place = autocomplete.getPlace();
+            const input = document.getElementById("locationSearch");
 
-                    if (!place.geometry) {
-                        return;
-                    }
+            // Create the autocomplete element
+            const autocomplete = document.createElement('gmp-place-autocomplete');
+            autocomplete.id = 'place-autocomplete';
+            autocomplete.placeholder = 'Start typing your city...';
+            autocomplete.className = 'form-control';
+            autocomplete.style.cssText = 'width: 100%; height: 38px;';
 
-                    // Extract city and country from address components
-                    let city = "";
-                    let countryCode = "";
+            // Set to only return cities
+            autocomplete.types = ['(cities)'];
 
-                    for (const component of place.address_components) {
-                        if (component.types.includes("locality")) {
-                            city = component.long_name;
-                        } else if (component.types.includes("administrative_area_level_1") && !city) {
-                            city = component.long_name;
-                        }
-                        if (component.types.includes("country")) {
-                            countryCode = component.short_name;
-                        }
-                    }
+            // Replace the input with the autocomplete
+            input.parentNode.replaceChild(autocomplete, input);
 
-                    // Populate hidden fields
-                    document.getElementById("City").value = city;
-                    document.getElementById("CountryCode").value = countryCode;
-                    document.getElementById("Latitude").value = place.geometry.location.lat();
-                    document.getElementById("Longitude").value = place.geometry.location.lng();
-                    document.getElementById("PlaceId").value = place.place_id;
-                });
+            // Set initial value if exists
+            const currentLocation = '@Model.LocationDisplay';
+            if (currentLocation) {
+                autocomplete.value = currentLocation;
             }
 
-            initAutocomplete();
+            // Listen for place selection
+            autocomplete.addEventListener('gmp-placeselect', async (event) => {
+                const place = event.place;
+
+                // Fetch full place details with only the fields we need
+                await place.fetchFields({
+                    fields: ['location', 'addressComponents', 'id']
+                });
+
+                // Extract city and country from address components
+                let city = '';
+                let countryCode = '';
+
+                if (place.addressComponents) {
+                    for (const component of place.addressComponents) {
+                        if (component.types.includes('locality')) {
+                            city = component.longText;
+                        } else if (component.types.includes('administrative_area_level_1') && !city) {
+                            city = component.longText;
+                        }
+                        if (component.types.includes('country')) {
+                            countryCode = component.shortText;
+                        }
+                    }
+                }
+
+                // Populate hidden fields
+                document.getElementById('City').value = city;
+                document.getElementById('CountryCode').value = countryCode;
+                document.getElementById('Latitude').value = place.location?.lat() || '';
+                document.getElementById('Longitude').value = place.location?.lng() || '';
+                document.getElementById('PlaceId').value = place.id || '';
+            });
         </script>
+        <style>
+            gmp-place-autocomplete {
+                --gmp-mat-background-color: #fff;
+                --gmp-mat-input-font-size: 1rem;
+            }
+        </style>
     }
     else
     {
