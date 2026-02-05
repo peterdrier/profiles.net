@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NodaTime;
 using NodaTime.Serialization.SystemTextJson;
 using OpenTelemetry.Metrics;
@@ -14,6 +16,7 @@ using Profiles.Infrastructure.Data;
 using Profiles.Infrastructure.Jobs;
 using Profiles.Infrastructure.Repositories;
 using Profiles.Infrastructure.Services;
+using Profiles.Web.Health;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -115,7 +118,8 @@ builder.Services.AddSingleton(new ActivitySource(serviceName, serviceVersion));
 builder.Services.AddHealthChecks()
     .AddNpgSql(connectionString, name: "postgresql")
     .AddHangfire(options => options.MinimumAvailableServers = 1, name: "hangfire")
-    .AddUrlGroup(new Uri("https://api.github.com"), name: "github-api");
+    .AddUrlGroup(new Uri("https://api.github.com"), name: "github-api")
+    .AddCheck<ConfigurationHealthCheck>("configuration");
 
 // Register Application Services
 builder.Services.AddScoped<IConsentRecordRepository, ConsentRecordRepository>();
@@ -150,12 +154,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Health check endpoints
-app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = WriteDetailedHealthResponse
+});
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false // Liveness check - just confirms the app is running
 });
 
-app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = _ => true // Readiness check - confirms all dependencies are available
 });
@@ -192,3 +201,23 @@ if (app.Environment.IsDevelopment())
 }
 
 await app.RunAsync();
+
+static async Task WriteDetailedHealthResponse(HttpContext context, HealthReport report)
+{
+    context.Response.ContentType = "application/json";
+
+    var result = new
+    {
+        status = report.Status.ToString(),
+        results = report.Entries.ToDictionary(
+            e => e.Key,
+            e => new
+            {
+                status = e.Value.Status.ToString(),
+                duration = e.Value.Duration.ToString()
+            },
+            StringComparer.Ordinal)
+    };
+
+    await context.Response.WriteAsJsonAsync(result);
+}
