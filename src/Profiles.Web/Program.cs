@@ -11,7 +11,9 @@ using OpenTelemetry.Trace;
 using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 using Profiles.Infrastructure.Data;
+using Profiles.Infrastructure.Jobs;
 using Profiles.Infrastructure.Repositories;
+using Profiles.Infrastructure.Services;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -117,6 +119,10 @@ builder.Services.AddHealthChecks()
 
 // Register Application Services
 builder.Services.AddScoped<IConsentRecordRepository, ConsentRecordRepository>();
+builder.Services.AddScoped<ITeamService, TeamService>();
+builder.Services.AddScoped<IGoogleSyncService, StubGoogleSyncService>();
+builder.Services.AddScoped<IMembershipCalculator, MembershipCalculator>();
+builder.Services.AddScoped<SystemTeamSyncJob>();
 
 // Add Controllers with Views
 builder.Services.AddControllersWithViews();
@@ -163,6 +169,12 @@ app.MapHangfireDashboard("/hangfire", new DashboardOptions
         ? []
         : [new Profiles.Web.HangfireAuthorizationFilter()]
 });
+
+// Schedule recurring jobs
+RecurringJob.AddOrUpdate<SystemTeamSyncJob>(
+    "system-team-sync",
+    job => job.ExecuteAsync(CancellationToken.None),
+    Cron.Hourly);
 
 app.MapControllerRoute(
     name: "default",

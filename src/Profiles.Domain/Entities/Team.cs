@@ -1,4 +1,5 @@
 using NodaTime;
+using Profiles.Domain.Enums;
 
 namespace Profiles.Domain.Entities;
 
@@ -33,6 +34,16 @@ public class Team
     public bool IsActive { get; set; } = true;
 
     /// <summary>
+    /// Whether joining this team requires approval from a metalead or board member.
+    /// </summary>
+    public bool RequiresApproval { get; set; } = true;
+
+    /// <summary>
+    /// Identifies system-managed teams with automatic membership sync.
+    /// </summary>
+    public SystemTeamType SystemTeamType { get; set; } = SystemTeamType.None;
+
+    /// <summary>
     /// When the team was created.
     /// </summary>
     public Instant CreatedAt { get; init; }
@@ -48,7 +59,17 @@ public class Team
     public ICollection<TeamMember> Members { get; } = new List<TeamMember>();
 
     /// <summary>
+    /// Navigation property to join requests.
+    /// </summary>
+    public ICollection<TeamJoinRequest> JoinRequests { get; } = new List<TeamJoinRequest>();
+
+    /// <summary>
     /// Navigation property to associated Google resources.
     /// </summary>
     public ICollection<GoogleResource> GoogleResources { get; } = new List<GoogleResource>();
+
+    /// <summary>
+    /// Whether this is a system-managed team.
+    /// </summary>
+    public bool IsSystemTeam => SystemTeamType != SystemTeamType.None;
 }

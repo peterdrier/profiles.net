@@ -1,0 +1,187 @@
+@model Profiles.Web.Models.TeamDetailViewModel
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Teams</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Name</li>
+    </ol>
+</nav>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">@Model.Name</h4>
+                <div>
+                    @if (Model.IsSystemTeam)
+                    {
+                        <span class="badge bg-secondary">@Model.SystemTeamType Team</span>
+                    }
+                    @if (Model.IsCurrentUserMember)
+                    {
+                        <span class="badge bg-success">Member</span>
+                    }
+                    @if (Model.IsCurrentUserMetalead)
+                    {
+                        <span class="badge bg-primary">Metalead</span>
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <p class="card-text">@Model.Description</p>
+                }
+                else
+                {
+                    <p class="text-muted">No description provided.</p>
+                }
+
+                @if (Model.IsSystemTeam)
+                {
+                    <div class="alert alert-info mb-0">
+                        This is a system-managed team. Membership is automatically synchronized based on @Model.SystemTeamType criteria.
+                    </div>
+                }
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">Created @Model.CreatedAt.ToString("MMMM d, yyyy")</small>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Members (@Model.Members.Count)</span>
+                @if (Model.CanCurrentUserManage)
+                {
+                    <a asp-controller="TeamAdmin" asp-action="Members" asp-route-slug="@Model.Slug" class="btn btn-sm btn-outline-primary">
+                        Manage Members
+                    </a>
+                }
+            </div>
+            <ul class="list-group list-group-flush">
+                @foreach (var member in Model.Members.Take(10))
+                {
+                    <li class="list-group-item d-flex align-items-center">
+                        @if (!string.IsNullOrEmpty(member.ProfilePictureUrl))
+                        {
+                            <img src="@member.ProfilePictureUrl" alt="" class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
+                        }
+                        else
+                        {
+                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
+                                <span class="text-white">@member.DisplayName[0]</span>
+                            </div>
+                        }
+                        <div class="flex-grow-1">
+                            <strong>@member.DisplayName</strong>
+                            @if (member.IsMetalead)
+                            {
+                                <span class="badge bg-primary ms-2">Metalead</span>
+                            }
+                        </div>
+                        <small class="text-muted">Joined @member.JoinedAt.ToString("MMM d, yyyy")</small>
+                    </li>
+                }
+                @if (Model.Members.Count > 10)
+                {
+                    <li class="list-group-item text-center text-muted">
+                        And @(Model.Members.Count - 10) more members...
+                    </li>
+                }
+                @if (!Model.Members.Any())
+                {
+                    <li class="list-group-item text-center text-muted">
+                        No members yet.
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">Actions</div>
+            <div class="card-body">
+                @if (Model.CanCurrentUserJoin)
+                {
+                    <a asp-action="Join" asp-route-slug="@Model.Slug" class="btn btn-primary w-100 mb-2">
+                        @if (Model.RequiresApproval)
+                        {
+                            <span>Request to Join</span>
+                        }
+                        else
+                        {
+                            <span>Join Team</span>
+                        }
+                    </a>
+                }
+                else if (Model.CurrentUserPendingRequestId.HasValue)
+                {
+                    <div class="alert alert-info mb-2">
+                        Your join request is pending approval.
+                    </div>
+                    <form asp-action="WithdrawRequest" asp-route-id="@Model.CurrentUserPendingRequestId" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Are you sure you want to withdraw your request?')">
+                            Withdraw Request
+                        </button>
+                    </form>
+                }
+                else if (Model.CanCurrentUserLeave)
+                {
+                    <form asp-action="Leave" asp-route-slug="@Model.Slug" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-outline-danger w-100" onclick="return confirm('Are you sure you want to leave this team?')">
+                            Leave Team
+                        </button>
+                    </form>
+                }
+                else if (Model.IsCurrentUserMember && Model.IsSystemTeam)
+                {
+                    <div class="alert alert-secondary mb-0">
+                        Membership in system teams is managed automatically.
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model.CanCurrentUserManage)
+        {
+            <div class="card">
+                <div class="card-header">Team Management</div>
+                <div class="list-group list-group-flush">
+                    <a asp-controller="TeamAdmin" asp-action="Requests" asp-route-slug="@Model.Slug" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        Pending Requests
+                        @if (Model.PendingRequestCount > 0)
+                        {
+                            <span class="badge bg-warning">@Model.PendingRequestCount</span>
+                        }
+                    </a>
+                    <a asp-controller="TeamAdmin" asp-action="Members" asp-route-slug="@Model.Slug" class="list-group-item list-group-item-action">
+                        Manage Members
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>

@@ -1,4 +1,5 @@
 using NodaTime;
+using Profiles.Domain.Enums;
 
 namespace Profiles.Domain.Entities;
 
@@ -33,9 +34,9 @@ public class TeamMember
     public User User { get; set; } = null!;
 
     /// <summary>
-    /// Role within the team (e.g., "Lead", "Member").
+    /// Role within the team.
     /// </summary>
-    public string Role { get; set; } = "Member";
+    public TeamMemberRole Role { get; set; } = TeamMemberRole.Member;
 
     /// <summary>
     /// When the user joined this team.

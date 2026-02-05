@@ -1,0 +1,64 @@
+@model Profiles.Web.Models.JoinTeamViewModel
+@{
+    ViewData["Title"] = "Join " + Model.TeamName;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Teams</a></li>
+        <li class="breadcrumb-item"><a asp-action="Details" asp-route-slug="@Model.TeamId">@Model.TeamName</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Join</li>
+    </ol>
+</nav>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Join @Model.TeamName</h4>
+            </div>
+            <div class="card-body">
+                @if (Model.RequiresApproval)
+                {
+                    <div class="alert alert-info">
+                        This team requires approval to join. Your request will be reviewed by the team metaleads or board members.
+                    </div>
+
+                    <form asp-action="Join" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="TeamId" />
+                        <input type="hidden" asp-for="TeamName" />
+                        <input type="hidden" asp-for="RequiresApproval" />
+
+                        <div class="mb-3">
+                            <label asp-for="Message" class="form-label">Message (optional)</label>
+                            <textarea asp-for="Message" class="form-control" rows="4" placeholder="Tell the team why you want to join..."></textarea>
+                            <span asp-validation-for="Message" class="text-danger"></span>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Submit Request</button>
+                            <a asp-action="Details" asp-route-slug="@Model.TeamId" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <p>You can join this team immediately without approval.</p>
+
+                    <form asp-action="Join" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="TeamId" />
+                        <input type="hidden" asp-for="TeamName" />
+                        <input type="hidden" asp-for="RequiresApproval" />
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Join Team</button>
+                            <a asp-action="Details" asp-route-slug="@Model.TeamId" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                }
+            </div>
+        </div>
+    </div>
+</div>

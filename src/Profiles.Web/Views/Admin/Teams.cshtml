@@ -1,0 +1,115 @@
+@model Profiles.Web.Models.AdminTeamListViewModel
+@{
+    ViewData["Title"] = "Teams Administration";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Teams Administration</h1>
+    <a asp-action="CreateTeam" class="btn btn-primary">Create Team</a>
+</div>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Members</th>
+                    <th>Pending</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var team in Model.Teams)
+                {
+                    <tr>
+                        <td>
+                            <a asp-controller="Team" asp-action="Details" asp-route-slug="@team.Slug">@team.Name</a>
+                        </td>
+                        <td>
+                            @if (team.IsSystemTeam)
+                            {
+                                <span class="badge bg-secondary">@team.SystemTeamType</span>
+                            }
+                            else if (team.RequiresApproval)
+                            {
+                                <span class="badge bg-info">Approval Required</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success">Open</span>
+                            }
+                        </td>
+                        <td>@team.MemberCount</td>
+                        <td>
+                            @if (team.PendingRequestCount > 0)
+                            {
+                                <span class="badge bg-warning">@team.PendingRequestCount</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">0</span>
+                            }
+                        </td>
+                        <td>
+                            @if (team.IsActive)
+                            {
+                                <span class="badge bg-success">Active</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">Inactive</span>
+                            }
+                        </td>
+                        <td>@team.CreatedAt.ToString("MMM d, yyyy")</td>
+                        <td>
+                            @if (!team.IsSystemTeam)
+                            {
+                                <div class="btn-group" role="group">
+                                    <a asp-action="EditTeam" asp-route-id="@team.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    @if (team.IsActive)
+                                    {
+                                        <form asp-action="DeleteTeam" asp-route-id="@team.Id" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Deactivate this team?')">Deactivate</button>
+                                        </form>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">System managed</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (!Model.Teams.Any())
+{
+    <div class="alert alert-info mt-3">
+        No teams have been created yet.
+    </div>
+}

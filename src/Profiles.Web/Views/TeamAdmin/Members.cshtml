@@ -1,0 +1,140 @@
+@model Profiles.Web.Models.TeamMembersViewModel
+@using Profiles.Domain.Enums
+@{
+    ViewData["Title"] = "Manage Members - " + Model.TeamName;
+}
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-controller="Team" asp-action="Index">Teams</a></li>
+        <li class="breadcrumb-item"><a asp-controller="Team" asp-action="Details" asp-route-slug="@Model.TeamSlug">@Model.TeamName</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Manage Members</li>
+    </ol>
+</nav>
+
+<h1>Manage Members</h1>
+<p class="text-muted">Team: @Model.TeamName @(Model.IsSystemTeam ? "(System Team)" : "")</p>
+
+@if (TempData["SuccessMessage"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        @TempData["SuccessMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["ErrorMessage"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @TempData["ErrorMessage"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (Model.IsSystemTeam)
+{
+    <div class="alert alert-info">
+        This is a system-managed team. Member roles cannot be changed manually.
+    </div>
+}
+
+@if (Model.Members.Any())
+{
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Member</th>
+                        <th>Role</th>
+                        <th>Joined</th>
+                        @if (Model.CanManageRoles)
+                        {
+                            <th>Actions</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var member in Model.Members)
+                    {
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    @if (!string.IsNullOrEmpty(member.ProfilePictureUrl))
+                                    {
+                                        <img src="@member.ProfilePictureUrl" alt="" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                    }
+                                    else
+                                    {
+                                        <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                                            <span class="text-white">@member.DisplayName[0]</span>
+                                        </div>
+                                    }
+                                    <div>
+                                        <strong>@member.DisplayName</strong><br>
+                                        <small class="text-muted">@member.Email</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                @if (member.IsMetalead)
+                                {
+                                    <span class="badge bg-primary">Metalead</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Member</span>
+                                }
+                            </td>
+                            <td>@member.JoinedAt.ToString("MMM d, yyyy")</td>
+                            @if (Model.CanManageRoles)
+                            {
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        @if (member.IsMetalead)
+                                        {
+                                            <form asp-action="SetRole" asp-route-slug="@Model.TeamSlug" asp-route-userId="@member.UserId" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="Role" value="@TeamMemberRole.Member" />
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Demote this user to Member?')">
+                                                    Demote to Member
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <form asp-action="SetRole" asp-route-slug="@Model.TeamSlug" asp-route-userId="@member.UserId" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="Role" value="@TeamMemberRole.Metalead" />
+                                                <button type="submit" class="btn btn-sm btn-outline-primary" onclick="return confirm('Promote this user to Metalead?')">
+                                                    Promote to Metalead
+                                                </button>
+                                            </form>
+                                        }
+                                        <form asp-action="RemoveMember" asp-route-slug="@Model.TeamSlug" asp-route-userId="@member.UserId" method="post" class="d-inline">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Remove this member from the team?')">
+                                                Remove
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        No members in this team yet.
+    </div>
+}
+
+<div class="mt-3">
+    <a asp-controller="Team" asp-action="Details" asp-route-slug="@Model.TeamSlug" class="btn btn-outline-secondary">Back to Team</a>
+    <a asp-action="Requests" asp-route-slug="@Model.TeamSlug" class="btn btn-outline-primary">View Pending Requests</a>
+</div>

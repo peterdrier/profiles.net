@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
+using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 using Profiles.Domain.Enums;
 using Profiles.Infrastructure.Data;
@@ -17,17 +18,20 @@ public class AdminController : Controller
 {
     private readonly ProfilesDbContext _dbContext;
     private readonly UserManager<User> _userManager;
+    private readonly ITeamService _teamService;
     private readonly IClock _clock;
     private readonly ILogger<AdminController> _logger;
 
     public AdminController(
         ProfilesDbContext dbContext,
         UserManager<User> userManager,
+        ITeamService teamService,
         IClock clock,
         ILogger<AdminController> logger)
     {
         _dbContext = dbContext;
         _userManager = userManager;
+        _teamService = teamService;
         _clock = clock;
         _logger = logger;
     }
@@ -380,5 +384,139 @@ public class AdminController : Controller
             ApplicationStatus.Withdrawn => "bg-secondary",
             _ => "bg-secondary"
         };
+    }
+
+    [HttpGet("Teams")]
+    public async Task<IActionResult> Teams()
+    {
+        var teams = await _dbContext.Teams
+            .Include(t => t.Members.Where(m => m.LeftAt == null))
+            .Include(t => t.JoinRequests.Where(r => r.Status == TeamJoinRequestStatus.Pending))
+            .OrderBy(t => t.SystemTeamType)
+            .ThenBy(t => t.Name)
+            .ToListAsync();
+
+        var viewModel = new AdminTeamListViewModel
+        {
+            Teams = teams.Select(t => new AdminTeamViewModel
+            {
+                Id = t.Id,
+                Name = t.Name,
+                Slug = t.Slug,
+                IsActive = t.IsActive,
+                RequiresApproval = t.RequiresApproval,
+                IsSystemTeam = t.IsSystemTeam,
+                SystemTeamType = t.SystemTeamType != SystemTeamType.None ? t.SystemTeamType.ToString() : null,
+                MemberCount = t.Members.Count,
+                PendingRequestCount = t.JoinRequests.Count,
+                CreatedAt = t.CreatedAt.ToDateTimeUtc()
+            }).ToList()
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpGet("Teams/Create")]
+    public IActionResult CreateTeam()
+    {
+        return View(new CreateTeamViewModel());
+    }
+
+    [HttpPost("Teams/Create")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateTeam(CreateTeamViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        try
+        {
+            var team = await _teamService.CreateTeamAsync(model.Name, model.Description, model.RequiresApproval);
+            var currentUser = await _userManager.GetUserAsync(User);
+            _logger.LogInformation("Admin {AdminId} created team {TeamId} ({TeamName})", currentUser?.Id, team.Id, team.Name);
+
+            TempData["SuccessMessage"] = $"Team '{team.Name}' created successfully.";
+            return RedirectToAction(nameof(Teams));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating team");
+            ModelState.AddModelError("", "An error occurred while creating the team.");
+            return View(model);
+        }
+    }
+
+    [HttpGet("Teams/{id}/Edit")]
+    public async Task<IActionResult> EditTeam(Guid id)
+    {
+        var team = await _dbContext.Teams.FindAsync(id);
+        if (team == null)
+        {
+            return NotFound();
+        }
+
+        var viewModel = new EditTeamViewModel
+        {
+            Id = team.Id,
+            Name = team.Name,
+            Description = team.Description,
+            RequiresApproval = team.RequiresApproval,
+            IsActive = team.IsActive,
+            IsSystemTeam = team.IsSystemTeam
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpPost("Teams/{id}/Edit")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditTeam(Guid id, EditTeamViewModel model)
+    {
+        if (id != model.Id)
+        {
+            return BadRequest();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        try
+        {
+            await _teamService.UpdateTeamAsync(id, model.Name, model.Description, model.RequiresApproval, model.IsActive);
+            var currentUser = await _userManager.GetUserAsync(User);
+            _logger.LogInformation("Admin {AdminId} updated team {TeamId}", currentUser?.Id, id);
+
+            TempData["SuccessMessage"] = "Team updated successfully.";
+            return RedirectToAction(nameof(Teams));
+        }
+        catch (InvalidOperationException ex)
+        {
+            ModelState.AddModelError("", ex.Message);
+            return View(model);
+        }
+    }
+
+    [HttpPost("Teams/{id}/Delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteTeam(Guid id)
+    {
+        try
+        {
+            await _teamService.DeleteTeamAsync(id);
+            var currentUser = await _userManager.GetUserAsync(User);
+            _logger.LogInformation("Admin {AdminId} deactivated team {TeamId}", currentUser?.Id, id);
+
+            TempData["SuccessMessage"] = "Team deactivated successfully.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Teams));
     }
 }

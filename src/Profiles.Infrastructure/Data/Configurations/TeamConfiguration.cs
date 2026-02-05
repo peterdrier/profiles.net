@@ -23,6 +23,15 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
             .HasMaxLength(256)
             .IsRequired();
 
+        builder.Property(t => t.RequiresApproval)
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(t => t.SystemTeamType)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(50);
+
         builder.Property(t => t.CreatedAt)
             .IsRequired();
 
@@ -34,6 +43,11 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
             .HasForeignKey(tm => tm.TeamId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(t => t.JoinRequests)
+            .WithOne(jr => jr.Team)
+            .HasForeignKey(jr => jr.TeamId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasMany(t => t.GoogleResources)
             .WithOne(gr => gr.Team)
             .HasForeignKey(gr => gr.TeamId)
@@ -43,5 +57,10 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
             .IsUnique();
 
         builder.HasIndex(t => t.IsActive);
+
+        builder.HasIndex(t => t.SystemTeamType);
+
+        // Ignore computed property
+        builder.Ignore(t => t.IsSystemTeam);
     }
 }

@@ -13,14 +13,21 @@ public class TeamMemberConfiguration : IEntityTypeConfiguration<TeamMember>
         builder.HasKey(tm => tm.Id);
 
         builder.Property(tm => tm.Role)
-            .HasMaxLength(100)
-            .IsRequired();
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(100);
 
         builder.Property(tm => tm.JoinedAt)
             .IsRequired();
 
+        builder.HasOne(tm => tm.User)
+            .WithMany()
+            .HasForeignKey(tm => tm.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(tm => new { tm.TeamId, tm.UserId });
         builder.HasIndex(tm => tm.UserId);
+        builder.HasIndex(tm => tm.Role);
 
         // Ignore computed property
         builder.Ignore(tm => tm.IsActive);

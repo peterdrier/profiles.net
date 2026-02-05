@@ -52,4 +52,20 @@ public interface IGoogleSyncService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The resource if found.</returns>
     Task<GoogleResource?> GetResourceStatusAsync(Guid resourceId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a user to all Google resources associated with a team.
+    /// </summary>
+    /// <param name="teamId">The team ID.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task AddUserToTeamResourcesAsync(Guid teamId, Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a user from all Google resources associated with a team.
+    /// </summary>
+    /// <param name="teamId">The team ID.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task RemoveUserFromTeamResourcesAsync(Guid teamId, Guid userId, CancellationToken cancellationToken = default);
 }

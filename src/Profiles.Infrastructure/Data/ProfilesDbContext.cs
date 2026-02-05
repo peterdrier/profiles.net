@@ -25,6 +25,8 @@ public class ProfilesDbContext : IdentityDbContext<User, IdentityRole<Guid>, Gui
     public DbSet<ConsentRecord> ConsentRecords => Set<ConsentRecord>();
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+    public DbSet<TeamJoinRequest> TeamJoinRequests => Set<TeamJoinRequest>();
+    public DbSet<TeamJoinRequestStateHistory> TeamJoinRequestStateHistories => Set<TeamJoinRequestStateHistory>();
     public DbSet<GoogleResource> GoogleResources => Set<GoogleResource>();
 
     protected override void OnModelCreating(ModelBuilder builder)
