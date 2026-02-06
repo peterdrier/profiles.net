@@ -112,6 +112,18 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         string folderName,
         CancellationToken cancellationToken = default)
     {
+        // Check for existing active folder — return it if found (idempotent)
+        var existing = await _dbContext.GoogleResources
+            .FirstOrDefaultAsync(r => r.TeamId == teamId
+                && r.ResourceType == GoogleResourceType.DriveFolder
+                && r.IsActive, cancellationToken);
+
+        if (existing != null)
+        {
+            _logger.LogInformation("Team {TeamId} already has active Drive folder {FolderId}", teamId, existing.GoogleId);
+            return existing;
+        }
+
         _logger.LogInformation("Provisioning Drive folder '{FolderName}' for team {TeamId}", folderName, teamId);
 
         var drive = await GetDriveServiceAsync();
