@@ -594,6 +594,7 @@ public class ProfileController : Controller
     }
 
     [HttpGet]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> ExportData()
     {
         var user = await _userManager.GetUserAsync(User);
@@ -715,6 +716,7 @@ public class ProfileController : Controller
     }
 
     [HttpGet]
+    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
     public async Task<IActionResult> DownloadData()
     {
         var user = await _userManager.GetUserAsync(User);
