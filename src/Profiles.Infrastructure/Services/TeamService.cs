@@ -38,35 +38,43 @@ public partial class TeamService : ITeamService
         bool requiresApproval,
         CancellationToken cancellationToken = default)
     {
-        var slug = GenerateSlug(name);
+        var baseSlug = GenerateSlug(name);
+        var now = _clock.GetCurrentInstant();
 
-        // Ensure unique slug
-        var existingCount = await _dbContext.Teams.CountAsync(t => t.Slug.StartsWith(slug), cancellationToken);
-        if (existingCount > 0)
+        // Retry with incrementing suffix on unique constraint violation
+        for (var attempt = 0; attempt < 10; attempt++)
         {
-            slug = $"{slug}-{existingCount + 1}";
+            var slug = attempt == 0 ? baseSlug : $"{baseSlug}-{attempt + 1}";
+
+            var team = new Team
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                Description = description,
+                Slug = slug,
+                IsActive = true,
+                RequiresApproval = requiresApproval,
+                SystemTeamType = SystemTeamType.None,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            _dbContext.Teams.Add(team);
+
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                _logger.LogInformation("Created team {TeamName} with slug {Slug}", name, slug);
+                return team;
+            }
+            catch (DbUpdateException) when (attempt < 9)
+            {
+                // Slug collision — detach and retry with next suffix
+                _dbContext.Entry(team).State = EntityState.Detached;
+            }
         }
 
-        var now = _clock.GetCurrentInstant();
-        var team = new Team
-        {
-            Id = Guid.NewGuid(),
-            Name = name,
-            Description = description,
-            Slug = slug,
-            IsActive = true,
-            RequiresApproval = requiresApproval,
-            SystemTeamType = SystemTeamType.None,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        _dbContext.Teams.Add(team);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Created team {TeamName} with slug {Slug}", name, slug);
-
-        return team;
+        throw new InvalidOperationException($"Could not generate unique slug for team '{name}' after 10 attempts");
     }
 
     public async Task<Team?> GetTeamBySlugAsync(string slug, CancellationToken cancellationToken = default)
