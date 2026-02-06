@@ -255,7 +255,15 @@ public partial class TeamService : ITeamService
         };
 
         _dbContext.TeamMembers.Add(member);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            throw new InvalidOperationException("User is already a member of this team");
+        }
 
         // Sync Google resources
         await _googleSyncService.AddUserToTeamResourcesAsync(teamId, userId, cancellationToken);
@@ -362,7 +370,15 @@ public partial class TeamService : ITeamService
         };
 
         _dbContext.TeamMembers.Add(member);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            throw new InvalidOperationException("User is already a member of this team");
+        }
 
         // Sync Google resources
         await _googleSyncService.AddUserToTeamResourcesAsync(request.TeamId, request.UserId, cancellationToken);
