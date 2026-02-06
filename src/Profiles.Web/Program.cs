@@ -156,6 +156,8 @@ builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IMembershipCalculator, MembershipCalculator>();
 builder.Services.AddScoped<SystemTeamSyncJob>();
 builder.Services.AddScoped<SyncLegalDocumentsJob>();
+builder.Services.AddScoped<ProcessAccountDeletionsJob>();
+builder.Services.AddScoped<SuspendNonCompliantMembersJob>();
 
 // Configure Response Compression
 builder.Services.AddResponseCompression(options =>
