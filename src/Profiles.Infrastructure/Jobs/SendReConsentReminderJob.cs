@@ -56,18 +56,25 @@ public class SendReConsentReminderJob
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
 
-            foreach (var userId in usersNeedingReminder)
-            {
-                var user = await _dbContext.Users
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken);
+            var userIds = usersNeedingReminder.ToList();
+            var users = await _dbContext.Users
+                .AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, cancellationToken);
 
-                var effectiveEmail = user?.GetEffectiveEmail();
+            foreach (var userId in userIds)
+            {
+                if (!users.TryGetValue(userId, out var user))
+                {
+                    continue;
+                }
+
+                var effectiveEmail = user.GetEffectiveEmail();
                 if (effectiveEmail != null)
                 {
                     await _emailService.SendReConsentReminderAsync(
                         effectiveEmail,
-                        user!.DisplayName,
+                        user.DisplayName,
                         requiredDocNames,
                         daysBeforeSuspension,
                         cancellationToken);
