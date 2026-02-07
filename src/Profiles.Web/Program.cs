@@ -161,6 +161,7 @@ builder.Services.AddScoped<SystemTeamSyncJob>();
 builder.Services.AddScoped<SyncLegalDocumentsJob>();
 builder.Services.AddScoped<ProcessAccountDeletionsJob>();
 builder.Services.AddScoped<SuspendNonCompliantMembersJob>();
+builder.Services.AddScoped<GoogleResourceReconciliationJob>();
 
 // Configure Response Compression
 builder.Services.AddResponseCompression(options =>
@@ -289,6 +290,11 @@ RecurringJob.AddOrUpdate<ProcessAccountDeletionsJob>(
     "process-account-deletions",
     job => job.ExecuteAsync(CancellationToken.None),
     Cron.Daily);
+
+RecurringJob.AddOrUpdate<GoogleResourceReconciliationJob>(
+    "google-resource-reconciliation",
+    job => job.ExecuteAsync(CancellationToken.None),
+    "0 3 * * *");
 
 RecurringJob.AddOrUpdate<SyncLegalDocumentsJob>(
     "legal-document-sync",

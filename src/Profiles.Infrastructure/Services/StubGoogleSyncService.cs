@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Profiles.Application.DTOs;
 using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 
@@ -71,6 +72,12 @@ public class StubGoogleSyncService : IGoogleSyncService
     {
         _logger.LogInformation("[STUB] Would sync all Google resources");
         return Task.CompletedTask;
+    }
+
+    public Task<SyncPreviewResult> PreviewSyncAllAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("[STUB] Would preview sync for all Google resources");
+        return Task.FromResult(new SyncPreviewResult());
     }
 
     public Task<GoogleResource?> GetResourceStatusAsync(Guid resourceId, CancellationToken cancellationToken = default)

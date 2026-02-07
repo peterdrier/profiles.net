@@ -1,3 +1,4 @@
+using Profiles.Application.DTOs;
 using Profiles.Domain.Entities;
 using Profiles.Domain.Enums;
 
@@ -44,6 +45,14 @@ public interface IGoogleSyncService
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SyncAllResourcesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Previews what SyncAllResourcesAsync would do without making any changes.
+    /// Compares expected state (DB) with actual state (Google) for each active resource.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A preview of all diffs.</returns>
+    Task<SyncPreviewResult> PreviewSyncAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets the status of a Google resource.

@@ -22,6 +22,7 @@ public class AdminController : Controller
     private readonly ProfilesDbContext _dbContext;
     private readonly UserManager<User> _userManager;
     private readonly ITeamService _teamService;
+    private readonly IGoogleSyncService _googleSyncService;
     private readonly IClock _clock;
     private readonly ILogger<AdminController> _logger;
     private readonly SystemTeamSyncJob _systemTeamSyncJob;
@@ -30,6 +31,7 @@ public class AdminController : Controller
         ProfilesDbContext dbContext,
         UserManager<User> userManager,
         ITeamService teamService,
+        IGoogleSyncService googleSyncService,
         IClock clock,
         ILogger<AdminController> logger,
         SystemTeamSyncJob systemTeamSyncJob)
@@ -37,6 +39,7 @@ public class AdminController : Controller
         _dbContext = dbContext;
         _userManager = userManager;
         _teamService = teamService;
+        _googleSyncService = googleSyncService;
         _clock = clock;
         _logger = logger;
         _systemTeamSyncJob = systemTeamSyncJob;
@@ -787,6 +790,59 @@ public class AdminController : Controller
 
         TempData["SuccessMessage"] = $"Role '{roleAssignment.RoleName}' ended for {roleAssignment.User.DisplayName}.";
         return RedirectToAction(nameof(MemberDetail), new { id = roleAssignment.UserId });
+    }
+
+    [HttpGet("GoogleSync")]
+    public async Task<IActionResult> GoogleSync()
+    {
+        var preview = await _googleSyncService.PreviewSyncAllAsync();
+
+        var viewModel = new GoogleSyncViewModel
+        {
+            TotalResources = preview.TotalResources,
+            InSyncCount = preview.InSyncCount,
+            DriftCount = preview.DriftCount,
+            ErrorCount = preview.Diffs.Count(d => d.ErrorMessage != null),
+            Resources = preview.Diffs
+                .OrderBy(d => d.IsInSync)
+                .ThenBy(d => d.TeamName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(d => d.ResourceName, StringComparer.OrdinalIgnoreCase)
+                .Select(d => new GoogleSyncResourceViewModel
+                {
+                    ResourceId = d.ResourceId,
+                    ResourceName = d.ResourceName,
+                    ResourceType = d.ResourceType,
+                    TeamName = d.TeamName,
+                    Url = d.Url,
+                    ErrorMessage = d.ErrorMessage,
+                    IsInSync = d.IsInSync,
+                    MembersToAdd = d.MembersToAdd,
+                    MembersToRemove = d.MembersToRemove
+                }).ToList()
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpPost("GoogleSync/Apply")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GoogleSyncApply()
+    {
+        var currentUser = await _userManager.GetUserAsync(User);
+
+        try
+        {
+            await _googleSyncService.SyncAllResourcesAsync();
+            _logger.LogInformation("Admin {AdminId} triggered manual Google resource sync", currentUser?.Id);
+            TempData["SuccessMessage"] = "Google resources synced successfully.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Manual Google resource sync failed");
+            TempData["ErrorMessage"] = "Sync failed. Check logs for details.";
+        }
+
+        return RedirectToAction(nameof(GoogleSync));
     }
 
     /// <summary>

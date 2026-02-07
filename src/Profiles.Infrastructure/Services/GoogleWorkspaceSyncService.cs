@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NodaTime;
+using Profiles.Application.DTOs;
 using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 using Profiles.Domain.Enums;
@@ -424,7 +425,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             return;
         }
 
-        // For Drive folders, sync permissions
+        // For Drive folders, sync permissions (add missing + remove stale)
         if (resource.Team == null)
         {
             return;
@@ -432,30 +433,66 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
 
         var drive = await GetDriveServiceAsync();
 
-        foreach (var member in resource.Team.Members.Where(m => m.LeftAt == null))
+        var expectedEmails = resource.Team.Members
+            .Where(m => m.LeftAt == null && !string.IsNullOrEmpty(m.User?.Email))
+            .Select(m => m.User!.Email!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Get current Drive permissions
+        var currentPermissions = await ListDrivePermissionsAsync(drive, resource.GoogleId, cancellationToken);
+
+        // Add missing permissions
+        foreach (var email in expectedEmails)
         {
-            if (string.IsNullOrEmpty(member.User?.Email))
+            if (!currentPermissions.Any(p => string.Equals(p.EmailAddress, email, StringComparison.OrdinalIgnoreCase)))
             {
-                continue;
-            }
-
-            try
-            {
-                var permission = new Google.Apis.Drive.v3.Data.Permission
+                try
                 {
-                    Type = "user",
-                    Role = "writer",
-                    EmailAddress = member.User.Email
-                };
+                    var permission = new Google.Apis.Drive.v3.Data.Permission
+                    {
+                        Type = "user",
+                        Role = "writer",
+                        EmailAddress = email
+                    };
 
-                var createReq = drive.Permissions.Create(permission, resource.GoogleId);
-                createReq.SupportsAllDrives = true;
-                await createReq.ExecuteAsync(cancellationToken);
+                    var createReq = drive.Permissions.Create(permission, resource.GoogleId);
+                    createReq.SupportsAllDrives = true;
+                    await createReq.ExecuteAsync(cancellationToken);
+                }
+                catch (Google.GoogleApiException ex) when (ex.Error?.Code == 400)
+                {
+                    _logger.LogDebug("Permission already exists for {Email} on {ResourceId}", email, resourceId);
+                }
             }
-            catch (Google.GoogleApiException ex) when (ex.Error?.Code == 400)
+        }
+
+        // Remove stale permissions (only type=user, skip owner role and service account)
+        foreach (var perm in currentPermissions)
+        {
+            if (!string.Equals(perm.Type, "user", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (string.Equals(perm.Role, "owner", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (string.IsNullOrEmpty(perm.EmailAddress))
+                continue;
+            if (perm.EmailAddress.EndsWith(".iam.gserviceaccount.com", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!expectedEmails.Contains(perm.EmailAddress))
             {
-                _logger.LogDebug("Permission already exists for {Email} on {ResourceId}",
-                    member.User.Email, resourceId);
+                try
+                {
+                    var deleteReq = drive.Permissions.Delete(resource.GoogleId, perm.Id);
+                    deleteReq.SupportsAllDrives = true;
+                    await deleteReq.ExecuteAsync(cancellationToken);
+                    _logger.LogInformation("Removed stale Drive permission for {Email} on {ResourceId}",
+                        perm.EmailAddress, resourceId);
+                }
+                catch (Google.GoogleApiException ex)
+                {
+                    _logger.LogWarning(ex, "Error removing permission for {Email} from {ResourceId}",
+                        perm.EmailAddress, resourceId);
+                }
             }
         }
 
@@ -611,6 +648,171 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
                 }
             }
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<SyncPreviewResult> PreviewSyncAllAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Starting sync preview of all Google resources");
+
+        var resources = await _dbContext.GoogleResources
+            .Include(r => r.Team)
+                .ThenInclude(t => t!.Members.Where(m => m.LeftAt == null))
+                    .ThenInclude(m => m.User)
+            .Where(r => r.IsActive)
+            .ToListAsync(cancellationToken);
+
+        var diffs = new List<ResourceSyncDiff>();
+
+        foreach (var resource in resources)
+        {
+            try
+            {
+                var diff = resource.ResourceType == GoogleResourceType.Group
+                    ? await PreviewGroupSyncAsync(resource, cancellationToken)
+                    : await PreviewDriveFolderSyncAsync(resource, cancellationToken);
+
+                diffs.Add(diff);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error previewing resource {ResourceId}", resource.Id);
+                diffs.Add(new ResourceSyncDiff
+                {
+                    ResourceId = resource.Id,
+                    ResourceName = resource.Name,
+                    ResourceType = resource.ResourceType.ToString(),
+                    TeamName = resource.Team?.Name ?? string.Empty,
+                    GoogleId = resource.GoogleId,
+                    Url = resource.Url,
+                    ErrorMessage = ex.Message
+                });
+            }
+        }
+
+        _logger.LogInformation("Completed sync preview: {Total} resources, {Drift} drifted",
+            diffs.Count, diffs.Count(d => !d.IsInSync));
+
+        return new SyncPreviewResult { Diffs = diffs };
+    }
+
+    private async Task<ResourceSyncDiff> PreviewGroupSyncAsync(
+        GoogleResource resource, CancellationToken cancellationToken)
+    {
+        var expectedEmails = resource.Team?.Members
+            .Where(m => m.LeftAt == null && !string.IsNullOrEmpty(m.User?.Email))
+            .Select(m => m.User!.Email!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+
+        // Get actual members from Google
+        var directory = await GetDirectoryServiceAsync();
+        var actualEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        string? pageToken = null;
+        do
+        {
+            var membersRequest = directory.Members.List(resource.GoogleId);
+            membersRequest.MaxResults = 200;
+            if (pageToken != null)
+            {
+                membersRequest.PageToken = pageToken;
+            }
+
+            var membersResponse = await membersRequest.ExecuteAsync(cancellationToken);
+
+            if (membersResponse.MembersValue != null)
+            {
+                foreach (var member in membersResponse.MembersValue)
+                {
+                    if (!string.IsNullOrEmpty(member.Email))
+                    {
+                        actualEmails.Add(member.Email);
+                    }
+                }
+            }
+
+            pageToken = membersResponse.NextPageToken;
+        } while (!string.IsNullOrEmpty(pageToken));
+
+        return new ResourceSyncDiff
+        {
+            ResourceId = resource.Id,
+            ResourceName = resource.Name,
+            ResourceType = resource.ResourceType.ToString(),
+            TeamName = resource.Team?.Name ?? string.Empty,
+            GoogleId = resource.GoogleId,
+            Url = resource.Url,
+            MembersToAdd = expectedEmails.Except(actualEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+            MembersToRemove = actualEmails.Except(expectedEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList()
+        };
+    }
+
+    private async Task<ResourceSyncDiff> PreviewDriveFolderSyncAsync(
+        GoogleResource resource, CancellationToken cancellationToken)
+    {
+        var expectedEmails = resource.Team?.Members
+            .Where(m => m.LeftAt == null && !string.IsNullOrEmpty(m.User?.Email))
+            .Select(m => m.User!.Email!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
+
+        var drive = await GetDriveServiceAsync();
+        var permissions = await ListDrivePermissionsAsync(drive, resource.GoogleId, cancellationToken);
+
+        // Filter to user-type permissions, excluding owner role and service accounts
+        var actualEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var perm in permissions)
+        {
+            if (!string.Equals(perm.Type, "user", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (string.Equals(perm.Role, "owner", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (string.IsNullOrEmpty(perm.EmailAddress))
+                continue;
+            if (perm.EmailAddress.EndsWith(".iam.gserviceaccount.com", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            actualEmails.Add(perm.EmailAddress);
+        }
+
+        return new ResourceSyncDiff
+        {
+            ResourceId = resource.Id,
+            ResourceName = resource.Name,
+            ResourceType = resource.ResourceType.ToString(),
+            TeamName = resource.Team?.Name ?? string.Empty,
+            GoogleId = resource.GoogleId,
+            Url = resource.Url,
+            MembersToAdd = expectedEmails.Except(actualEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+            MembersToRemove = actualEmails.Except(expectedEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList()
+        };
+    }
+
+    private static async Task<List<Google.Apis.Drive.v3.Data.Permission>> ListDrivePermissionsAsync(
+        DriveService drive, string fileId, CancellationToken cancellationToken)
+    {
+        var permissions = new List<Google.Apis.Drive.v3.Data.Permission>();
+        string? pageToken = null;
+
+        do
+        {
+            var listReq = drive.Permissions.List(fileId);
+            listReq.SupportsAllDrives = true;
+            listReq.Fields = "nextPageToken, permissions(id, emailAddress, role, type)";
+            if (pageToken != null)
+            {
+                listReq.PageToken = pageToken;
+            }
+
+            var response = await listReq.ExecuteAsync(cancellationToken);
+            if (response.Permissions != null)
+            {
+                permissions.AddRange(response.Permissions);
+            }
+
+            pageToken = response.NextPageToken;
+        } while (!string.IsNullOrEmpty(pageToken));
+
+        return permissions;
     }
 
     /// <inheritdoc />
