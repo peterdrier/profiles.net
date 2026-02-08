@@ -16,4 +16,11 @@ public enum AuditAction
     VolunteerApproved,
     GoogleResourceAccessGranted,
     GoogleResourceAccessRevoked,
+    GoogleResourceProvisioned,
+    TeamJoinedDirectly,
+    TeamLeft,
+    TeamJoinRequestApproved,
+    TeamJoinRequestRejected,
+    TeamMemberRoleChanged,
+    AnomalousPermissionDetected,
 }

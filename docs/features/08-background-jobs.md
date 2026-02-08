@@ -14,6 +14,7 @@ Several system operations need to run automatically without user interaction: sy
 | ProcessAccountDeletionsJob | Daily | Process account deletion requests |
 | SystemTeamSyncJob | **DISABLED** | Sync system team membership + Google permissions |
 | GoogleResourceReconciliationJob | **DISABLED** | Full Google resource reconciliation |
+| DriveActivityMonitorJob | Hourly | Check Drive Activity API for anomalous permission changes |
 
 > **Note:** `SystemTeamSyncJob` and `GoogleResourceReconciliationJob` are currently disabled because they modify Google Shared Drive and Group permissions. Use the manual "Sync Now" button at `/Admin/GoogleSync` until automated sync is validated.
 
@@ -311,3 +312,4 @@ BackgroundJob.Enqueue<SystemTeamSyncJob>(
 - [Membership Status](05-membership-status.md) - Compliance jobs
 - [Teams](06-teams.md) - System team sync
 - [Google Integration](07-google-integration.md) - Resource provisioning job
+- [Drive Activity Monitoring](13-drive-activity-monitoring.md) - Anomalous permission detection

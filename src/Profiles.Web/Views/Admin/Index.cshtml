@@ -5,36 +5,44 @@
 
 <h1>@Localizer["AdminDashboard_Title"]</h1>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
+<div class="row row-cols-1 row-cols-md-3 row-cols-lg-5 g-3 mb-4">
+    <div class="col">
+        <div class="card text-center h-100">
             <div class="card-body">
                 <h2 class="card-title mb-0">@Model.TotalMembers</h2>
                 <p class="card-text text-muted">@Localizer["Admin_TotalMembers"]</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
+    <div class="col">
+        <div class="card text-center h-100">
             <div class="card-body">
                 <h2 class="card-title mb-0 text-success">@Model.ActiveMembers</h2>
                 <p class="card-text text-muted">@Localizer["Admin_ActiveMembers"]</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center @(Model.PendingVolunteers > 0 ? "border-warning" : "")">
+    <div class="col">
+        <div class="card text-center h-100 @(Model.PendingVolunteers > 0 ? "border-warning" : "")">
             <div class="card-body">
                 <h2 class="card-title mb-0 text-warning">@Model.PendingVolunteers</h2>
                 <p class="card-text text-muted">@Localizer["Admin_PendingVolunteers"]</p>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
+    <div class="col">
+        <div class="card text-center h-100">
             <div class="card-body">
                 <h2 class="card-title mb-0 text-warning">@Model.PendingApplications</h2>
                 <p class="card-text text-muted">@Localizer["Admin_PendingApplications"]</p>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-center h-100 @(Model.PendingConsents > 0 ? "border-warning" : "")">
+            <div class="card-body">
+                <h2 class="card-title mb-0 @(Model.PendingConsents > 0 ? "text-warning" : "text-success")">@Model.PendingConsents</h2>
+                <p class="card-text text-muted">@Localizer["Admin_PendingConsents"]</p>
             </div>
         </div>
     </div>
@@ -73,7 +81,10 @@
                 <a asp-action="GoogleSync" class="list-group-item list-group-item-action">
                     @Localizer["Admin_GoogleSyncStatus"]
                 </a>
-                <a asp-controller="Hangfire" asp-action="Index" class="list-group-item list-group-item-action">
+                <a asp-action="AuditLog" class="list-group-item list-group-item-action">
+                    Audit Log
+                </a>
+                <a href="/hangfire" class="list-group-item list-group-item-action">
                     @Localizer["Admin_BackgroundJobs"]
                 </a>
             </div>
@@ -97,6 +108,35 @@
                         <a href="/health/ready" target="_blank">@Localizer["Admin_ViewHealthCheck"]</a>
                     </li>
                 </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">@Localizer["Admin_RecentActivity"]</div>
+            <div class="card-body">
+                @if (Model.RecentActivity.Count == 0)
+                {
+                    <p class="text-muted mb-0">@Localizer["Admin_NoRecentActivity"]</p>
+                }
+                else
+                {
+                    <ul class="list-unstyled mb-0">
+                        @foreach (var activity in Model.RecentActivity)
+                        {
+                            <li class="mb-2 d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge bg-secondary me-2">@activity.Type</span>
+                                    @activity.Description
+                                </div>
+                                <small class="text-muted text-nowrap ms-3">@activity.Timestamp.ToString("g")</small>
+                            </li>
+                        }
+                    </ul>
+                }
             </div>
         </div>
     </div>

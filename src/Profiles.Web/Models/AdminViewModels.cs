@@ -171,3 +171,13 @@ public class AuditLogEntryViewModel
     public string ActorName { get; set; } = string.Empty;
     public bool IsSystemAction { get; set; }
 }
+
+public class AuditLogListViewModel
+{
+    public List<AuditLogEntryViewModel> Entries { get; set; } = [];
+    public string? ActionFilter { get; set; }
+    public int AnomalyCount { get; set; }
+    public int TotalCount { get; set; }
+    public int PageNumber { get; set; } = 1;
+    public int PageSize { get; set; } = 50;
+}

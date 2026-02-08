@@ -17,17 +17,20 @@ public partial class TeamService : ITeamService
 {
     private readonly ProfilesDbContext _dbContext;
     private readonly IGoogleSyncService _googleSyncService;
+    private readonly IAuditLogService _auditLogService;
     private readonly IClock _clock;
     private readonly ILogger<TeamService> _logger;
 
     public TeamService(
         ProfilesDbContext dbContext,
         IGoogleSyncService googleSyncService,
+        IAuditLogService auditLogService,
         IClock clock,
         ILogger<TeamService> logger)
     {
         _dbContext = dbContext;
         _googleSyncService = googleSyncService;
+        _auditLogService = auditLogService;
         _clock = clock;
         _logger = logger;
     }
@@ -265,6 +268,13 @@ public partial class TeamService : ITeamService
 
         _dbContext.TeamMembers.Add(member);
 
+        var joiningUser = await _dbContext.Users.FindAsync([userId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamJoinedDirectly, "Team", teamId,
+            $"{joiningUser?.DisplayName ?? userId.ToString()} joined {team.Name} directly",
+            userId, joiningUser?.DisplayName ?? userId.ToString(),
+            relatedEntityId: userId, relatedEntityType: "User");
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -311,6 +321,14 @@ public partial class TeamService : ITeamService
         }
 
         member.LeftAt = _clock.GetCurrentInstant();
+
+        var leavingUser = await _dbContext.Users.FindAsync([userId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamLeft, "Team", teamId,
+            $"{leavingUser?.DisplayName ?? userId.ToString()} left {team.Name}",
+            userId, leavingUser?.DisplayName ?? userId.ToString(),
+            relatedEntityId: userId, relatedEntityType: "User");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Sync Google resources
@@ -325,20 +343,10 @@ public partial class TeamService : ITeamService
         CancellationToken cancellationToken = default)
     {
         var request = await _dbContext.TeamJoinRequests
-            .Include(r => r.StateHistory)
             .FirstOrDefaultAsync(r => r.Id == requestId && r.UserId == userId, cancellationToken)
             ?? throw new InvalidOperationException("Join request not found");
 
-        if (request.Status != TeamJoinRequestStatus.Pending)
-        {
-            throw new InvalidOperationException("Can only withdraw pending requests");
-        }
-
         request.Withdraw(_clock);
-
-        // Explicitly mark the request as modified to ensure EF Core detects changes
-        // made by the Stateless state machine through private setters
-        _dbContext.Entry(request).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -353,14 +361,8 @@ public partial class TeamService : ITeamService
     {
         var request = await _dbContext.TeamJoinRequests
             .Include(r => r.Team)
-            .Include(r => r.StateHistory)
             .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken)
             ?? throw new InvalidOperationException("Join request not found");
-
-        if (request.Status != TeamJoinRequestStatus.Pending)
-        {
-            throw new InvalidOperationException("Can only approve pending requests");
-        }
 
         // Verify approver has permission
         var canApprove = await CanUserApproveRequestsForTeamAsync(request.TeamId, approverUserId, cancellationToken);
@@ -370,10 +372,6 @@ public partial class TeamService : ITeamService
         }
 
         request.Approve(approverUserId, notes, _clock);
-
-        // Explicitly mark the request as modified to ensure EF Core detects changes
-        // made by the Stateless state machine through private setters
-        _dbContext.Entry(request).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
 
         // Add as team member
         var member = new TeamMember
@@ -387,6 +385,13 @@ public partial class TeamService : ITeamService
 
         _dbContext.TeamMembers.Add(member);
 
+        var approver = await _dbContext.Users.FindAsync([approverUserId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamJoinRequestApproved, "Team", request.TeamId,
+            $"Join request for {request.Team?.Name ?? request.TeamId.ToString()} approved",
+            approverUserId, approver?.DisplayName ?? approverUserId.ToString(),
+            relatedEntityId: request.UserId, relatedEntityType: "User");
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -396,7 +401,6 @@ public partial class TeamService : ITeamService
             _logger.LogError(ex, "Failed to approve join request {RequestId} for user {UserId} to team {TeamId}",
                 requestId, request.UserId, request.TeamId);
 
-            // Check for unique constraint violation (PostgreSQL error code 23505)
             if (ex.InnerException is Npgsql.PostgresException { SqlState: "23505" })
             {
                 throw new InvalidOperationException("User is already a member of this team");
@@ -421,14 +425,8 @@ public partial class TeamService : ITeamService
         CancellationToken cancellationToken = default)
     {
         var request = await _dbContext.TeamJoinRequests
-            .Include(r => r.StateHistory)
             .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken)
             ?? throw new InvalidOperationException("Join request not found");
-
-        if (request.Status != TeamJoinRequestStatus.Pending)
-        {
-            throw new InvalidOperationException("Can only reject pending requests");
-        }
 
         // Verify approver has permission
         var canApprove = await CanUserApproveRequestsForTeamAsync(request.TeamId, approverUserId, cancellationToken);
@@ -439,9 +437,12 @@ public partial class TeamService : ITeamService
 
         request.Reject(approverUserId, reason, _clock);
 
-        // Explicitly mark the request as modified to ensure EF Core detects changes
-        // made by the Stateless state machine through private setters
-        _dbContext.Entry(request).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+        var rejecter = await _dbContext.Users.FindAsync([approverUserId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamJoinRequestRejected, "Team", request.TeamId,
+            $"Join request for team rejected: {reason}",
+            approverUserId, rejecter?.DisplayName ?? approverUserId.ToString(),
+            relatedEntityId: request.UserId, relatedEntityType: "User");
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -580,6 +581,14 @@ public partial class TeamService : ITeamService
             ?? throw new InvalidOperationException("User is not a member of this team");
 
         member.Role = role;
+
+        var roleActor = await _dbContext.Users.FindAsync([actorUserId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamMemberRoleChanged, "Team", teamId,
+            $"Member role changed to {role} in {team.Name}",
+            actorUserId, roleActor?.DisplayName ?? actorUserId.ToString(),
+            relatedEntityId: userId, relatedEntityType: "User");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Actor {ActorId} set user {UserId} role to {Role} in team {TeamId}",
@@ -612,6 +621,14 @@ public partial class TeamService : ITeamService
             ?? throw new InvalidOperationException("User is not a member of this team");
 
         member.LeftAt = _clock.GetCurrentInstant();
+
+        var actor = await _dbContext.Users.FindAsync([actorUserId], cancellationToken);
+        await _auditLogService.LogAsync(
+            AuditAction.TeamMemberRemoved, "Team", teamId,
+            $"Member removed from {team.Name}",
+            actorUserId, actor?.DisplayName ?? actorUserId.ToString(),
+            relatedEntityId: userId, relatedEntityType: "User");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Sync Google resources

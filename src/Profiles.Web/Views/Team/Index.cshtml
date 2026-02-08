@@ -5,10 +5,13 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>@Localizer["Teams_Title"]</h1>
-    @if (Model.CanCreateTeam)
-    {
-        <a asp-controller="Admin" asp-action="CreateTeam" class="btn btn-primary">@Localizer["Teams_CreateTeam"]</a>
-    }
+    <div class="d-flex gap-2">
+        <a asp-action="Birthdays" class="btn btn-outline-secondary">@Localizer["Birthdays_Title"]</a>
+        @if (Model.CanCreateTeam)
+        {
+            <a asp-controller="Admin" asp-action="CreateTeam" class="btn btn-primary">@Localizer["Teams_CreateTeam"]</a>
+        }
+    </div>
 </div>
 
 @if (TempData["SuccessMessage"] != null)

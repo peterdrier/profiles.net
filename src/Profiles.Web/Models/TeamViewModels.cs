@@ -55,9 +55,18 @@ public class TeamMemberViewModel
     public string DisplayName { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string? ProfilePictureUrl { get; set; }
+    public bool HasCustomProfilePicture { get; set; }
+    public string? CustomProfilePictureUrl { get; set; }
     public string Role { get; set; } = string.Empty;
     public DateTime JoinedAt { get; set; }
     public bool IsMetalead { get; set; }
+
+    /// <summary>
+    /// The effective profile picture URL (custom upload takes priority over Google avatar).
+    /// </summary>
+    public string? EffectiveProfilePictureUrl => HasCustomProfilePicture
+        ? CustomProfilePictureUrl
+        : ProfilePictureUrl;
 }
 
 public class MyTeamsViewModel
@@ -94,6 +103,7 @@ public class JoinTeamViewModel
 {
     public Guid TeamId { get; set; }
     public string TeamName { get; set; } = string.Empty;
+    public string TeamSlug { get; set; } = string.Empty;
     public bool RequiresApproval { get; set; }
 
     [StringLength(2000)]
@@ -173,6 +183,23 @@ public class SetMemberRoleModel
     public Guid TeamId { get; set; }
     public Guid UserId { get; set; }
     public TeamMemberRole Role { get; set; }
+}
+
+public class BirthdayCalendarViewModel
+{
+    public List<BirthdayEntryViewModel> Birthdays { get; set; } = [];
+    public int CurrentMonth { get; set; }
+    public string CurrentMonthName { get; set; } = string.Empty;
+}
+
+public class BirthdayEntryViewModel
+{
+    public string DisplayName { get; set; } = string.Empty;
+    public string? EffectiveProfilePictureUrl { get; set; }
+    public int DayOfMonth { get; set; }
+    public int Month { get; set; }
+    public string MonthName { get; set; } = string.Empty;
+    public List<string> TeamNames { get; set; } = [];
 }
 
 public class ApproveRejectRequestModel

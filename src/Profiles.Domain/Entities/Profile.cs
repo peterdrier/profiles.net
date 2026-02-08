@@ -95,6 +95,24 @@ public class Profile
     public string? Bio { get; set; }
 
     /// <summary>
+    /// Member's date of birth.
+    /// </summary>
+    [PersonalData]
+    public LocalDate? DateOfBirth { get; set; }
+
+    /// <summary>
+    /// Custom profile picture data (resized to 256x256, max 2MB).
+    /// Stored in database given small scale (~500 users).
+    /// </summary>
+    [PersonalData]
+    public byte[]? ProfilePictureData { get; set; }
+
+    /// <summary>
+    /// MIME content type of the custom profile picture (e.g., "image/jpeg").
+    /// </summary>
+    public string? ProfilePictureContentType { get; set; }
+
+    /// <summary>
     /// When the profile was created.
     /// </summary>
     public Instant CreatedAt { get; init; }
@@ -164,6 +182,11 @@ public class Profile
     /// Gets the full name of the member.
     /// </summary>
     public string FullName => $"{FirstName} {LastName}".Trim();
+
+    /// <summary>
+    /// Whether this profile has a custom uploaded profile picture.
+    /// </summary>
+    public bool HasCustomProfilePicture => ProfilePictureData != null && ProfilePictureData.Length > 0;
 
     /// <summary>
     /// Contact fields with visibility controls.

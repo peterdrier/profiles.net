@@ -429,3 +429,4 @@ On Google API error:
 - [Teams](06-teams.md) - Triggers resource provisioning
 - [Background Jobs](08-background-jobs.md) - Resource sync job
 - [Authentication](01-authentication.md) - User Google identity
+- [Drive Activity Monitoring](13-drive-activity-monitoring.md) - Anomalous permission detection

@@ -38,9 +38,9 @@
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-md-3">
-                        @if (!string.IsNullOrEmpty(Model.ProfilePictureUrl))
+                        @if (!string.IsNullOrEmpty(Model.EffectiveProfilePictureUrl))
                         {
-                            <img src="@Model.ProfilePictureUrl" alt="Profile" class="rounded-circle img-fluid" style="max-width: 100px;" />
+                            <img src="@Model.EffectiveProfilePictureUrl" alt="Profile" class="rounded-circle img-fluid" style="width: 100px; height: 100px; object-fit: cover;" />
                         }
                         else
                         {
@@ -99,6 +99,19 @@
 
                     <dt class="col-sm-3">@Localizer["Profile_Bio"]</dt>
                     <dd class="col-sm-9">@(Model.Bio ?? Localizer["Common_NotProvided"].Value)</dd>
+
+                    <dt class="col-sm-3">@Localizer["Profile_DateOfBirth"]</dt>
+                    <dd class="col-sm-9">
+                        @if (!string.IsNullOrEmpty(Model.FormattedDateOfBirth))
+                        {
+                            @Model.FormattedDateOfBirth
+                            <small class="text-muted">(@Localizer["Profile_OnlyVisibleToYouAndBoard"])</small>
+                        }
+                        else
+                        {
+                            <text>@Localizer["Common_NotProvided"]</text>
+                        }
+                    </dd>
                 </dl>
             </div>
         </div>
@@ -115,12 +128,12 @@
                         @foreach (var field in Model.ContactFields)
                         {
                             <dt class="col-sm-3">
-                                <i class="fa-solid @field.IconClass me-1"></i>
+                                <i class="@field.IconClass me-1"></i>
                                 @field.Label
                             </dt>
                             <dd class="col-sm-9">
                                 @field.Value
-                                <i class="fa-solid @field.VisibilityIconClass text-muted ms-2"
+                                <i class="@field.VisibilityIconClass text-muted ms-2"
                                    title="@field.VisibilityTooltip"
                                    data-bs-toggle="tooltip"></i>
                             </dd>

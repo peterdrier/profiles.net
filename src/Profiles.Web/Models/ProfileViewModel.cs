@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 using NodaTime;
 using Profiles.Domain.Enums;
 
@@ -10,6 +11,16 @@ public class ProfileViewModel
     public string Email { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? ProfilePictureUrl { get; set; }
+
+    /// <summary>
+    /// Whether the profile has a custom uploaded picture (takes precedence over Google avatar).
+    /// </summary>
+    public bool HasCustomProfilePicture { get; set; }
+
+    /// <summary>
+    /// URL to the custom profile picture endpoint (if uploaded).
+    /// </summary>
+    public string? CustomProfilePictureUrl { get; set; }
 
     [Required]
     [StringLength(100)]
@@ -75,10 +86,69 @@ public class ProfileViewModel
     [DataType(DataType.MultilineText)]
     public string? Bio { get; set; }
 
+    /// <summary>
+    /// Date of birth as a string for the date input (yyyy-MM-dd format).
+    /// </summary>
+    [Display(Name = "Date of Birth")]
+    public string? DateOfBirthString { get; set; }
+
+    /// <summary>
+    /// Parsed date of birth. Returns null if invalid.
+    /// </summary>
+    public LocalDate? ParsedDateOfBirth
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DateOfBirthString))
+                return null;
+
+            var pattern = NodaTime.Text.LocalDatePattern.CreateWithInvariantCulture("yyyy-MM-dd");
+            var parseResult = pattern.Parse(DateOfBirthString);
+            return parseResult.Success ? parseResult.Value : null;
+        }
+    }
+
+    /// <summary>
+    /// Profile picture file upload (max 2MB, JPEG/PNG).
+    /// </summary>
+    [Display(Name = "Profile Picture")]
+    public IFormFile? ProfilePictureUpload { get; set; }
+
+    /// <summary>
+    /// Whether to remove the current custom profile picture.
+    /// </summary>
+    public bool RemoveProfilePicture { get; set; }
+
     public string MembershipStatus { get; set; } = "None";
     public bool IsApproved { get; set; }
     public bool HasPendingConsents { get; set; }
     public int PendingConsentCount { get; set; }
+
+    /// <summary>
+    /// The effective profile picture URL (custom upload takes priority over Google avatar).
+    /// </summary>
+    public string? EffectiveProfilePictureUrl => HasCustomProfilePicture
+        ? CustomProfilePictureUrl
+        : ProfilePictureUrl;
+
+    /// <summary>
+    /// Formatted date of birth for display.
+    /// </summary>
+    public string? FormattedDateOfBirth
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(DateOfBirthString))
+                return null;
+
+            var parsed = ParsedDateOfBirth;
+            if (parsed == null)
+                return null;
+
+            var pattern = NodaTime.Text.LocalDatePattern.CreateWithInvariantCulture("MMMM d");
+            return pattern.Format(parsed.Value);
+        }
+    }
 
     /// <summary>
     /// Gets the formatted phone number with country code.
@@ -142,12 +212,12 @@ public class ContactFieldViewModel
     /// </summary>
     public string IconClass => FieldType switch
     {
-        ContactFieldType.Email => "fa-envelope",
-        ContactFieldType.Phone => "fa-phone",
-        ContactFieldType.Signal => "fa-comment-dots",
-        ContactFieldType.Telegram => "fa-paper-plane",
-        ContactFieldType.WhatsApp => "fa-whatsapp",
-        _ => "fa-address-card"
+        ContactFieldType.Email => "fa-solid fa-envelope",
+        ContactFieldType.Phone => "fa-solid fa-phone",
+        ContactFieldType.Signal => "fa-solid fa-comment-dots",
+        ContactFieldType.Telegram => "fa-brands fa-telegram",
+        ContactFieldType.WhatsApp => "fa-brands fa-whatsapp",
+        _ => "fa-solid fa-address-card"
     };
 
     /// <summary>
@@ -155,11 +225,11 @@ public class ContactFieldViewModel
     /// </summary>
     public string VisibilityIconClass => Visibility switch
     {
-        ContactFieldVisibility.BoardOnly => "fa-lock",
-        ContactFieldVisibility.LeadsAndBoard => "fa-user-shield",
-        ContactFieldVisibility.MyTeams => "fa-users",
-        ContactFieldVisibility.AllActiveProfiles => "fa-globe",
-        _ => "fa-eye"
+        ContactFieldVisibility.BoardOnly => "fa-solid fa-lock",
+        ContactFieldVisibility.LeadsAndBoard => "fa-solid fa-user-shield",
+        ContactFieldVisibility.MyTeams => "fa-solid fa-users",
+        ContactFieldVisibility.AllActiveProfiles => "fa-solid fa-globe",
+        _ => "fa-solid fa-eye"
     };
 
     /// <summary>
@@ -178,7 +248,7 @@ public class ContactFieldViewModel
 /// <summary>
 /// Contact field for editing purposes.
 /// </summary>
-public class ContactFieldEditViewModel
+public class ContactFieldEditViewModel : IValidatableObject
 {
     public Guid? Id { get; set; }
 
@@ -197,6 +267,19 @@ public class ContactFieldEditViewModel
     public ContactFieldVisibility Visibility { get; set; } = ContactFieldVisibility.AllActiveProfiles;
 
     public int DisplayOrder { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (FieldType == ContactFieldType.Email && !string.IsNullOrWhiteSpace(Value))
+        {
+            if (!new EmailAddressAttribute().IsValid(Value))
+            {
+                yield return new ValidationResult(
+                    "Please enter a valid email address.",
+                    [nameof(Value)]);
+            }
+        }
+    }
 }
 
 /// <summary>

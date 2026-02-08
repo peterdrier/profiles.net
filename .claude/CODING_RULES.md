@@ -91,6 +91,10 @@ if (status == "submitted")
 if (string.Equals(status, "submitted", StringComparison.Ordinal))
 ```
 
+## Localization (i18n)
+
+**Admin pages do not require localization.** Existing localized strings in admin views can stay, but do not add new `@Localizer[...]` calls or resource keys for admin-side views (`/Admin/*`, `/TeamAdmin/*`) until further notice. Only public/user-facing views require localization.
+
 ## Git Branch Naming
 
 **Rule:** Always use `main` as the default branch name, never `master`.

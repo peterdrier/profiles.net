@@ -25,6 +25,7 @@ public class AdminController : Controller
     private readonly ITeamService _teamService;
     private readonly IGoogleSyncService _googleSyncService;
     private readonly IAuditLogService _auditLogService;
+    private readonly IMembershipCalculator _membershipCalculator;
     private readonly IClock _clock;
     private readonly ILogger<AdminController> _logger;
     private readonly SystemTeamSyncJob _systemTeamSyncJob;
@@ -36,6 +37,7 @@ public class AdminController : Controller
         ITeamService teamService,
         IGoogleSyncService googleSyncService,
         IAuditLogService auditLogService,
+        IMembershipCalculator membershipCalculator,
         IClock clock,
         ILogger<AdminController> logger,
         SystemTeamSyncJob systemTeamSyncJob,
@@ -46,6 +48,7 @@ public class AdminController : Controller
         _teamService = teamService;
         _googleSyncService = googleSyncService;
         _auditLogService = auditLogService;
+        _membershipCalculator = membershipCalculator;
         _clock = clock;
         _logger = logger;
         _systemTeamSyncJob = systemTeamSyncJob;
@@ -61,14 +64,31 @@ public class AdminController : Controller
         var pendingVolunteers = await _dbContext.Profiles
             .CountAsync(p => !p.IsApproved && !p.IsSuspended);
 
+        // Calculate users with missing required consents
+        var allUserIds = await _dbContext.Users.Select(u => u.Id).ToListAsync();
+        var usersWithAllConsents = await _membershipCalculator.GetUsersWithAllRequiredConsentsAsync(allUserIds);
+        var pendingConsents = allUserIds.Count - usersWithAllConsents.Count;
+
+        var recentActivity = await _dbContext.AuditLogEntries
+            .AsNoTracking()
+            .OrderByDescending(e => e.OccurredAt)
+            .Take(15)
+            .Select(e => new RecentActivityViewModel
+            {
+                Description = e.Description,
+                Timestamp = e.OccurredAt.ToDateTimeUtc(),
+                Type = e.Action.ToString()
+            })
+            .ToListAsync();
+
         var viewModel = new AdminDashboardViewModel
         {
             TotalMembers = totalMembers,
             ActiveMembers = await _dbContext.Profiles.CountAsync(p => !p.IsSuspended),
             PendingVolunteers = pendingVolunteers,
             PendingApplications = pendingApplications,
-            PendingConsents = 0, // Would calculate from consent requirements
-            RecentActivity = []
+            PendingConsents = pendingConsents,
+            RecentActivity = recentActivity
         };
 
         return View(viewModel);
@@ -911,6 +931,76 @@ public class AdminController : Controller
         }
 
         return RedirectToAction(nameof(GoogleSync));
+    }
+
+    [HttpGet("AuditLog")]
+    public async Task<IActionResult> AuditLog(string? filter, int page = 1)
+    {
+        var pageSize = 50;
+        var query = _dbContext.AuditLogEntries.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(filter) && Enum.TryParse<AuditAction>(filter, out var actionEnum))
+        {
+            query = query.Where(e => e.Action == actionEnum);
+        }
+
+        var totalCount = await query.CountAsync();
+
+        var entries = await query
+            .OrderByDescending(e => e.OccurredAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(e => new AuditLogEntryViewModel
+            {
+                Action = e.Action.ToString(),
+                Description = e.Description,
+                OccurredAt = e.OccurredAt.ToDateTimeUtc(),
+                ActorName = e.ActorName,
+                IsSystemAction = e.ActorUserId == null
+            })
+            .ToListAsync();
+
+        var anomalyCount = await _dbContext.AuditLogEntries
+            .AsNoTracking()
+            .CountAsync(e => e.Action == AuditAction.AnomalousPermissionDetected);
+
+        var viewModel = new AuditLogListViewModel
+        {
+            Entries = entries,
+            ActionFilter = filter,
+            AnomalyCount = anomalyCount,
+            TotalCount = totalCount,
+            PageNumber = page,
+            PageSize = pageSize
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpPost("AuditLog/CheckDriveActivity")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CheckDriveActivity(
+        [FromServices] IDriveActivityMonitorService monitorService)
+    {
+        var currentUser = await _userManager.GetUserAsync(User);
+
+        try
+        {
+            var count = await monitorService.CheckForAnomalousActivityAsync();
+            _logger.LogInformation("Admin {AdminId} triggered manual Drive activity check: {Count} anomalies",
+                currentUser?.Id, count);
+
+            TempData["SuccessMessage"] = count > 0
+                ? $"Drive activity check completed: {count} anomalous change(s) detected."
+                : "Drive activity check completed: no anomalies detected.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Manual Drive activity check failed");
+            TempData["ErrorMessage"] = "Drive activity check failed. Check logs for details.";
+        }
+
+        return RedirectToAction(nameof(AuditLog), new { action = nameof(AuditAction.AnomalousPermissionDetected) });
     }
 
     /// <summary>

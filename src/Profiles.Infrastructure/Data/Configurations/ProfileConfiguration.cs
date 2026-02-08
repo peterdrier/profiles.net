@@ -48,6 +48,11 @@ public class ProfileConfiguration : IEntityTypeConfiguration<Profile>
         builder.Property(p => p.IsApproved)
             .HasDefaultValue(false);
 
+        builder.Property(p => p.DateOfBirth);
+
+        builder.Property(p => p.ProfilePictureContentType)
+            .HasMaxLength(100);
+
         builder.Property(p => p.CreatedAt)
             .IsRequired();
 
@@ -57,7 +62,8 @@ public class ProfileConfiguration : IEntityTypeConfiguration<Profile>
         builder.HasIndex(p => p.UserId)
             .IsUnique();
 
-        // Ignore computed property
+        // Ignore computed properties
         builder.Ignore(p => p.FullName);
+        builder.Ignore(p => p.HasCustomProfilePicture);
     }
 }

@@ -65,11 +65,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 // Configure EF Core with PostgreSQL and NodaTime
 builder.Services.AddDbContext<ProfilesDbContext>(options =>
+{
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.UseNodaTime();
         npgsqlOptions.MigrationsAssembly("Profiles.Infrastructure");
-    }));
+    });
+    if (builder.Environment.IsDevelopment())
+    {
+        options.EnableSensitiveDataLogging();
+        options.EnableDetailedErrors();
+    }
+});
 
 // Configure ASP.NET Core Identity
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
@@ -162,11 +169,13 @@ if (!string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyPath"]) ||
 {
     builder.Services.AddScoped<IGoogleSyncService, GoogleWorkspaceSyncService>();
     builder.Services.AddScoped<ITeamResourceService, TeamResourceService>();
+    builder.Services.AddScoped<IDriveActivityMonitorService, DriveActivityMonitorService>();
 }
 else
 {
     builder.Services.AddScoped<IGoogleSyncService, StubGoogleSyncService>();
     builder.Services.AddScoped<ITeamResourceService, StubTeamResourceService>();
+    builder.Services.AddScoped<IDriveActivityMonitorService, StubDriveActivityMonitorService>();
 }
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 builder.Services.AddScoped<IMembershipCalculator, MembershipCalculator>();
@@ -176,6 +185,7 @@ builder.Services.AddScoped<SyncLegalDocumentsJob>();
 builder.Services.AddScoped<ProcessAccountDeletionsJob>();
 builder.Services.AddScoped<SuspendNonCompliantMembersJob>();
 builder.Services.AddScoped<GoogleResourceReconciliationJob>();
+builder.Services.AddScoped<DriveActivityMonitorJob>();
 
 // Configure Response Compression
 builder.Services.AddResponseCompression(options =>
@@ -317,8 +327,8 @@ app.Use(async (context, next) =>
     context.Response.Headers.Append("Content-Security-Policy",
         "default-src 'self'; " +
         "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://maps.googleapis.com https://maps.gstatic.com; " +
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
-        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; " +
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; " +
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; " +
         "img-src 'self' https: data:; " +
         "connect-src 'self' https://maps.googleapis.com https://places.googleapis.com; " +
         "frame-ancestors 'none'");
@@ -395,6 +405,11 @@ RecurringJob.AddOrUpdate<SuspendNonCompliantMembersJob>(
     "suspend-non-compliant-members",
     job => job.ExecuteAsync(CancellationToken.None),
     "30 4 * * *");
+
+RecurringJob.AddOrUpdate<DriveActivityMonitorJob>(
+    "drive-activity-monitor",
+    job => job.ExecuteAsync(CancellationToken.None),
+    Cron.Hourly);
 
 app.MapControllerRoute(
     name: "default",

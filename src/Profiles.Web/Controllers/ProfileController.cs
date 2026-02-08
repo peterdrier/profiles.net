@@ -11,6 +11,7 @@ using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 using Profiles.Domain.Enums;
 using Profiles.Infrastructure.Data;
+using SkiaSharp;
 using Profiles.Web.Models;
 
 namespace Profiles.Web.Controllers;
@@ -32,6 +33,14 @@ public class ProfileController : Controller
 
     private const string EmailVerificationTokenPurpose = "PreferredEmailVerification";
     private const int VerificationCooldownMinutes = 5;
+    private const int MaxProfilePictureUploadBytes = 20 * 1024 * 1024; // 20MB upload limit
+    private const int MaxProfilePictureLongSide = 1000;
+    private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    };
 
     public ProfileController(
         ProfilesDbContext dbContext,
@@ -99,12 +108,16 @@ public class ProfileController : Controller
             })
             .ToList();
 
+        var hasCustomPicture = profile?.HasCustomProfilePicture == true;
+
         var viewModel = new ProfileViewModel
         {
             Id = profile?.Id ?? Guid.Empty,
             Email = user.Email ?? string.Empty,
             DisplayName = user.DisplayName,
             ProfilePictureUrl = user.ProfilePictureUrl,
+            HasCustomProfilePicture = hasCustomPicture,
+            CustomProfilePictureUrl = hasCustomPicture ? Url.Action(nameof(Picture), new { id = profile!.Id }) : null,
             BurnerName = profile?.BurnerName ?? string.Empty,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
@@ -113,6 +126,7 @@ public class ProfileController : Controller
             City = profile?.City,
             CountryCode = profile?.CountryCode,
             Bio = profile?.Bio,
+            DateOfBirthString = profile?.DateOfBirth?.ToString("yyyy-MM-dd", null),
             HasPendingConsents = pendingConsents > 0,
             PendingConsentCount = pendingConsents,
             IsApproved = profile?.IsApproved ?? false,
@@ -161,12 +175,16 @@ public class ProfileController : Controller
             ? await _volunteerHistoryService.GetAllAsync(profile.Id)
             : [];
 
+        var hasCustomPicture = profile?.HasCustomProfilePicture == true;
+
         var viewModel = new ProfileViewModel
         {
             Id = profile?.Id ?? Guid.Empty,
             Email = user.Email ?? string.Empty,
             DisplayName = user.DisplayName,
             ProfilePictureUrl = user.ProfilePictureUrl,
+            HasCustomProfilePicture = hasCustomPicture,
+            CustomProfilePictureUrl = hasCustomPicture ? Url.Action(nameof(Picture), new { id = profile!.Id }) : null,
             BurnerName = profile?.BurnerName ?? user.DisplayName,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
@@ -178,6 +196,7 @@ public class ProfileController : Controller
             Longitude = profile?.Longitude,
             PlaceId = profile?.PlaceId,
             Bio = profile?.Bio,
+            DateOfBirthString = profile?.DateOfBirth?.ToString("yyyy-MM-dd", null),
             CanViewLegalName = true, // User editing their own profile
             EditableContactFields = contactFields.Select(cf => new ContactFieldEditViewModel
             {
@@ -246,7 +265,41 @@ public class ProfileController : Controller
         profile.Longitude = model.Longitude;
         profile.PlaceId = model.PlaceId;
         profile.Bio = model.Bio;
+        profile.DateOfBirth = model.ParsedDateOfBirth;
         profile.UpdatedAt = now;
+
+        // Handle profile picture removal
+        if (model.RemoveProfilePicture)
+        {
+            profile.ProfilePictureData = null;
+            profile.ProfilePictureContentType = null;
+        }
+
+        // Handle profile picture upload
+        if (model.ProfilePictureUpload is { Length: > 0 })
+        {
+            if (model.ProfilePictureUpload.Length > MaxProfilePictureUploadBytes)
+            {
+                ModelState.AddModelError(nameof(model.ProfilePictureUpload),
+                    _localizer["Profile_PictureTooLarge"].Value);
+                ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+                return View(model);
+            }
+
+            if (!AllowedImageContentTypes.Contains(model.ProfilePictureUpload.ContentType))
+            {
+                ModelState.AddModelError(nameof(model.ProfilePictureUpload),
+                    _localizer["Profile_PictureInvalidFormat"].Value);
+                ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+                return View(model);
+            }
+
+            using var uploadStream = new MemoryStream();
+            await model.ProfilePictureUpload.CopyToAsync(uploadStream);
+            var (resizedData, contentType) = ResizeProfilePicture(uploadStream.ToArray());
+            profile.ProfilePictureData = resizedData;
+            profile.ProfilePictureContentType = contentType;
+        }
 
         // Update display name on user to burner name (public-facing name)
         user.DisplayName = model.BurnerName;
@@ -286,6 +339,55 @@ public class ProfileController : Controller
 
         TempData["SuccessMessage"] = _localizer["Profile_Updated"].Value;
         return RedirectToAction(nameof(Index));
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+    public async Task<IActionResult> Picture(Guid id)
+    {
+        var profile = await _dbContext.Profiles
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new { p.ProfilePictureData, p.ProfilePictureContentType })
+            .FirstOrDefaultAsync();
+
+        if (profile?.ProfilePictureData == null || string.IsNullOrEmpty(profile.ProfilePictureContentType))
+        {
+            return NotFound();
+        }
+
+        return File(profile.ProfilePictureData, profile.ProfilePictureContentType);
+    }
+
+    private static (byte[] Data, string ContentType) ResizeProfilePicture(byte[] imageData)
+    {
+        using var original = SKBitmap.Decode(imageData);
+        if (original == null)
+        {
+            throw new InvalidOperationException("Could not decode the uploaded image.");
+        }
+
+        var width = original.Width;
+        var height = original.Height;
+        var longSide = Math.Max(width, height);
+
+        if (longSide > MaxProfilePictureLongSide)
+        {
+            var scale = (float)MaxProfilePictureLongSide / longSide;
+            width = (int)(width * scale);
+            height = (int)(height * scale);
+
+            using var resized = original.Resize(new SKImageInfo(width, height), SKSamplingOptions.Default);
+            using var image = SKImage.FromBitmap(resized);
+            using var encoded = image.Encode(SKEncodedImageFormat.Jpeg, 85);
+            return (encoded.ToArray(), "image/jpeg");
+        }
+
+        // Image is already small enough — re-encode as JPEG for consistent storage
+        using var smallImage = SKImage.FromBitmap(original);
+        using var smallEncoded = smallImage.Encode(SKEncodedImageFormat.Jpeg, 85);
+        return (smallEncoded.ToArray(), "image/jpeg");
     }
 
     [HttpGet]
@@ -663,12 +765,14 @@ public class ProfileController : Controller
                 profile.BurnerName,
                 profile.FirstName,
                 profile.LastName,
+                DateOfBirth = profile.DateOfBirth?.ToString("yyyy-MM-dd", null),
                 profile.PhoneCountryCode,
                 profile.PhoneNumber,
                 profile.City,
                 profile.CountryCode,
                 profile.Bio,
                 profile.IsSuspended,
+                HasCustomProfilePicture = profile.HasCustomProfilePicture,
                 CreatedAt = profile.CreatedAt.ToString(null, CultureInfo.InvariantCulture),
                 UpdatedAt = profile.UpdatedAt.ToString(null, CultureInfo.InvariantCulture)
             } : null,

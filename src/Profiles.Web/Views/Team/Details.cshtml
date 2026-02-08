@@ -79,43 +79,71 @@
                     </a>
                 }
             </div>
-            <ul class="list-group list-group-flush">
-                @foreach (var member in Model.Members.Take(10))
+            <div class="card-body">
+                @if (Model.Members.Any())
                 {
-                    <li class="list-group-item d-flex align-items-center">
-                        @if (!string.IsNullOrEmpty(member.ProfilePictureUrl))
-                        {
-                            <img src="@member.ProfilePictureUrl" alt="" class="rounded-circle me-3" style="width: 40px; height: 40px; object-fit: cover;">
-                        }
-                        else
-                        {
-                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center me-3" style="width: 40px; height: 40px;">
-                                <span class="text-white">@member.DisplayName[0]</span>
-                            </div>
-                        }
-                        <div class="flex-grow-1">
-                            <strong>@member.DisplayName</strong>
-                            @if (member.IsMetalead)
+                    var metaleads = Model.Members.Where(m => m.IsMetalead).ToList();
+                    var regularMembers = Model.Members.Where(m => !m.IsMetalead).ToList();
+
+                    @if (metaleads.Any())
+                    {
+                        <h6 class="text-muted mb-3">@Localizer["TeamDetail_TeamLeads"]</h6>
+                        <div class="row g-3 mb-4">
+                            @foreach (var member in metaleads)
                             {
-                                <span class="badge bg-primary ms-2">Metalead</span>
+                                <div class="col-6 col-sm-4 col-md-3">
+                                    <div class="text-center">
+                                        @if (!string.IsNullOrEmpty(member.EffectiveProfilePictureUrl))
+                                        {
+                                            <img src="@member.EffectiveProfilePictureUrl" alt="@member.DisplayName" class="rounded-circle mb-2" style="width: 80px; height: 80px; object-fit: cover; border: 3px solid var(--bs-primary);" />
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white mx-auto mb-2" style="width: 80px; height: 80px; font-size: 1.5rem;">
+                                                @member.DisplayName[0]
+                                            </div>
+                                        }
+                                        <div class="fw-semibold small">@member.DisplayName</div>
+                                        <span class="badge bg-primary">Metalead</span>
+                                    </div>
+                                </div>
                             }
                         </div>
-                        <small class="text-muted">@Localizer["TeamDetail_Joined"] @member.JoinedAt.ToString("MMM d, yyyy")</small>
-                    </li>
+                    }
+
+                    @if (regularMembers.Any())
+                    {
+                        @if (metaleads.Any())
+                        {
+                            <h6 class="text-muted mb-3">@Localizer["Teams_Member"]</h6>
+                        }
+                        <div class="row g-3">
+                            @foreach (var member in regularMembers)
+                            {
+                                <div class="col-6 col-sm-4 col-md-3">
+                                    <div class="text-center">
+                                        @if (!string.IsNullOrEmpty(member.EffectiveProfilePictureUrl))
+                                        {
+                                            <img src="@member.EffectiveProfilePictureUrl" alt="@member.DisplayName" class="rounded-circle mb-2" style="width: 64px; height: 64px; object-fit: cover;" />
+                                        }
+                                        else
+                                        {
+                                            <div class="rounded-circle bg-secondary d-flex align-items-center justify-content-center text-white mx-auto mb-2" style="width: 64px; height: 64px; font-size: 1.2rem;">
+                                                @member.DisplayName[0]
+                                            </div>
+                                        }
+                                        <div class="small">@member.DisplayName</div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
                 }
-                @if (Model.Members.Count > 10)
+                else
                 {
-                    <li class="list-group-item text-center text-muted">
-                        @string.Format(Localizer["TeamDetail_AndMoreMembers"].Value, Model.Members.Count - 10)
-                    </li>
+                    <p class="text-center text-muted mb-0">@Localizer["TeamDetail_NoMembers"]</p>
                 }
-                @if (!Model.Members.Any())
-                {
-                    <li class="list-group-item text-center text-muted">
-                        @Localizer["TeamDetail_NoMembers"]
-                    </li>
-                }
-            </ul>
+            </div>
         </div>
     </div>
 

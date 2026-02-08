@@ -6,7 +6,7 @@
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
         <li class="breadcrumb-item"><a asp-action="Index">@Localizer["Teams_Title"]</a></li>
-        <li class="breadcrumb-item"><a asp-action="Details" asp-route-slug="@Model.TeamId">@Model.TeamName</a></li>
+        <li class="breadcrumb-item"><a asp-action="Details" asp-route-slug="@Model.TeamSlug">@Model.TeamName</a></li>
         <li class="breadcrumb-item active" aria-current="page">@Localizer["JoinTeam_Join"]</li>
     </ol>
 </nav>
@@ -38,7 +38,7 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">@Localizer["JoinTeam_SubmitRequest"]</button>
-                            <a asp-action="Details" asp-route-slug="@Model.TeamId" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
+                            <a asp-action="Details" asp-route-slug="@Model.TeamSlug" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
                         </div>
                     </form>
                 }
@@ -54,7 +54,7 @@
 
                         <div class="d-flex gap-2">
                             <button type="submit" class="btn btn-primary">@Localizer["JoinTeam_JoinTeamButton"]</button>
-                            <a asp-action="Details" asp-route-slug="@Model.TeamId" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
+                            <a asp-action="Details" asp-route-slug="@Model.TeamSlug" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
                         </div>
                     </form>
                 }

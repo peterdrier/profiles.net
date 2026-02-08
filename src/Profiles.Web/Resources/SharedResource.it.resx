@@ -558,6 +558,7 @@
   <data name="Admin_ActiveMembers" xml:space="preserve"><value>Membri attivi</value></data>
   <data name="Admin_PendingVolunteers" xml:space="preserve"><value>Volontari in sospeso</value></data>
   <data name="Admin_PendingApplications" xml:space="preserve"><value>Domande in sospeso</value></data>
+  <data name="Admin_PendingConsents" xml:space="preserve"><value>Consensi in sospeso</value></data>
   <data name="Admin_QuickActions" xml:space="preserve"><value>Azioni rapide</value></data>
   <data name="Admin_ReviewPendingVolunteers" xml:space="preserve"><value>Esamina volontari in sospeso</value></data>
   <data name="Admin_ReviewApplications" xml:space="preserve"><value>Esamina domande</value></data>
@@ -569,6 +570,8 @@
   <data name="Admin_SystemHealth" xml:space="preserve"><value>Stato del sistema</value></data>
   <data name="Admin_DatabaseConnection" xml:space="preserve"><value>Connessione al database</value></data>
   <data name="Admin_ViewHealthCheck" xml:space="preserve"><value>Visualizza controllo stato</value></data>
+  <data name="Admin_RecentActivity" xml:space="preserve"><value>Attività recente</value></data>
+  <data name="Admin_NoRecentActivity" xml:space="preserve"><value>Nessuna attività recente registrata.</value></data>
 
   <!-- ======================== -->
   <!-- Admin Members View       -->
@@ -746,5 +749,22 @@
   <data name="TeamAdmin_GroupEmail" xml:space="preserve"><value>Email del gruppo</value></data>
   <data name="TeamAdmin_GroupEmailHelp" xml:space="preserve"><value>Inserisca l'indirizzo email del Google Group. L'account di servizio deve essere Manager del gruppo.</value></data>
   <data name="TeamAdmin_LinkGroup" xml:space="preserve"><value>Collega gruppo</value></data>
+
+  <!-- Profile Picture & DOB -->
+  <data name="Profile_ProfilePicture" xml:space="preserve"><value>Foto del profilo</value></data>
+  <data name="Profile_DateOfBirth" xml:space="preserve"><value>Data di nascita</value></data>
+  <data name="Profile_PictureTooLarge" xml:space="preserve"><value>La foto del profilo deve essere inferiore a 20MB.</value></data>
+  <data name="Profile_PictureInvalidFormat" xml:space="preserve"><value>La foto del profilo deve essere in formato JPEG, PNG o WebP.</value></data>
+  <data name="ProfileEdit_GoogleAvatar" xml:space="preserve"><value>(avatar di Google)</value></data>
+  <data name="ProfileEdit_PictureHelp" xml:space="preserve"><value>Carica un'immagine JPEG, PNG o WebP (max 20MB). Le immagini grandi vengono ridimensionate automaticamente. Questo sostituisce il tuo avatar di Google.</value></data>
+  <data name="ProfileEdit_RemovePicture" xml:space="preserve"><value>Rimuovi foto personalizzata (torna all'avatar di Google)</value></data>
+  <data name="ProfileEdit_DateOfBirthHelp" xml:space="preserve"><value>Visibile solo a te e al consiglio. Utilizzato per il calendario dei compleanni.</value></data>
+  <data name="TeamDetail_TeamLeads" xml:space="preserve"><value>Responsabili del team</value></data>
+
+  <!-- Birthday Calendar -->
+  <data name="Birthdays_Title" xml:space="preserve"><value>Calendario dei compleanni</value></data>
+  <data name="Birthdays_Count" xml:space="preserve"><value>{0} compleanni in {1}</value></data>
+  <data name="Birthdays_None" xml:space="preserve"><value>Nessun compleanno in {0}.</value></data>
+  <data name="Birthdays_Privacy" xml:space="preserve"><value>Vengono mostrati solo i membri che hanno impostato la propria data di nascita. La data di nascita &#xE8; visibile solo al membro e al consiglio.</value></data>
 
 </root>

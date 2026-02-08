@@ -24,6 +24,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     private readonly ProfilesDbContext _dbContext;
     private readonly GoogleWorkspaceSettings _settings;
     private readonly IClock _clock;
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<GoogleWorkspaceSyncService> _logger;
 
     private DirectoryService? _directoryService;
@@ -33,11 +34,13 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         ProfilesDbContext dbContext,
         IOptions<GoogleWorkspaceSettings> settings,
         IClock clock,
+        IAuditLogService auditLogService,
         ILogger<GoogleWorkspaceSyncService> logger)
     {
         _dbContext = dbContext;
         _settings = settings.Value;
         _clock = clock;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -158,6 +161,13 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         };
 
         _dbContext.GoogleResources.Add(resource);
+
+        await _auditLogService.LogAsync(
+            AuditAction.GoogleResourceProvisioned, "GoogleResource", resource.Id,
+            $"Provisioned Drive folder '{folder.Name}' for team",
+            nameof(GoogleWorkspaceSyncService),
+            relatedEntityId: teamId, relatedEntityType: "Team");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Created Drive folder {FolderId} for team {TeamId}", folder.Id, teamId);
@@ -200,6 +210,13 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         };
 
         _dbContext.GoogleResources.Add(resource);
+
+        await _auditLogService.LogAsync(
+            AuditAction.GoogleResourceProvisioned, "GoogleResource", resource.Id,
+            $"Provisioned Drive folder '{folder.Name}' for user",
+            nameof(GoogleWorkspaceSyncService),
+            relatedEntityId: userId, relatedEntityType: "User");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Created Drive folder {FolderId} for user {UserId}", folder.Id, userId);
@@ -241,6 +258,13 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         };
 
         _dbContext.GoogleResources.Add(resource);
+
+        await _auditLogService.LogAsync(
+            AuditAction.GoogleResourceProvisioned, "GoogleResource", resource.Id,
+            $"Provisioned Google Group '{groupName}' ({groupEmail}) for team",
+            nameof(GoogleWorkspaceSyncService),
+            relatedEntityId: teamId, relatedEntityType: "Team");
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation("Created Google Group {GroupId} ({GroupEmail}) for team {TeamId}",
@@ -277,6 +301,12 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         try
         {
             await directory.Members.Insert(member, resource.GoogleId).ExecuteAsync(cancellationToken);
+
+            await _auditLogService.LogAsync(
+                AuditAction.GoogleResourceAccessGranted, "GoogleResource", groupResourceId,
+                $"Granted Google Group access to {userEmail} ({resource.Name})",
+                nameof(GoogleWorkspaceSyncService));
+
             _logger.LogInformation("Added {UserEmail} to group {GroupId}", userEmail, resource.GoogleId);
         }
         catch (Google.GoogleApiException ex) when (ex.Error?.Code == 409)
@@ -286,33 +316,15 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     }
 
     /// <inheritdoc />
-    public async Task RemoveUserFromGroupAsync(
+    public Task RemoveUserFromGroupAsync(
         Guid groupResourceId,
         string userEmail,
         CancellationToken cancellationToken = default)
     {
-        var resource = await _dbContext.GoogleResources
-            .FirstOrDefaultAsync(r => r.Id == groupResourceId, cancellationToken);
-
-        if (resource == null || resource.ResourceType != GoogleResourceType.Group)
-        {
-            _logger.LogWarning("Group resource {ResourceId} not found", groupResourceId);
-            return;
-        }
-
-        _logger.LogInformation("Removing {UserEmail} from group {GroupId}", userEmail, resource.GoogleId);
-
-        var directory = await GetDirectoryServiceAsync();
-
-        try
-        {
-            await directory.Members.Delete(resource.GoogleId, userEmail).ExecuteAsync(cancellationToken);
-            _logger.LogInformation("Removed {UserEmail} from group {GroupId}", userEmail, resource.GoogleId);
-        }
-        catch (Google.GoogleApiException ex) when (ex.Error?.Code == 404)
-        {
-            _logger.LogDebug("User {UserEmail} was not a member of group {GroupId}", userEmail, resource.GoogleId);
-        }
+        // Removal disabled — sync is add-only until automated sync is validated
+        _logger.LogInformation("Skipping Google Group removal for {UserEmail} from {GroupResourceId} (removal disabled)",
+            userEmail, groupResourceId);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -385,15 +397,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             }
         }
 
-        // Remove members who left
-        var teamMemberSet = new HashSet<string>(teamMembers!, StringComparer.OrdinalIgnoreCase);
-        foreach (var email in currentGroupMembers)
-        {
-            if (!teamMemberSet.Contains(email))
-            {
-                await RemoveUserFromGroupAsync(groupResource.Id, email, cancellationToken);
-            }
-        }
+        // Removal disabled — sync is add-only until automated sync is validated
 
         groupResource.LastSyncedAt = _clock.GetCurrentInstant();
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -441,16 +445,17 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         // Get current Drive permissions
         var currentPermissions = await ListDrivePermissionsAsync(drive, resource.GoogleId, cancellationToken);
 
-        // Filter to direct (non-inherited) permissions we manage
-        var directPermissions = currentPermissions.Where(IsDirectManagedPermission).ToList();
-        var currentEmails = directPermissions
+        // Check ALL user permissions (including inherited from Shared Drive).
+        // Users with inherited access don't need a direct permission added.
+        var allUserEmails = currentPermissions
+            .Where(IsAnyUserPermission)
             .Select(p => p.EmailAddress!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Add missing permissions
+        // Add missing permissions (skip users who already have access via inheritance or direct)
         foreach (var email in expectedEmails)
         {
-            if (!currentEmails.Contains(email))
+            if (!allUserEmails.Contains(email))
             {
                 try
                 {
@@ -464,6 +469,11 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
                     var createReq = drive.Permissions.Create(permission, resource.GoogleId);
                     createReq.SupportsAllDrives = true;
                     await createReq.ExecuteAsync(cancellationToken);
+
+                    await _auditLogService.LogAsync(
+                        AuditAction.GoogleResourceAccessGranted, "GoogleResource", resourceId,
+                        $"Granted Drive folder access to {email} ({resource.Name}) during sync",
+                        nameof(GoogleWorkspaceSyncService));
                 }
                 catch (Google.GoogleApiException ex) when (ex.Error?.Code == 400)
                 {
@@ -472,26 +482,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             }
         }
 
-        // Remove stale direct permissions
-        foreach (var perm in directPermissions)
-        {
-            if (!expectedEmails.Contains(perm.EmailAddress!))
-            {
-                try
-                {
-                    var deleteReq = drive.Permissions.Delete(resource.GoogleId, perm.Id);
-                    deleteReq.SupportsAllDrives = true;
-                    await deleteReq.ExecuteAsync(cancellationToken);
-                    _logger.LogInformation("Removed stale Drive permission for {Email} on {ResourceId}",
-                        perm.EmailAddress, resourceId);
-                }
-                catch (Google.GoogleApiException ex)
-                {
-                    _logger.LogWarning(ex, "Error removing permission for {Email} from {ResourceId}",
-                        perm.EmailAddress, resourceId);
-                }
-            }
-        }
+        // Removal disabled — sync is add-only until automated sync is validated
 
         resource.LastSyncedAt = _clock.GetCurrentInstant();
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -572,6 +563,12 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
                     var createReq = drive.Permissions.Create(permission, resource.GoogleId);
                     createReq.SupportsAllDrives = true;
                     await createReq.ExecuteAsync(cancellationToken);
+
+                    await _auditLogService.LogAsync(
+                        AuditAction.GoogleResourceAccessGranted, "GoogleResource", resource.Id,
+                        $"Granted Drive folder access to {user.Email} ({resource.Name})",
+                        nameof(GoogleWorkspaceSyncService),
+                        relatedEntityId: userId, relatedEntityType: "User");
                 }
                 catch (Google.GoogleApiException ex) when (ex.Error?.Code == 400)
                 {
@@ -579,72 +576,20 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
                 }
             }
         }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
-    public async Task RemoveUserFromTeamResourcesAsync(
+    public Task RemoveUserFromTeamResourcesAsync(
         Guid teamId,
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.FindAsync([userId], cancellationToken);
-        if (user?.Email == null)
-        {
-            _logger.LogWarning("User {UserId} not found or has no email", userId);
-            return;
-        }
-
-        var resources = await _dbContext.GoogleResources
-            .Where(r => r.TeamId == teamId && r.IsActive)
-            .ToListAsync(cancellationToken);
-
-        foreach (var resource in resources)
-        {
-            if (resource.ResourceType == GoogleResourceType.Group)
-            {
-                await RemoveUserFromGroupAsync(resource.Id, user.Email, cancellationToken);
-            }
-            else
-            {
-                // Remove Drive permission - need to find permission ID first
-                var drive = await GetDriveServiceAsync();
-
-                try
-                {
-                    // Paginate through all permissions to find the user's
-                    Google.Apis.Drive.v3.Data.Permission? userPermission = null;
-                    string? permPageToken = null;
-                    do
-                    {
-                        var listReq = drive.Permissions.List(resource.GoogleId);
-                        listReq.SupportsAllDrives = true;
-                        listReq.Fields = "nextPageToken, permissions(id, emailAddress)";
-                        if (permPageToken != null)
-                        {
-                            listReq.PageToken = permPageToken;
-                        }
-
-                        var permissions = await listReq.ExecuteAsync(cancellationToken);
-                        userPermission = permissions.Permissions?
-                            .FirstOrDefault(p => string.Equals(p.EmailAddress, user.Email, StringComparison.OrdinalIgnoreCase));
-
-                        permPageToken = permissions.NextPageToken;
-                    } while (userPermission == null && !string.IsNullOrEmpty(permPageToken));
-
-                    if (userPermission != null)
-                    {
-                        var deleteReq = drive.Permissions.Delete(resource.GoogleId, userPermission.Id);
-                        deleteReq.SupportsAllDrives = true;
-                        await deleteReq.ExecuteAsync(cancellationToken);
-                    }
-                }
-                catch (Google.GoogleApiException ex)
-                {
-                    _logger.LogWarning(ex, "Error removing permission for {Email} from {ResourceId}",
-                        user.Email, resource.Id);
-                }
-            }
-        }
+        // Removal disabled — sync is add-only until automated sync is validated
+        _logger.LogInformation("Skipping Google resource removal for user {UserId} from team {TeamId} (removal disabled)",
+            userId, teamId);
+        return Task.CompletedTask;
     }
 
     /// <inheritdoc />
@@ -740,7 +685,8 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             GoogleId = resource.GoogleId,
             Url = resource.Url,
             MembersToAdd = expectedEmails.Except(actualEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
-            MembersToRemove = actualEmails.Except(expectedEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList()
+            // Removal disabled — sync is add-only until automated sync is validated
+            MembersToRemove = []
         };
     }
 
@@ -755,9 +701,10 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         var drive = await GetDriveServiceAsync();
         var permissions = await ListDrivePermissionsAsync(drive, resource.GoogleId, cancellationToken);
 
-        // Filter to direct (non-inherited) user permissions we manage
-        var actualEmails = permissions
-            .Where(IsDirectManagedPermission)
+        // For "members to add", check ALL user permissions (including inherited from Shared Drive).
+        // Users with inherited access don't need a direct permission added.
+        var allUserEmails = permissions
+            .Where(IsAnyUserPermission)
             .Select(p => p.EmailAddress!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -769,9 +716,26 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             TeamName = resource.Team?.Name ?? string.Empty,
             GoogleId = resource.GoogleId,
             Url = resource.Url,
-            MembersToAdd = expectedEmails.Except(actualEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
-            MembersToRemove = actualEmails.Except(expectedEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList()
+            MembersToAdd = expectedEmails.Except(allUserEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
+            // Removal disabled — sync is add-only until automated sync is validated
+            MembersToRemove = []
         };
+    }
+
+    /// <summary>
+    /// Returns true if this is any user permission (direct or inherited), excluding
+    /// service accounts and non-user types. Used to determine if a user already has
+    /// access in any form and doesn't need to be added.
+    /// </summary>
+    private static bool IsAnyUserPermission(Google.Apis.Drive.v3.Data.Permission perm)
+    {
+        if (!string.Equals(perm.Type, "user", StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (string.IsNullOrEmpty(perm.EmailAddress))
+            return false;
+        if (perm.EmailAddress.EndsWith(".iam.gserviceaccount.com", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return true;
     }
 
     /// <summary>

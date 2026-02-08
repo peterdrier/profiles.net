@@ -161,3 +161,4 @@ Profile includes a computed `MembershipStatus` property:
 - [Membership Status](05-membership-status.md) - Computed from profile + roles + consents
 - [Contact Fields](10-contact-fields.md) - Granular contact info visibility
 - [Administration](09-administration.md) - Admin member management
+- [Profile Pictures & Birthdays](14-profile-pictures-birthdays.md) - Custom profile pictures and birthday calendar

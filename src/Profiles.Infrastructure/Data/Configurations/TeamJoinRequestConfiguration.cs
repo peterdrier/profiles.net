@@ -45,8 +45,5 @@ public class TeamJoinRequestConfiguration : IEntityTypeConfiguration<TeamJoinReq
         builder.HasIndex(r => r.UserId);
         builder.HasIndex(r => r.Status);
         builder.HasIndex(r => new { r.TeamId, r.UserId, r.Status });
-
-        // Ignore the state machine property
-        builder.Ignore(r => r.StateMachine);
     }
 }

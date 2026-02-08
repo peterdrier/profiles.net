@@ -1,10 +1,13 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using Profiles.Application.Interfaces;
 using Profiles.Domain.Entities;
 using Profiles.Domain.Enums;
+using Profiles.Infrastructure.Data;
 using Profiles.Web.Models;
 
 namespace Profiles.Web.Controllers;
@@ -15,17 +18,20 @@ public class TeamController : Controller
 {
     private readonly ITeamService _teamService;
     private readonly UserManager<User> _userManager;
+    private readonly ProfilesDbContext _dbContext;
     private readonly ILogger<TeamController> _logger;
     private readonly IStringLocalizer<SharedResource> _localizer;
 
     public TeamController(
         ITeamService teamService,
         UserManager<User> userManager,
+        ProfilesDbContext dbContext,
         ILogger<TeamController> logger,
         IStringLocalizer<SharedResource> localizer)
     {
         _teamService = teamService;
         _userManager = userManager;
+        _dbContext = dbContext;
         _logger = logger;
         _localizer = localizer;
     }
@@ -104,6 +110,21 @@ public class TeamController : Controller
             pendingRequestCount = requests.Count;
         }
 
+        // Get user IDs of active members to look up custom profile pictures
+        var activeMembers = team.Members.Where(m => m.LeftAt == null).ToList();
+        var memberUserIds = activeMembers.Select(m => m.UserId).ToList();
+
+        // Load profiles that have custom pictures (only need Id and UserId, not the picture data)
+        var profilesWithCustomPictures = await _dbContext.Profiles
+            .AsNoTracking()
+            .Where(p => memberUserIds.Contains(p.UserId) && p.ProfilePictureData != null)
+            .Select(p => new { p.Id, p.UserId })
+            .ToListAsync();
+
+        var customPictureByUserId = profilesWithCustomPictures.ToDictionary(
+            p => p.UserId,
+            p => Url.Action("Picture", "Profile", new { id = p.Id })!);
+
         var viewModel = new TeamDetailViewModel
         {
             Id = team.Id,
@@ -115,8 +136,7 @@ public class TeamController : Controller
             IsSystemTeam = team.IsSystemTeam,
             SystemTeamType = team.SystemTeamType != SystemTeamType.None ? team.SystemTeamType.ToString() : null,
             CreatedAt = team.CreatedAt.ToDateTimeUtc(),
-            Members = team.Members
-                .Where(m => m.LeftAt == null)
+            Members = activeMembers
                 .OrderBy(m => m.Role)
                 .ThenBy(m => m.JoinedAt)
                 .Select(m => new TeamMemberViewModel
@@ -125,6 +145,8 @@ public class TeamController : Controller
                     DisplayName = m.User?.DisplayName ?? "Unknown",
                     Email = m.User?.Email ?? "",
                     ProfilePictureUrl = m.User?.ProfilePictureUrl,
+                    HasCustomProfilePicture = customPictureByUserId.ContainsKey(m.UserId),
+                    CustomProfilePictureUrl = customPictureByUserId.GetValueOrDefault(m.UserId),
                     Role = m.Role.ToString(),
                     JoinedAt = m.JoinedAt.ToDateTimeUtc(),
                     IsMetalead = m.Role == TeamMemberRole.Metalead
@@ -136,6 +158,73 @@ public class TeamController : Controller
             CanCurrentUserManage = canManage,
             CurrentUserPendingRequestId = pendingRequest?.Id,
             PendingRequestCount = pendingRequestCount
+        };
+
+        return View(viewModel);
+    }
+
+    [HttpGet("Birthdays")]
+    public async Task<IActionResult> Birthdays(int? month)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var currentMonth = month ?? DateTime.UtcNow.Month;
+        if (currentMonth < 1 || currentMonth > 12)
+            currentMonth = DateTime.UtcNow.Month;
+
+        // Load all active profiles that have a date of birth and are in at least one team
+        var profilesWithBirthdays = await _dbContext.Profiles
+            .AsNoTracking()
+            .Include(p => p.User)
+            .Where(p => p.DateOfBirth != null && !p.IsSuspended)
+            .Where(p => p.DateOfBirth!.Value.Month == currentMonth)
+            .OrderBy(p => p.DateOfBirth!.Value.Day)
+            .Select(p => new
+            {
+                p.UserId,
+                DisplayName = p.User!.DisplayName,
+                ProfilePictureUrl = p.User.ProfilePictureUrl,
+                HasCustomPicture = p.ProfilePictureData != null,
+                ProfileId = p.Id,
+                Day = p.DateOfBirth!.Value.Day,
+                Month = p.DateOfBirth!.Value.Month
+            })
+            .ToListAsync();
+
+        // Load team memberships for these users
+        var userIds = profilesWithBirthdays.Select(p => p.UserId).ToList();
+        var teamMemberships = await _dbContext.Set<TeamMember>()
+            .AsNoTracking()
+            .Include(tm => tm.Team)
+            .Where(tm => userIds.Contains(tm.UserId) && tm.LeftAt == null && !tm.Team.IsSystemTeam)
+            .Select(tm => new { tm.UserId, tm.Team.Name })
+            .ToListAsync();
+
+        var teamsByUser = teamMemberships
+            .GroupBy(tm => tm.UserId)
+            .ToDictionary(g => g.Key, g => g.Select(tm => tm.Name).Distinct(StringComparer.Ordinal).ToList());
+
+        var monthName = new DateTime(2000, currentMonth, 1).ToString("MMMM", CultureInfo.CurrentCulture);
+
+        var viewModel = new BirthdayCalendarViewModel
+        {
+            CurrentMonth = currentMonth,
+            CurrentMonthName = monthName,
+            Birthdays = profilesWithBirthdays.Select(p => new BirthdayEntryViewModel
+            {
+                DisplayName = p.DisplayName,
+                EffectiveProfilePictureUrl = p.HasCustomPicture
+                    ? Url.Action("Picture", "Profile", new { id = p.ProfileId })
+                    : p.ProfilePictureUrl,
+                DayOfMonth = p.Day,
+                Month = p.Month,
+                MonthName = monthName,
+                TeamNames = teamsByUser.GetValueOrDefault(p.UserId, [])
+            }).ToList()
         };
 
         return View(viewModel);
@@ -227,6 +316,7 @@ public class TeamController : Controller
         {
             TeamId = team.Id,
             TeamName = team.Name,
+            TeamSlug = team.Slug,
             RequiresApproval = team.RequiresApproval
         };
 

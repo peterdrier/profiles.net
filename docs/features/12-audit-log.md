@@ -39,8 +39,15 @@ Stored as string in the database. New values can be appended without migration.
 - `RoleAssigned` — Admin assigned a governance role
 - `RoleEnded` — Admin ended a governance role
 - `VolunteerApproved` — Admin approved a volunteer
-- `GoogleResourceAccessGranted` — (Phase 2) Google resource access granted
-- `GoogleResourceAccessRevoked` — (Phase 2) Google resource access revoked
+- `GoogleResourceAccessGranted` — Google resource access granted (Group or Drive folder)
+- `GoogleResourceAccessRevoked` — Google resource access revoked (Group or Drive folder)
+- `GoogleResourceProvisioned` — New Google resource created (Drive folder or Group)
+- `TeamJoinedDirectly` — User joined an open team directly
+- `TeamLeft` — User left a team voluntarily
+- `TeamJoinRequestApproved` — Approver approved a team join request
+- `TeamJoinRequestRejected` — Approver rejected a team join request
+- `TeamMemberRoleChanged` — Member role changed within a team
+- `AnomalousPermissionDetected` — Drive Activity API detected a permission change not made by the system
 
 ## Service Design
 
@@ -71,14 +78,50 @@ The service adds entries to the `DbContext` without calling `SaveChangesAsync`. 
 | Add role | RoleAssigned |
 | End role | RoleEnded |
 
-## Phase 2 (Future)
+## Phase 2 Coverage (Current)
 
-- Wire into `TeamService` (manual join/leave, approve/reject requests)
-- Wire into `GoogleWorkspaceSyncService` (resource access grant/revoke)
+### TeamService
+
+| Action | AuditAction | Actor |
+|--------|-------------|-------|
+| User joins open team | TeamJoinedDirectly | User |
+| User leaves team | TeamLeft | User |
+| Join request approved | TeamJoinRequestApproved | Approver (Board/Metalead) |
+| Join request rejected | TeamJoinRequestRejected | Approver (Board/Metalead) |
+| Member removed by admin | TeamMemberRemoved | Admin (Board/Metalead) |
+| Member role changed | TeamMemberRoleChanged | Admin (Board/Metalead) |
+
+### GoogleWorkspaceSyncService
+
+| Action | AuditAction | Actor |
+|--------|-------------|-------|
+| Drive folder provisioned | GoogleResourceProvisioned | GoogleWorkspaceSyncService |
+| Google Group provisioned | GoogleResourceProvisioned | GoogleWorkspaceSyncService |
+| User added to Group | GoogleResourceAccessGranted | GoogleWorkspaceSyncService |
+| User removed from Group | GoogleResourceAccessRevoked | GoogleWorkspaceSyncService |
+| Drive permission added (direct or sync) | GoogleResourceAccessGranted | GoogleWorkspaceSyncService |
+| Drive permission removed (direct or sync) | GoogleResourceAccessRevoked | GoogleWorkspaceSyncService |
+
+### DriveActivityMonitorJob
+
+| Action | AuditAction | Actor |
+|--------|-------------|-------|
+| Anomalous permission change detected | AnomalousPermissionDetected | DriveActivityMonitorJob |
+
+## Phase 3 (Future)
+
 - Per-resource audit view on team admin pages
-- Global audit log page with filtering
 
 ## User Interface
+
+### Global Audit Log Page (`/Admin/AuditLog`)
+
+Displays all audit log entries with filtering by action type. Features:
+- Filter buttons: All, Anomalous Permissions, Access Granted/Revoked, Suspensions, Roles
+- Anomalous entries highlighted with warning styling
+- Alert banner showing total anomaly count
+- "Check Drive Activity Now" button for manual trigger
+- Paginated (50 per page)
 
 ### Per-User Audit View (MemberDetail page)
 
@@ -102,3 +145,4 @@ Audit log is visible only to Board and Admin roles (inherits from AdminControlle
 - [F-08: Background Jobs](08-background-jobs.md) — Jobs are primary audit producers
 - [F-09: Administration](09-administration.md) — Admin actions produce audit entries
 - [F-06: Teams](06-teams.md) — Team sync produces audit entries
+- [F-13: Drive Activity Monitoring](13-drive-activity-monitoring.md) — Anomalous permission detection
