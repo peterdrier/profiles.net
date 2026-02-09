@@ -16,6 +16,7 @@ Members need to share contact information (Signal, Telegram, WhatsApp, email, ph
 - Choose from predefined types: Email, Phone, Signal, Telegram, WhatsApp
 - Can add "Other" type with custom label (e.g., Discord, Matrix)
 - Each field has a value (the actual contact info)
+- Email-type fields are validated for proper email format (client-side and server-side)
 - Fields can be reordered
 
 ### US-10.2: Set Per-Field Visibility
@@ -157,7 +158,8 @@ Eve (active member, no shared teams) views Bob's profile:
 ### Profile Edit
 - Dynamic form with add/remove capability
 - Dropdown for field type (shows/hides custom label for "Other")
-- Text input for value
+- Text input for value (uses `type="email"` for Email fields)
+- Inline validation error for invalid email addresses (on blur and on submit)
 - Dropdown for visibility level
 - Delete button per row
 - JavaScript handles dynamic row management
@@ -180,7 +182,7 @@ IContactFieldService
 ├── GetAllContactFieldsAsync(profileId)
 │   → Returns all fields for editing (owner only)
 ├── SaveContactFieldsAsync(profileId, fields)
-│   → Upsert/delete contact fields
+│   → Upsert/delete contact fields (validates email format for Email-type fields)
 └── GetViewerAccessLevelAsync(ownerUserId, viewerUserId)
     → Determines what visibility level viewer has
 ```

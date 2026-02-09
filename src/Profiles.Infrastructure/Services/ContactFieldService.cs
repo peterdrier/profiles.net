@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using Profiles.Application.DTOs;
@@ -88,11 +89,25 @@ public class ContactFieldService : IContactFieldService
         )).ToList();
     }
 
+    private static readonly EmailAddressAttribute EmailValidator = new();
+
     public async Task SaveContactFieldsAsync(
         Guid profileId,
         IReadOnlyList<ContactFieldEditDto> fields,
         CancellationToken cancellationToken = default)
     {
+        // Validate email fields before saving (defense-in-depth)
+        foreach (var field in fields)
+        {
+            if (field.FieldType == ContactFieldType.Email
+                && !string.IsNullOrWhiteSpace(field.Value)
+                && !EmailValidator.IsValid(field.Value))
+            {
+                throw new ValidationException(
+                    $"Invalid email address: {field.Value}");
+            }
+        }
+
         var now = _clock.GetCurrentInstant();
 
         // Get existing fields

@@ -191,6 +191,7 @@
                                         <div class="col-md-3">
                                             <label class="form-label small">Value</label>
                                             <input type="@(Model.EditableContactFields[i].FieldType == Profiles.Domain.Enums.ContactFieldType.Email ? "email" : "text")" name="EditableContactFields[@i].Value" value="@Model.EditableContactFields[i].Value" class="form-control form-control-sm contact-value-input" required placeholder="Enter contact info" />
+                                            <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[@i].Value"></span>
                                         </div>
 
                                         <div class="col-md-3">
@@ -425,6 +426,7 @@
                                 <div class="col-md-3">
                                     <label class="form-label small">Value</label>
                                     <input type="email" name="EditableContactFields[${index}].Value" class="form-control form-control-sm contact-value-input" placeholder="Enter contact info" />
+                                    <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[${index}].Value"></span>
                                 </div>
 
                                 <div class="col-md-3">
@@ -451,6 +453,24 @@
                 return template.content.firstChild;
             }
 
+            function validateEmailField(input, typeSelect) {
+                const errorSpan = input.parentElement.querySelector('.field-validation-error');
+                if (!errorSpan) return true;
+
+                if (typeSelect.value === 'Email' && input.value.trim() !== '') {
+                    // Basic email pattern check
+                    const emailPattern = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+                    if (!emailPattern.test(input.value.trim())) {
+                        errorSpan.textContent = 'Please enter a valid email address.';
+                        input.classList.add('is-invalid');
+                        return false;
+                    }
+                }
+                errorSpan.textContent = '';
+                input.classList.remove('is-invalid');
+                return true;
+            }
+
             function setupRow(row) {
                 const typeSelect = row.querySelector('.field-type-select');
                 const customLabelCol = row.querySelector('.custom-label-col');
@@ -461,8 +481,15 @@
                     customLabelCol.style.display = this.value === 'Other' ? 'block' : 'none';
                     if (valueInput) {
                         valueInput.type = this.value === 'Email' ? 'email' : 'text';
+                        validateEmailField(valueInput, typeSelect);
                     }
                 });
+
+                if (valueInput) {
+                    valueInput.addEventListener('blur', function() {
+                        validateEmailField(valueInput, typeSelect);
+                    });
+                }
 
                 removeBtn.addEventListener('click', function() {
                     row.remove();
@@ -491,8 +518,28 @@
                 const row = createContactFieldRow(index);
                 container.appendChild(row);
                 setupRow(row);
-                row.querySelector('input[type="text"]').focus();
+                row.querySelector('.contact-value-input').focus();
             });
+
+            // Validate all email fields on form submit
+            const form = container.closest('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    let valid = true;
+                    container.querySelectorAll('.contact-field-row').forEach(function(row) {
+                        const typeSelect = row.querySelector('.field-type-select');
+                        const valueInput = row.querySelector('.contact-value-input');
+                        if (typeSelect && valueInput) {
+                            if (!validateEmailField(valueInput, typeSelect)) {
+                                valid = false;
+                            }
+                        }
+                    });
+                    if (!valid) {
+                        e.preventDefault();
+                    }
+                });
+            }
         })();
 
         // Volunteer History Management

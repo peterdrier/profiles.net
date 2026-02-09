@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
@@ -323,6 +324,61 @@ public class ContactFieldServiceTests : IDisposable
             .Where(cf => cf.ProfileId == profile.Id)
             .ToListAsync();
         remainingFields.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("not-an-email")]
+    [InlineData("missing-at-sign")]
+    [InlineData("@no-local-part.com")]
+    public async Task SaveContactFields_WithInvalidEmail_ThrowsValidationException(string invalidEmail)
+    {
+        var profile = await CreateProfile(Guid.NewGuid());
+        var fields = new List<ContactFieldEditDto>
+        {
+            new(null, ContactFieldType.Email, null, invalidEmail, ContactFieldVisibility.AllActiveProfiles, 0)
+        };
+
+        var act = () => _service.SaveContactFieldsAsync(profile.Id, fields);
+
+        await act.Should().ThrowAsync<ValidationException>();
+    }
+
+    [Theory]
+    [InlineData("valid@example.com")]
+    [InlineData("user.name+tag@domain.co")]
+    public async Task SaveContactFields_WithValidEmail_Succeeds(string validEmail)
+    {
+        var profile = await CreateProfile(Guid.NewGuid());
+        var fields = new List<ContactFieldEditDto>
+        {
+            new(null, ContactFieldType.Email, null, validEmail, ContactFieldVisibility.AllActiveProfiles, 0)
+        };
+
+        await _service.SaveContactFieldsAsync(profile.Id, fields);
+
+        var savedFields = await _dbContext.ContactFields
+            .Where(cf => cf.ProfileId == profile.Id)
+            .ToListAsync();
+        savedFields.Should().HaveCount(1);
+        savedFields[0].Value.Should().Be(validEmail);
+    }
+
+    [Fact]
+    public async Task SaveContactFields_WithInvalidValueOnNonEmailField_Succeeds()
+    {
+        // Non-email fields should not be validated as email
+        var profile = await CreateProfile(Guid.NewGuid());
+        var fields = new List<ContactFieldEditDto>
+        {
+            new(null, ContactFieldType.Telegram, null, "@my_telegram_handle", ContactFieldVisibility.AllActiveProfiles, 0)
+        };
+
+        await _service.SaveContactFieldsAsync(profile.Id, fields);
+
+        var savedFields = await _dbContext.ContactFields
+            .Where(cf => cf.ProfileId == profile.Id)
+            .ToListAsync();
+        savedFields.Should().HaveCount(1);
     }
 
     #endregion

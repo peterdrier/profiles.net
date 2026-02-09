@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Web;
 using Microsoft.AspNetCore.Authorization;
@@ -320,7 +321,16 @@ public class ProfileController : Controller
             ))
             .ToList();
 
-        await _contactFieldService.SaveContactFieldsAsync(profile.Id, contactFieldDtos);
+        try
+        {
+            await _contactFieldService.SaveContactFieldsAsync(profile.Id, contactFieldDtos);
+        }
+        catch (ValidationException ex)
+        {
+            ModelState.AddModelError(string.Empty, ex.Message);
+            ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+            return View(model);
+        }
 
         // Save volunteer history entries
         var volunteerHistoryDtos = model.EditableVolunteerHistory
