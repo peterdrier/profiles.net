@@ -95,44 +95,37 @@ Email subjects localized via `IStringLocalizerFactory` in `SmtpEmailService` (13
 
 Added `https://cdn.jsdelivr.net` to `script-src` CSP directive. Bootstrap JS was silently blocked, breaking all interactive components (dropdowns, modals, collapse). Committed with `4189f8d`.
 
+### ~~F-01: Profile pictures with team photo gallery~~ DONE
+
+Added profile picture upload with resize to 256x256 (max 2MB, stored in DB). Team detail view shows member photo gallery with meta leads at top. Also added DateOfBirth field and team birthdays view. Feature spec: `docs/features/14-profile-pictures-birthdays.md`. Committed `f04c8cf`.
+
+### ~~F-07: Admin dashboard RecentActivity widget~~ DONE
+
+Wired `RecentActivity` to query the 15 most recent `AuditLogEntry` records. Dashboard now shows recent activity list. Committed `f04c8cf`.
+
+### ~~F-08: Admin dashboard PendingConsents metric~~ DONE
+
+Calculated `PendingConsents` using `IMembershipCalculator.GetUsersWithAllRequiredConsentsAsync()`. Dashboard now displays the metric with warning styling when non-zero. Committed `f04c8cf`.
+
+### ~~P1-14: Hangfire dashboard link returns 404~~ FIXED
+
+Replaced `asp-controller="Hangfire" asp-action="Index"` with direct `href="/hangfire"` link. Committed `f04c8cf`.
+
+### ~~P1-15: Team Join view passes GUID where slug is expected~~ FIXED
+
+Added `TeamSlug` property to `JoinTeamViewModel` and updated Join view to use `asp-route-slug="@Model.TeamSlug"` instead of `@Model.TeamId`. Committed `f04c8cf`.
+
+### ~~Drive Activity API monitoring~~ DONE
+
+Added `IDriveActivityMonitorService` with `DriveActivityMonitorJob` to detect anomalous permission changes on Shared Drives. Audit log entries created for detected anomalies. Admin can trigger manual check from Audit Log page. Feature spec: `docs/features/13-drive-activity-monitoring.md`. Committed `f04c8cf`. Closes GitHub #11.
+
 ---
 
 ## 1. Missing Features (toward overall goal)
 
 These are prioritized by how critical they are to the core purpose: managing the membership lifecycle, organizing teams, and giving Board visibility into automatic actions.
 
-### F-01: Profile pictures with team photo gallery
-
-**Priority: MEDIUM — improves team visualization but not blocking core workflows.**
-
-- Allow members to upload a profile picture (in addition to Google OAuth avatar)
-- Enforce reasonable size/dimension limits (e.g., max 2MB, resize to ~256x256 or similar)
-- Team detail view should show a photo gallery of members, with meta leads displayed at the top
-- Consider storage approach (local filesystem, blob storage, database)
-
----
-
-### F-07: Admin dashboard RecentActivity widget
-
-**Priority: LOW — easy win now that audit log exists.**
-
-**Where:** `src/Profiles.Web/Controllers/AdminController.cs:67`, `src/Profiles.Web/Models/AdminViewModels.cs:10`
-
-**What happens today:** `RecentActivity = []` — always empty. The `RecentActivityViewModel` class exists but is never populated.
-
-**Fix:** Query the most recent 10-20 `AuditLogEntry` records and map to `RecentActivityViewModel`. The audit log (F-04) now provides the data source.
-
----
-
-### F-08: Admin dashboard PendingConsents metric
-
-**Priority: LOW — invisible placeholder.**
-
-**Where:** `src/Profiles.Web/Controllers/AdminController.cs:66`
-
-**What happens today:** `PendingConsents = 0, // Would calculate from consent requirements` — hardcoded to 0. The admin dashboard view does not currently display this metric, so it's invisible.
-
-**Fix:** Calculate using `IMembershipCalculator` (count users missing required consents). Wire into dashboard view if the metric is wanted.
+No open feature items — all planned features are complete.
 
 ---
 

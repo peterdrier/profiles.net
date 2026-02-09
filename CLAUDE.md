@@ -111,3 +111,9 @@ dotnet run --project src/Profiles.Web
 ## Post-Fix Documentation Check
 
 **After completing a fix or feature but before committing**, check the relevant BRDs in `docs/features/` and update them if the change affects documented behavior, authorization rules, workflows, data model, or routes. This reduces churn from separate doc-only commits.
+
+## Todos and Issue Tracking
+
+**After committing work that resolves or partially resolves items in `todos.md`**, update the file: move completed items to the Completed section with a summary of what was done and the commit hash. This keeps the todo list accurate and avoids stale entries.
+
+**After committing work that resolves a GitHub issue**, close the issue with `gh issue close <number> -c "comment"` including a brief summary and the commit hash.
