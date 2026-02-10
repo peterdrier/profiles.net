@@ -316,6 +316,7 @@ public partial class AdminController : Controller
             Status = application.Status.ToString(),
             Motivation = application.Motivation,
             AdditionalInfo = application.AdditionalInfo,
+            Language = application.Language,
             SubmittedAt = application.SubmittedAt.ToDateTimeUtc(),
             ReviewStartedAt = application.ReviewStartedAt?.ToDateTimeUtc(),
             ReviewerName = application.ReviewedByUser?.DisplayName,
@@ -447,7 +448,7 @@ public partial class AdminController : Controller
         {
             await _auditLogService.LogAsync(
                 AuditAction.MemberSuspended, "User", id,
-                $"{user.DisplayName} suspended by admin{(string.IsNullOrWhiteSpace(notes) ? "" : $": {notes}")}",
+                $"{user.DisplayName} suspended by {currentUser.DisplayName}{(string.IsNullOrWhiteSpace(notes) ? "" : $": {notes}")}",
                 currentUser.Id, currentUser.DisplayName);
         }
 
@@ -481,7 +482,7 @@ public partial class AdminController : Controller
         {
             await _auditLogService.LogAsync(
                 AuditAction.MemberUnsuspended, "User", id,
-                $"{user.DisplayName} unsuspended by admin",
+                $"{user.DisplayName} unsuspended by {currentUser.DisplayName}",
                 currentUser.Id, currentUser.DisplayName);
         }
 
@@ -507,19 +508,23 @@ public partial class AdminController : Controller
         }
 
         var currentUser = await _userManager.GetUserAsync(User);
+        var now = _clock.GetCurrentInstant();
 
         user.Profile.IsApproved = true;
-        user.Profile.UpdatedAt = _clock.GetCurrentInstant();
+        user.Profile.UpdatedAt = now;
 
         if (currentUser != null)
         {
             await _auditLogService.LogAsync(
                 AuditAction.VolunteerApproved, "User", id,
-                $"{user.DisplayName} approved as volunteer by admin",
+                $"{user.DisplayName} approved as volunteer by {currentUser.DisplayName}",
                 currentUser.Id, currentUser.DisplayName);
         }
 
         await _dbContext.SaveChangesAsync();
+
+        // Sync Volunteers team membership (adds user if they also have all required consents)
+        await _systemTeamSyncJob.SyncVolunteersMembershipForUserAsync(id);
 
         _logger.LogInformation("Admin {AdminId} approved volunteer {MemberId}", currentUser?.Id, id);
 
@@ -919,6 +924,24 @@ public partial class AdminController : Controller
         };
 
         return View(viewModel);
+    }
+
+    [HttpPost("SyncSystemTeams")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SyncSystemTeams()
+    {
+        try
+        {
+            await _systemTeamSyncJob.ExecuteAsync();
+            TempData["SuccessMessage"] = "System teams synced successfully.";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync system teams");
+            TempData["ErrorMessage"] = $"Sync failed: {ex.Message}";
+        }
+
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost("GoogleSync/Apply")]

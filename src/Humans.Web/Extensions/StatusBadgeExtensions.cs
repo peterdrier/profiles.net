@@ -47,6 +47,7 @@ public static class StatusBadgeExtensions
         return status switch
         {
             "Active" => "bg-success",
+            "Pending" => "bg-info",
             "Inactive" => "bg-warning text-dark",
             "Incomplete" => "bg-secondary",
             "Suspended" => "bg-danger",

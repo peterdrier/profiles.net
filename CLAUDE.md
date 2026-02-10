@@ -57,7 +57,17 @@ Clean Architecture with 4 layers:
 
 The `consent_records` table has database triggers that prevent UPDATE and DELETE operations. Only INSERT is allowed to maintain GDPR audit trail integrity.
 
+## Important: Volunteer vs Asociado — Two Separate Concepts
+
+**Volunteer** = the standard member. ~100% of users. Onboarding: sign up, complete profile, consent to legal docs, board approves → added to Volunteers team. This is NOT done through the Application entity.
+
+**Asociado** = optional governance upgrade for ~20% of volunteers. Asociados are voting members who participate in assemblies and elections. This IS the Application entity (Governance section). Applying to become an Asociado is completely optional and has no effect on volunteer access, team membership, or resources.
+
+**NEVER conflate these two flows.** The Application/Governance workflow is NOT part of volunteer onboarding. It is a separate, optional path for long-term committed volunteers who want voting rights.
+
 ## Application Workflow State Machine
+
+The Application entity is for **Asociado applications only** (optional governance membership), NOT for becoming a volunteer.
 
 ```
 Submitted → UnderReview → Approved/Rejected

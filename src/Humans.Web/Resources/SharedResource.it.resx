@@ -134,9 +134,14 @@
   <data name="Dashboard_NoConsentsRequired" xml:space="preserve"><value>Al momento non sono richiesti consensi per alcun documento.</value></data>
   <data name="Dashboard_LatestApplication" xml:space="preserve"><value>Ultima domanda:</value></data>
   <data name="Dashboard_ViewApplicationHistory" xml:space="preserve"><value>Visualizza storico domande</value></data>
-  <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Gli asociados sono membri votanti che partecipano alle decisioni di governance come assemblee ed elezioni. Questo è pensato per i leader della comunità e i volontari impegnati a lungo termine.</value></data>
-  <data name="Dashboard_GovernanceOptional" xml:space="preserve"><value>La partecipazione alla governance è facoltativa e non influisce sul Suo accesso alle risorse.</value></data>
+  <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Gli asociados sono membri votanti che partecipano alle decisioni di governance come assemblee ed elezioni. Questo &#xE8; pensato per i leader della comunit&#xE0; e i volontari impegnati a lungo termine.</value></data>
+  <data name="Dashboard_GovernanceOptional" xml:space="preserve"><value>La partecipazione alla governance &#xE8; facoltativa e non influisce sul Suo accesso alle risorse.</value></data>
   <data name="Dashboard_LearnMore" xml:space="preserve"><value>Maggiori informazioni</value></data>
+  <data name="Dashboard_OnboardingTitle" xml:space="preserve"><value>Per iniziare</value></data>
+  <data name="Dashboard_OnboardingDescription" xml:space="preserve"><value>Completa questi passaggi per diventare volontario:</value></data>
+  <data name="Dashboard_Step_Profile" xml:space="preserve"><value>Completa il tuo profilo</value></data>
+  <data name="Dashboard_Step_Consents" xml:space="preserve"><value>Rivedi e accetta i documenti richiesti</value></data>
+  <data name="Dashboard_Step_Approval" xml:space="preserve"><value>Il consiglio esamina e approva il tuo account</value></data>
   <data name="Dashboard_YourMembership" xml:space="preserve"><value>La Sua iscrizione</value></data>
   <data name="Dashboard_MemberSince" xml:space="preserve"><value>Membro dal</value></data>
   <data name="Dashboard_LastLogin" xml:space="preserve"><value>Ultimo accesso</value></data>
@@ -643,6 +648,7 @@
   <data name="AdminAppDetail_RejectConfirm" xml:space="preserve"><value>Rifiutare questa domanda?</value></data>
   <data name="AdminAppDetail_Reject" xml:space="preserve"><value>Rifiuta</value></data>
   <data name="AdminAppDetail_RequestMoreInfo" xml:space="preserve"><value>Richiedi ulteriori informazioni</value></data>
+  <data name="AdminAppDetail_Language" xml:space="preserve"><value>Lingua</value></data>
 
   <!-- ======================== -->
   <!-- Admin Teams View         -->

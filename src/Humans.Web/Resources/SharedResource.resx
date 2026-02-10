@@ -137,6 +137,11 @@
   <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Asociados are voting members who participate in governance decisions like assemblies and elections. This is intended for community leaders and long-term committed volunteers.</value></data>
   <data name="Dashboard_GovernanceOptional" xml:space="preserve"><value>Governance participation is optional and doesn't affect your access to resources.</value></data>
   <data name="Dashboard_LearnMore" xml:space="preserve"><value>Learn More</value></data>
+  <data name="Dashboard_OnboardingTitle" xml:space="preserve"><value>Getting Started</value></data>
+  <data name="Dashboard_OnboardingDescription" xml:space="preserve"><value>Complete these steps to become a volunteer:</value></data>
+  <data name="Dashboard_Step_Profile" xml:space="preserve"><value>Complete your profile</value></data>
+  <data name="Dashboard_Step_Consents" xml:space="preserve"><value>Review and consent to required documents</value></data>
+  <data name="Dashboard_Step_Approval" xml:space="preserve"><value>The board reviews and approves your account</value></data>
   <data name="Dashboard_YourMembership" xml:space="preserve"><value>Your Membership</value></data>
   <data name="Dashboard_MemberSince" xml:space="preserve"><value>Member Since</value></data>
   <data name="Dashboard_LastLogin" xml:space="preserve"><value>Last Login</value></data>
@@ -646,6 +651,7 @@
   <data name="AdminAppDetail_RejectConfirm" xml:space="preserve"><value>Reject this application?</value></data>
   <data name="AdminAppDetail_Reject" xml:space="preserve"><value>Reject</value></data>
   <data name="AdminAppDetail_RequestMoreInfo" xml:space="preserve"><value>Request More Info</value></data>
+  <data name="AdminAppDetail_Language" xml:space="preserve"><value>Language</value></data>
 
   <!-- ======================== -->
   <!-- Admin Teams View         -->

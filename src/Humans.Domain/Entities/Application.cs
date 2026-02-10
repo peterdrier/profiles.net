@@ -42,6 +42,11 @@ public class Application
     public string? AdditionalInfo { get; set; }
 
     /// <summary>
+    /// The UI language the applicant was using when they submitted the application (ISO 639-1 code, e.g. "es", "en").
+    /// </summary>
+    public string? Language { get; set; }
+
+    /// <summary>
     /// When the application was submitted.
     /// </summary>
     public Instant SubmittedAt { get; init; }

@@ -134,9 +134,14 @@
   <data name="Dashboard_NoConsentsRequired" xml:space="preserve"><value>Derzeit sind keine Einwilligungen erforderlich.</value></data>
   <data name="Dashboard_LatestApplication" xml:space="preserve"><value>Letzter Antrag:</value></data>
   <data name="Dashboard_ViewApplicationHistory" xml:space="preserve"><value>Antragsverlauf anzeigen</value></data>
-  <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Asociados sind stimmberechtigte Mitglieder, die an Governance-Entscheidungen wie Versammlungen und Wahlen teilnehmen. Dies ist für Community-Leiter und langfristig engagierte Freiwillige gedacht.</value></data>
+  <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Asociados sind stimmberechtigte Mitglieder, die an Governance-Entscheidungen wie Versammlungen und Wahlen teilnehmen. Dies ist f&#xFC;r Community-Leiter und langfristig engagierte Freiwillige gedacht.</value></data>
   <data name="Dashboard_GovernanceOptional" xml:space="preserve"><value>Die Teilnahme an der Governance ist freiwillig und hat keinen Einfluss auf Ihren Zugang zu Ressourcen.</value></data>
   <data name="Dashboard_LearnMore" xml:space="preserve"><value>Mehr erfahren</value></data>
+  <data name="Dashboard_OnboardingTitle" xml:space="preserve"><value>Erste Schritte</value></data>
+  <data name="Dashboard_OnboardingDescription" xml:space="preserve"><value>F&#xFC;hren Sie diese Schritte aus, um Freiwilliger zu werden:</value></data>
+  <data name="Dashboard_Step_Profile" xml:space="preserve"><value>Profil vervollst&#xE4;ndigen</value></data>
+  <data name="Dashboard_Step_Consents" xml:space="preserve"><value>Erforderliche Dokumente pr&#xFC;fen und zustimmen</value></data>
+  <data name="Dashboard_Step_Approval" xml:space="preserve"><value>Der Vorstand pr&#xFC;ft und genehmigt Ihr Konto</value></data>
   <data name="Dashboard_YourMembership" xml:space="preserve"><value>Ihre Mitgliedschaft</value></data>
   <data name="Dashboard_MemberSince" xml:space="preserve"><value>Mitglied seit</value></data>
   <data name="Dashboard_LastLogin" xml:space="preserve"><value>Letzte Anmeldung</value></data>
@@ -643,6 +648,7 @@
   <data name="AdminAppDetail_RejectConfirm" xml:space="preserve"><value>Diesen Antrag ablehnen?</value></data>
   <data name="AdminAppDetail_Reject" xml:space="preserve"><value>Ablehnen</value></data>
   <data name="AdminAppDetail_RequestMoreInfo" xml:space="preserve"><value>Weitere Informationen anfordern</value></data>
+  <data name="AdminAppDetail_Language" xml:space="preserve"><value>Sprache</value></data>
 
   <!-- ======================== -->
   <!-- Admin Teams View         -->

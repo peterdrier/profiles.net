@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
+using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
@@ -56,10 +57,12 @@ public class HomeController : Controller
             .Select(tm => tm.TeamId)
             .ToListAsync();
 
-        // Always include Volunteers team (global docs)
-        if (!userTeamIds.Contains(Domain.Constants.SystemTeamIds.Volunteers))
+        var isVolunteerMember = userTeamIds.Contains(SystemTeamIds.Volunteers);
+
+        // Always include Volunteers team for consent checks (global docs)
+        if (!isVolunteerMember)
         {
-            userTeamIds.Add(Domain.Constants.SystemTeamIds.Volunteers);
+            userTeamIds.Add(SystemTeamIds.Volunteers);
         }
 
         // Get required document versions across all user's teams
@@ -92,11 +95,12 @@ public class HomeController : Controller
         {
             DisplayName = user.DisplayName,
             ProfilePictureUrl = user.ProfilePictureUrl,
-            MembershipStatus = GetMembershipStatus(profile, pendingConsents),
+            MembershipStatus = GetMembershipStatus(profile, isVolunteerMember, pendingConsents),
             HasProfile = profile != null,
             ProfileComplete = profile != null && !string.IsNullOrEmpty(profile.FirstName),
             PendingConsents = pendingConsents,
             TotalRequiredConsents = requiredVersionIds.Count,
+            IsVolunteerMember = isVolunteerMember,
             HasPendingApplication = hasPendingApp,
             LatestApplicationStatus = latestApplication?.Status.ToString(),
             LatestApplicationDate = latestApplication?.SubmittedAt.ToDateTimeUtc(),
@@ -125,16 +129,16 @@ public class HomeController : Controller
         return View();
     }
 
-    private static string GetMembershipStatus(Profile? profile, int pendingConsents)
+    private static string GetMembershipStatus(Profile? profile, bool isVolunteerMember, int pendingConsents)
     {
-        if (profile == null)
-        {
-            return "Incomplete";
-        }
-
-        if (profile.IsSuspended)
+        if (profile?.IsSuspended == true)
         {
             return "Suspended";
+        }
+
+        if (!isVolunteerMember)
+        {
+            return "Pending";
         }
 
         if (pendingConsents > 0)

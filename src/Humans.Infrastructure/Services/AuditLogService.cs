@@ -70,7 +70,7 @@ public class AuditLogService : IAuditLogService
             Description = description,
             OccurredAt = _clock.GetCurrentInstant(),
             ActorUserId = actorUserId,
-            ActorName = $"Admin: {actorDisplayName}",
+            ActorName = actorDisplayName,
             RelatedEntityId = relatedEntityId,
             RelatedEntityType = relatedEntityType
         };
@@ -78,7 +78,7 @@ public class AuditLogService : IAuditLogService
         _dbContext.AuditLogEntries.Add(entry);
 
         _logger.LogDebug("Audit: {Action} on {EntityType} {EntityId} by {Actor} — {Description}",
-            action, entityType, entityId, $"Admin: {actorDisplayName}", description);
+            action, entityType, entityId, actorDisplayName, description);
 
         return Task.CompletedTask;
     }

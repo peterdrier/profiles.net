@@ -137,6 +137,11 @@
   <data name="Dashboard_GovernanceDescription" xml:space="preserve"><value>Les asociados sont des membres votants qui participent aux d&#xE9;cisions de gouvernance telles que les assembl&#xE9;es et les &#xE9;lections. Cela est destin&#xE9; aux leaders communautaires et aux b&#xE9;n&#xE9;voles engag&#xE9;s sur le long terme.</value></data>
   <data name="Dashboard_GovernanceOptional" xml:space="preserve"><value>La participation &#xE0; la gouvernance est facultative et n'affecte pas votre acc&#xE8;s aux ressources.</value></data>
   <data name="Dashboard_LearnMore" xml:space="preserve"><value>En savoir plus</value></data>
+  <data name="Dashboard_OnboardingTitle" xml:space="preserve"><value>Premiers pas</value></data>
+  <data name="Dashboard_OnboardingDescription" xml:space="preserve"><value>Compl&#xE9;tez ces &#xE9;tapes pour devenir b&#xE9;n&#xE9;vole :</value></data>
+  <data name="Dashboard_Step_Profile" xml:space="preserve"><value>Compl&#xE9;ter votre profil</value></data>
+  <data name="Dashboard_Step_Consents" xml:space="preserve"><value>Examiner et accepter les documents requis</value></data>
+  <data name="Dashboard_Step_Approval" xml:space="preserve"><value>Le conseil examine et approuve votre compte</value></data>
   <data name="Dashboard_YourMembership" xml:space="preserve"><value>Votre adh&#xE9;sion</value></data>
   <data name="Dashboard_MemberSince" xml:space="preserve"><value>Membre depuis</value></data>
   <data name="Dashboard_LastLogin" xml:space="preserve"><value>Derni&#xE8;re connexion</value></data>
@@ -643,6 +648,7 @@
   <data name="AdminAppDetail_RejectConfirm" xml:space="preserve"><value>Refuser cette candidature&#xA0;?</value></data>
   <data name="AdminAppDetail_Reject" xml:space="preserve"><value>Refuser</value></data>
   <data name="AdminAppDetail_RequestMoreInfo" xml:space="preserve"><value>Demander plus d'informations</value></data>
+  <data name="AdminAppDetail_Language" xml:space="preserve"><value>Langue</value></data>
 
   <!-- ======================== -->
   <!-- Admin Teams View         -->

@@ -20,16 +20,15 @@
         return langCode == "es" ? $"{name} (Legal)" : name;
     }
 
-    // Determine which tab to show first: user's language if available, else "es"
+    // Order: Spanish (canonical/legal) always first, then alphabetical
+    var orderedLanguages = Model.Content
+        .OrderByDescending(kv => kv.Key == "es")
+        .ThenBy(kv => languageNames.TryGetValue(kv.Key, out var n) ? n : kv.Key, StringComparer.Ordinal)
+        .ToList();
+
+    // Default active tab: user's language if available, else Spanish
     var userLang = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
     var defaultLang = Model.Content.ContainsKey(userLang) ? userLang : "es";
-
-    // Order: default language first, then "es" (if not already first), then alphabetical
-    var orderedLanguages = Model.Content
-        .OrderByDescending(kv => kv.Key == defaultLang)
-        .ThenByDescending(kv => kv.Key == "es")
-        .ThenBy(kv => kv.Key, StringComparer.Ordinal)
-        .ToList();
 }
 
 <nav aria-label="breadcrumb">
@@ -62,14 +61,13 @@
         @if (orderedLanguages.Count > 0)
         {
             <ul class="nav nav-tabs" id="contentTabs" role="tablist">
-                @for (var i = 0; i < orderedLanguages.Count; i++)
+                @foreach (var lang in orderedLanguages)
                 {
-                    var lang = orderedLanguages[i];
-                    var isFirst = i == 0;
+                    var isActive = lang.Key == defaultLang;
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link @(isFirst ? "active" : "")" id="tab-@lang.Key" data-bs-toggle="tab"
+                        <button class="nav-link @(isActive ? "active" : "")" id="tab-@lang.Key" data-bs-toggle="tab"
                                 data-bs-target="#content-@lang.Key" type="button" role="tab"
-                                aria-controls="content-@lang.Key" aria-selected="@(isFirst ? "true" : "false")">
+                                aria-controls="content-@lang.Key" aria-selected="@(isActive ? "true" : "false")">
                             @GetLanguageLabel(lang.Key)
                         </button>
                     </li>
@@ -77,11 +75,10 @@
             </ul>
 
             <div class="tab-content border border-top-0 p-4 bg-white" id="contentTabsContent" style="max-height: 500px; overflow-y: auto;">
-                @for (var i = 0; i < orderedLanguages.Count; i++)
+                @foreach (var lang in orderedLanguages)
                 {
-                    var lang = orderedLanguages[i];
-                    var isFirst = i == 0;
-                    <div class="tab-pane fade @(isFirst ? "show active" : "")" id="content-@lang.Key" role="tabpanel" aria-labelledby="tab-@lang.Key">
+                    var isActive = lang.Key == defaultLang;
+                    <div class="tab-pane fade @(isActive ? "show active" : "")" id="content-@lang.Key" role="tabpanel" aria-labelledby="tab-@lang.Key">
                         @if (string.IsNullOrEmpty(lang.Value))
                         {
                             <p class="text-muted">@Localizer["ConsentReview_ContentNotAvailable"]</p>

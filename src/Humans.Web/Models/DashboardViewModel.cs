@@ -14,6 +14,9 @@ public class DashboardViewModel
     public int PendingConsents { get; set; }
     public int TotalRequiredConsents { get; set; }
 
+    // Membership
+    public bool IsVolunteerMember { get; set; }
+
     // Applications
     public bool HasPendingApplication { get; set; }
     public string? LatestApplicationStatus { get; set; }

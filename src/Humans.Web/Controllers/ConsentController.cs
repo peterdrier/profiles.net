@@ -9,6 +9,7 @@ using NodaTime;
 using Humans.Application.Interfaces;
 using Humans.Domain.Entities;
 using Humans.Infrastructure.Data;
+using Humans.Infrastructure.Jobs;
 using Humans.Web.Models;
 
 namespace Humans.Web.Controllers;
@@ -21,6 +22,7 @@ public class ConsentController : Controller
     private readonly IConsentRecordRepository _consentRepository;
     private readonly IMembershipCalculator _membershipCalculator;
     private readonly IGoogleSyncService _googleSyncService;
+    private readonly SystemTeamSyncJob _systemTeamSyncJob;
     private readonly IClock _clock;
     private readonly ILogger<ConsentController> _logger;
     private readonly IStringLocalizer<SharedResource> _localizer;
@@ -31,6 +33,7 @@ public class ConsentController : Controller
         IConsentRecordRepository consentRepository,
         IMembershipCalculator membershipCalculator,
         IGoogleSyncService googleSyncService,
+        SystemTeamSyncJob systemTeamSyncJob,
         IClock clock,
         ILogger<ConsentController> logger,
         IStringLocalizer<SharedResource> localizer)
@@ -40,6 +43,7 @@ public class ConsentController : Controller
         _consentRepository = consentRepository;
         _membershipCalculator = membershipCalculator;
         _googleSyncService = googleSyncService;
+        _systemTeamSyncJob = systemTeamSyncJob;
         _clock = clock;
         _logger = logger;
         _localizer = localizer;
@@ -237,14 +241,8 @@ public class ConsentController : Controller
             "User {UserId} consented to document {DocumentName} version {Version}",
             user.Id, version.LegalDocument.Name, version.VersionNumber);
 
-        // Check if status is now Active (restores access if previously suspended)
-        var newStatus = await _membershipCalculator.ComputeStatusAsync(user.Id);
-        if (newStatus == Domain.Enums.MembershipStatus.Active)
-        {
-            // Restore access to Google resources
-            await _googleSyncService.RestoreUserToAllTeamsAsync(user.Id);
-            _logger.LogInformation("Restored resource access for user {UserId} after compliance", user.Id);
-        }
+        // Sync Volunteers team membership (adds user if approved + all consents done)
+        await _systemTeamSyncJob.SyncVolunteersMembershipForUserAsync(user.Id);
 
         TempData["SuccessMessage"] = string.Format(_localizer["Consent_ThankYou"].Value, version.LegalDocument.Name);
         return RedirectToAction(nameof(Index));

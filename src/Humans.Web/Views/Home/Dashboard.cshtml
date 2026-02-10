@@ -24,7 +24,23 @@
     </div>
 </div>
 
-@if (Model.PendingConsents > 0)
+@if (!Model.IsVolunteerMember)
+{
+    <div class="alert alert-info" role="alert">
+        <h5 class="alert-heading">@Localizer["Dashboard_OnboardingTitle"]</h5>
+        <p class="mb-2">@Localizer["Dashboard_OnboardingDescription"]</p>
+        <ol class="mb-0">
+            <li class="@(Model.ProfileComplete ? "text-decoration-line-through text-muted" : "fw-bold")">
+                @Localizer["Dashboard_Step_Profile"]
+            </li>
+            <li class="@(Model.PendingConsents == 0 && Model.TotalRequiredConsents > 0 ? "text-decoration-line-through text-muted" : Model.ProfileComplete ? "fw-bold" : "")">
+                @Localizer["Dashboard_Step_Consents"]
+            </li>
+            <li>@Localizer["Dashboard_Step_Approval"]</li>
+        </ol>
+    </div>
+}
+else if (Model.PendingConsents > 0)
 {
     <div class="alert alert-warning" role="alert">
         @Html.Raw(string.Format(Localizer["Dashboard_PendingConsentsAlert"].Value, Model.PendingConsents))
@@ -83,30 +99,33 @@
             </div>
         </div>
 
-        <div class="card mb-4">
-            <div class="card-header">@Localizer["Nav_Governance"]</div>
-            <div class="card-body">
-                @if (Model.LatestApplicationStatus != null)
-                {
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>@Localizer["Dashboard_LatestApplication"]</strong>
-                            <span class="badge @StatusBadgeExtensions.GetApplicationStatusBadgeClass(Model.LatestApplicationStatus)">@Model.LatestApplicationStatus</span>
+        @if (Model.IsVolunteerMember)
+        {
+            <div class="card mb-4">
+                <div class="card-header">@Localizer["Nav_Governance"]</div>
+                <div class="card-body">
+                    @if (Model.LatestApplicationStatus != null)
+                    {
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@Localizer["Dashboard_LatestApplication"]</strong>
+                                <span class="badge @StatusBadgeExtensions.GetApplicationStatusBadgeClass(Model.LatestApplicationStatus)">@Model.LatestApplicationStatus</span>
+                            </div>
+                            <small class="text-muted">@Model.LatestApplicationDate?.ToString("d MMM yyyy")</small>
                         </div>
-                        <small class="text-muted">@Model.LatestApplicationDate?.ToString("d MMM yyyy")</small>
-                    </div>
-                    <div class="mt-2">
-                        <a asp-controller="Application" asp-action="Index">@Localizer["Dashboard_ViewApplicationHistory"]</a>
-                    </div>
-                }
-                else
-                {
-                    <p class="text-muted mb-2">@Localizer["Dashboard_GovernanceDescription"]</p>
-                    <p class="text-muted mb-3"><small>@Localizer["Dashboard_GovernanceOptional"]</small></p>
-                    <a asp-controller="Application" asp-action="Index" class="btn btn-sm btn-outline-secondary">@Localizer["Dashboard_LearnMore"]</a>
-                }
+                        <div class="mt-2">
+                            <a asp-controller="Application" asp-action="Index">@Localizer["Dashboard_ViewApplicationHistory"]</a>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-2">@Localizer["Dashboard_GovernanceDescription"]</p>
+                        <p class="text-muted mb-3"><small>@Localizer["Dashboard_GovernanceOptional"]</small></p>
+                        <a asp-controller="Application" asp-action="Index" class="btn btn-sm btn-outline-secondary">@Localizer["Dashboard_LearnMore"]</a>
+                    }
+                </div>
             </div>
-        </div>
+        }
     </div>
 
     <div class="col-md-4">
@@ -140,7 +159,11 @@
                         <span class="badge bg-warning float-end">@Model.PendingConsents</span>
                     }
                 </a>
-                <a asp-controller="Application" asp-action="Index" class="list-group-item list-group-item-action">@Localizer["Nav_Governance"]</a>
+                @if (Model.IsVolunteerMember)
+                {
+                    <a asp-controller="Team" asp-action="Index" class="list-group-item list-group-item-action">@Localizer["Nav_Teams"]</a>
+                    <a asp-controller="Application" asp-action="Index" class="list-group-item list-group-item-action">@Localizer["Nav_Governance"]</a>
+                }
                 <a asp-controller="Home" asp-action="Privacy" class="list-group-item list-group-item-action">@Localizer["Nav_Privacy"]</a>
             </div>
         </div>

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -131,6 +132,7 @@ public class ApplicationController : Controller
             UserId = user.Id,
             Motivation = model.Motivation,
             AdditionalInfo = model.AdditionalInfo,
+            Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName,
             SubmittedAt = now,
             UpdatedAt = now
         };

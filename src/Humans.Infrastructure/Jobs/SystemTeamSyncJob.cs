@@ -160,6 +160,31 @@ public class SystemTeamSyncJob
         await SyncTeamMembershipAsync(team, eligibleSet.ToList(), cancellationToken);
     }
 
+    /// <summary>
+    /// Syncs Volunteers team membership for a single user. Call this after approving
+    /// a volunteer or after they complete their required consents.
+    /// </summary>
+    public async Task SyncVolunteersMembershipForUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var team = await GetSystemTeamAsync(SystemTeamType.Volunteers, cancellationToken);
+        if (team == null)
+        {
+            _logger.LogWarning("Volunteers system team not found");
+            return;
+        }
+
+        var profile = await _dbContext.Profiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == userId, cancellationToken);
+
+        var isEligible = profile is { IsApproved: true, IsSuspended: false }
+            && await _membershipCalculator.HasAllRequiredConsentsForTeamAsync(userId, SystemTeamIds.Volunteers, cancellationToken);
+
+        // Build a single-user eligible list and let the existing sync logic handle add/remove
+        var eligibleUserIds = isEligible ? [userId] : new List<Guid>();
+        await SyncTeamMembershipAsync(team, eligibleUserIds, cancellationToken, singleUserSync: userId);
+    }
+
     private async Task<Team?> GetSystemTeamAsync(SystemTeamType systemTeamType, CancellationToken cancellationToken)
     {
         return await _dbContext.Teams
@@ -167,7 +192,8 @@ public class SystemTeamSyncJob
             .FirstOrDefaultAsync(t => t.SystemTeamType == systemTeamType, cancellationToken);
     }
 
-    private async Task SyncTeamMembershipAsync(Team team, List<Guid> eligibleUserIds, CancellationToken cancellationToken)
+    private async Task SyncTeamMembershipAsync(Team team, List<Guid> eligibleUserIds,
+        CancellationToken cancellationToken, Guid? singleUserSync = null)
     {
         var currentMemberIds = team.Members
             .Where(m => m.LeftAt == null)
@@ -176,11 +202,14 @@ public class SystemTeamSyncJob
 
         var eligibleSet = eligibleUserIds.ToHashSet();
 
+        // When syncing a single user, only evaluate that user (don't remove others)
+        var scopeIds = singleUserSync.HasValue ? new HashSet<Guid> { singleUserSync.Value } : currentMemberIds.Union(eligibleSet).ToHashSet();
+
         // Users to add (in eligible but not current members)
-        var toAdd = eligibleSet.Except(currentMemberIds).ToList();
+        var toAdd = scopeIds.Where(id => eligibleSet.Contains(id) && !currentMemberIds.Contains(id)).ToList();
 
         // Users to remove (current members but not in eligible)
-        var toRemove = currentMemberIds.Except(eligibleSet).ToList();
+        var toRemove = scopeIds.Where(id => currentMemberIds.Contains(id) && !eligibleSet.Contains(id)).ToList();
 
         var now = _clock.GetCurrentInstant();
 

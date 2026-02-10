@@ -2,16 +2,22 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
+using Humans.Domain.Constants;
 using Humans.Infrastructure.Data;
 
 namespace Humans.Web.Authorization;
 
 /// <summary>
-/// Claims transformation that syncs active RoleAssignment entities to Identity role claims.
-/// This enables User.IsInRole() and [Authorize(Roles = "...")] to work correctly.
+/// Claims transformation that syncs active RoleAssignment entities to Identity role claims
+/// and adds membership status claims. Runs on every authenticated request.
 /// </summary>
 public class RoleAssignmentClaimsTransformation : IClaimsTransformation
 {
+    /// <summary>
+    /// Claim type indicating the user is an active member of the Volunteers team.
+    /// </summary>
+    public const string ActiveMemberClaimType = "ActiveMember";
+
     private readonly IServiceProvider _serviceProvider;
     private readonly IClock _clock;
 
@@ -55,15 +61,24 @@ public class RoleAssignmentClaimsTransformation : IClaimsTransformation
             .Distinct()
             .ToListAsync();
 
-        if (activeRoles.Count == 0)
-        {
-            return principal;
-        }
-
         var identity = new ClaimsIdentity();
+
         foreach (var role in activeRoles)
         {
             identity.AddClaim(new Claim(ClaimTypes.Role, role));
+        }
+
+        // Check if user is an active Volunteers team member
+        var isVolunteerMember = await dbContext.TeamMembers
+            .AsNoTracking()
+            .AnyAsync(tm =>
+                tm.UserId == userId &&
+                tm.TeamId == SystemTeamIds.Volunteers &&
+                !tm.LeftAt.HasValue);
+
+        if (isVolunteerMember)
+        {
+            identity.AddClaim(new Claim(ActiveMemberClaimType, "true"));
         }
 
         // Marker claim to prevent duplicate processing

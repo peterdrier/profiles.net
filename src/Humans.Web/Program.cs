@@ -234,7 +234,10 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 builder.Services.AddLocalization();
 
 // Add Controllers with Views
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllersWithViews(options =>
+    {
+        options.Filters.Add<MembershipRequiredFilter>();
+    })
     .AddViewLocalization(LanguageViewLocationExpanderFormat.Suffix)
     .AddDataAnnotationsLocalization();
 builder.Services.AddRazorPages();

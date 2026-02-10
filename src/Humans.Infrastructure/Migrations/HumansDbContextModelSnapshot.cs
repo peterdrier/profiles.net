@@ -33,6 +33,10 @@ namespace Humans.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("Language")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
                     b.Property<string>("Motivation")
                         .IsRequired()
                         .HasMaxLength(4000)

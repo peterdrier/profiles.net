@@ -23,6 +23,9 @@ public class ApplicationConfiguration : IEntityTypeConfiguration<MemberApplicati
         builder.Property(a => a.AdditionalInfo)
             .HasMaxLength(4000);
 
+        builder.Property(a => a.Language)
+            .HasMaxLength(10);
+
         builder.Property(a => a.ReviewNotes)
             .HasMaxLength(4000);
 

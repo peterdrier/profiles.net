@@ -105,6 +105,7 @@ public class AdminApplicationDetailViewModel
     public string Status { get; set; } = string.Empty;
     public string Motivation { get; set; } = string.Empty;
     public string? AdditionalInfo { get; set; }
+    public string? Language { get; set; }
     public DateTime SubmittedAt { get; set; }
     public DateTime? ReviewStartedAt { get; set; }
     public string? ReviewerName { get; set; }
