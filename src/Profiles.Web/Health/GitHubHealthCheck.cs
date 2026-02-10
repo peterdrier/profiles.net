@@ -34,7 +34,7 @@ public class GitHubHealthCheck : IHealthCheck
 
         try
         {
-            var client = new GitHubClient(new ProductHeaderValue("NobodiesProfiles-HealthCheck"));
+            var client = new GitHubClient(new ProductHeaderValue("Humans-HealthCheck"));
 
             if (!string.IsNullOrEmpty(_settings.AccessToken))
             {

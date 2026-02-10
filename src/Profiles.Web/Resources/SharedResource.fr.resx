@@ -50,7 +50,7 @@
   <!-- ======================== -->
   <!-- Navigation (_Layout)     -->
   <!-- ======================== -->
-  <data name="Nav_Brand" xml:space="preserve"><value>Nobodies Profiles</value></data>
+  <data name="Nav_Brand" xml:space="preserve"><value>Humans</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Accueil</value></data>
   <data name="Nav_MyProfile" xml:space="preserve"><value>Mon profil</value></data>
   <data name="Nav_Teams" xml:space="preserve"><value>&#xC9;quipes</value></data>
@@ -58,7 +58,7 @@
   <data name="Nav_Governance" xml:space="preserve"><value>Gouvernance</value></data>
   <data name="Nav_Privacy" xml:space="preserve"><value>Confidentialit&#xE9;</value></data>
   <data name="Nav_Admin" xml:space="preserve"><value>Admin</value></data>
-  <data name="Footer_Copyright" xml:space="preserve"><value>&amp;copy; {0} Nobodies Collective. Tous droits r&#xE9;serv&#xE9;s.</value><comment>{0} = year</comment></data>
+  <data name="Footer_Copyright" xml:space="preserve"><value>Humans &amp;mdash; Sous licence &lt;a href="https://creativecommons.org/licenses/by-sa/4.0/"&gt;CC BY-SA 4.0&lt;/a&gt;</value></data>
 
   <!-- ======================== -->
   <!-- Cookie Banner (_Layout)  -->
@@ -79,7 +79,7 @@
   <!-- Account / Login          -->
   <!-- ======================== -->
   <data name="Login_Title" xml:space="preserve"><value>Connexion</value></data>
-  <data name="Login_Description" xml:space="preserve"><value>Connectez-vous avec votre compte Google pour acc&#xE9;der &#xE0; Nobodies Profiles.</value></data>
+  <data name="Login_Description" xml:space="preserve"><value>Connectez-vous avec votre compte Google pour acc&#xE9;der &#xE0; Humans.</value></data>
   <data name="Login_SignInWithGoogle" xml:space="preserve"><value>Se connecter avec Google</value></data>
   <data name="AccessDenied_Title" xml:space="preserve"><value>Acc&#xE8;s refus&#xE9;</value></data>
   <data name="AccessDenied_Description" xml:space="preserve"><value>Vous n'avez pas la permission d'acc&#xE9;der &#xE0; cette page.</value></data>
@@ -98,7 +98,7 @@
   <!-- Home (Landing Page)      -->
   <!-- ======================== -->
   <data name="Home_Title" xml:space="preserve"><value>Accueil</value></data>
-  <data name="Home_Tagline" xml:space="preserve"><value>Acc&#xE8;s et conformit&#xE9; pour Nobodies Collective</value></data>
+  <data name="Home_Tagline" xml:space="preserve"><value>Portail des membres de Nobodies Collective</value></data>
   <data name="Home_WhyTitle" xml:space="preserve"><value>Pourquoi avons-nous besoin de cela&#xA0;?</value></data>
   <data name="Home_WhyDescription" xml:space="preserve"><value>En tant qu'association enregistr&#xE9;e en Espagne, Nobodies Collective a des obligations l&#xE9;gales. Avant que quiconque puisse acc&#xE9;der aux ressources partag&#xE9;es, nous devons confirmer l'acceptation de nos politiques. Ce syst&#xE8;me g&#xE8;re cela simplement et maintient tout &#xE0; jour.</value></data>
   <data name="Home_ComplianceTitle" xml:space="preserve"><value>Conformit&#xE9; l&#xE9;gale</value></data>
@@ -520,13 +520,13 @@
   <!-- Email Subjects           -->
   <!-- ======================== -->
   <data name="Email_ApplicationSubmitted_Subject" xml:space="preserve"><value>Nouvelle candidature d'adh&#xE9;sion : {0}</value><comment>{0} = applicant name</comment></data>
-  <data name="Email_ApplicationApproved_Subject" xml:space="preserve"><value>Bienvenue chez Nobodies Collective&#xA0;!</value></data>
+  <data name="Email_ApplicationApproved_Subject" xml:space="preserve"><value>Bienvenue sur Humans&#xA0;!</value></data>
   <data name="Email_ApplicationApproved_Heading" xml:space="preserve"><value>Votre candidature a &#xE9;t&#xE9; approuv&#xE9;e&#xA0;!</value></data>
   <data name="Email_ApplicationRejected_Subject" xml:space="preserve"><value>Concernant votre candidature d'adh&#xE9;sion</value></data>
   <data name="Email_ReConsentRequired_Subject_Single" xml:space="preserve"><value>Action requise : {0} mis &#xE0; jour</value><comment>{0} = document name</comment></data>
   <data name="Email_ReConsentRequired_Subject_Multiple" xml:space="preserve"><value>Action requise : Plusieurs documents l&#xE9;gaux mis &#xE0; jour</value></data>
   <data name="Email_ReConsentReminder_Subject" xml:space="preserve"><value>Rappel : {0} jours pour consulter les documents mis &#xE0; jour</value><comment>{0} = days remaining</comment></data>
-  <data name="Email_Welcome_Subject" xml:space="preserve"><value>Bienvenue chez Nobodies Collective&#xA0;!</value></data>
+  <data name="Email_Welcome_Subject" xml:space="preserve"><value>Bienvenue sur Humans&#xA0;!</value></data>
   <data name="Email_Welcome_Heading" xml:space="preserve"><value>Bienvenue&#xA0;!</value></data>
   <data name="Email_AccessSuspended_Subject" xml:space="preserve"><value>Votre acc&#xE8;s membre a &#xE9;t&#xE9; suspendu</value></data>
   <data name="Email_VerifyEmail_Subject" xml:space="preserve"><value>V&#xE9;rifiez votre adresse e-mail</value></data>

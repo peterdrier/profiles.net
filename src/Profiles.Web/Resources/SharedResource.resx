@@ -50,7 +50,7 @@
   <!-- ======================== -->
   <!-- Navigation (_Layout)     -->
   <!-- ======================== -->
-  <data name="Nav_Brand" xml:space="preserve"><value>Nobodies Profiles</value></data>
+  <data name="Nav_Brand" xml:space="preserve"><value>Humans</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
   <data name="Nav_MyProfile" xml:space="preserve"><value>My Profile</value></data>
   <data name="Nav_Teams" xml:space="preserve"><value>Teams</value></data>
@@ -58,7 +58,7 @@
   <data name="Nav_Governance" xml:space="preserve"><value>Governance</value></data>
   <data name="Nav_Privacy" xml:space="preserve"><value>Privacy</value></data>
   <data name="Nav_Admin" xml:space="preserve"><value>Admin</value></data>
-  <data name="Footer_Copyright" xml:space="preserve"><value>&amp;copy; {0} Nobodies Collective. All rights reserved.</value><comment>{0} = year</comment></data>
+  <data name="Footer_Copyright" xml:space="preserve"><value>Humans &amp;mdash; Licensed under &lt;a href="https://creativecommons.org/licenses/by-sa/4.0/"&gt;CC BY-SA 4.0&lt;/a&gt;</value></data>
 
   <!-- ======================== -->
   <!-- Cookie Banner (_Layout)  -->
@@ -79,7 +79,7 @@
   <!-- Account / Login          -->
   <!-- ======================== -->
   <data name="Login_Title" xml:space="preserve"><value>Sign In</value></data>
-  <data name="Login_Description" xml:space="preserve"><value>Sign in with your Google account to access Nobodies Profiles.</value></data>
+  <data name="Login_Description" xml:space="preserve"><value>Sign in with your Google account to access Humans.</value></data>
   <data name="Login_SignInWithGoogle" xml:space="preserve"><value>Sign in with Google</value></data>
   <data name="AccessDenied_Title" xml:space="preserve"><value>Access Denied</value></data>
   <data name="AccessDenied_Description" xml:space="preserve"><value>You do not have permission to access this page.</value></data>
@@ -98,7 +98,7 @@
   <!-- Home (Landing Page)      -->
   <!-- ======================== -->
   <data name="Home_Title" xml:space="preserve"><value>Home</value></data>
-  <data name="Home_Tagline" xml:space="preserve"><value>Access and compliance for Nobodies Collective</value></data>
+  <data name="Home_Tagline" xml:space="preserve"><value>Membership portal for Nobodies Collective</value></data>
   <data name="Home_WhyTitle" xml:space="preserve"><value>Why do we need this?</value></data>
   <data name="Home_WhyDescription" xml:space="preserve"><value>As a registered association in Spain, Nobodies Collective has legal obligations. Before anyone can access shared resources, we need to confirm agreement to our policies. This system handles that simply and keeps everything current.</value></data>
   <data name="Home_ComplianceTitle" xml:space="preserve"><value>Legal Compliance</value></data>
@@ -520,13 +520,13 @@
   <!-- Email Subjects           -->
   <!-- ======================== -->
   <data name="Email_ApplicationSubmitted_Subject" xml:space="preserve"><value>New Membership Application: {0}</value><comment>{0} = applicant name</comment></data>
-  <data name="Email_ApplicationApproved_Subject" xml:space="preserve"><value>Welcome to Nobodies Collective!</value></data>
+  <data name="Email_ApplicationApproved_Subject" xml:space="preserve"><value>Welcome to Humans!</value></data>
   <data name="Email_ApplicationApproved_Heading" xml:space="preserve"><value>Your Application Has Been Approved!</value></data>
   <data name="Email_ApplicationRejected_Subject" xml:space="preserve"><value>Regarding Your Membership Application</value></data>
   <data name="Email_ReConsentRequired_Subject_Single" xml:space="preserve"><value>Action Required: Updated {0}</value><comment>{0} = document name</comment></data>
   <data name="Email_ReConsentRequired_Subject_Multiple" xml:space="preserve"><value>Action Required: Multiple Legal Documents Updated</value></data>
   <data name="Email_ReConsentReminder_Subject" xml:space="preserve"><value>Reminder: {0} days to review updated documents</value><comment>{0} = days remaining</comment></data>
-  <data name="Email_Welcome_Subject" xml:space="preserve"><value>Welcome to Nobodies Collective!</value></data>
+  <data name="Email_Welcome_Subject" xml:space="preserve"><value>Welcome to Humans!</value></data>
   <data name="Email_Welcome_Heading" xml:space="preserve"><value>Welcome!</value></data>
   <data name="Email_AccessSuspended_Subject" xml:space="preserve"><value>Your Membership Access Has Been Suspended</value></data>
   <data name="Email_VerifyEmail_Subject" xml:space="preserve"><value>Verify Your Email Address</value></data>

@@ -60,7 +60,7 @@ public class SmtpEmailService : IEmailService
             <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
             <p>Dear {HtmlEncode(userName)},</p>
             <p>We're delighted to inform you that your membership application has been approved.
-            Welcome to Nobodies Collective!</p>
+            Welcome to Humans!</p>
             <p>You can now access your member profile and explore teams:</p>
             <ul>
                 <li><a href="{_settings.BaseUrl}/Profile">View Your Profile</a></li>
@@ -68,7 +68,7 @@ public class SmtpEmailService : IEmailService
                 <li><a href="{_settings.BaseUrl}/Consent">Review Legal Documents</a></li>
             </ul>
             <p>If you have any questions, don't hesitate to reach out.</p>
-            <p>Welcome aboard!<br/>The Nobodies Collective Team</p>
+            <p>Welcome aboard!<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -85,12 +85,12 @@ public class SmtpEmailService : IEmailService
         var body = $"""
             <h2>Application Update</h2>
             <p>Dear {HtmlEncode(userName)},</p>
-            <p>Thank you for your interest in Nobodies Collective. After careful review,
+            <p>Thank you for your interest in joining us. After careful review,
             we regret to inform you that we are unable to approve your membership application at this time.</p>
             {(string.IsNullOrEmpty(reason) ? "" : $"<p><strong>Reason:</strong> {HtmlEncode(reason)}</p>")}
             <p>If you have any questions or would like to discuss this decision,
             please contact us at <a href="mailto:{_settings.AdminAddress}">{_settings.AdminAddress}</a>.</p>
-            <p>Best regards,<br/>The Nobodies Collective Team</p>
+            <p>Best regards,<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -128,7 +128,7 @@ public class SmtpEmailService : IEmailService
             <p>As a member, you need to review and accept these updated documents to maintain your active membership status.</p>
             <p><a href="{_settings.BaseUrl}/Consent">Review and Accept</a></p>
             <p>If you have any questions about the changes, please contact us.</p>
-            <p>Thank you,<br/>The Nobodies Collective Team</p>
+            <p>Thank you,<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -154,7 +154,7 @@ public class SmtpEmailService : IEmailService
             </ul>
             <p>If you do not accept these documents before the deadline, your membership access may be temporarily suspended.</p>
             <p><a href="{_settings.BaseUrl}/Consent">Review Documents Now</a></p>
-            <p>Thank you,<br/>The Nobodies Collective Team</p>
+            <p>Thank you,<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -170,7 +170,7 @@ public class SmtpEmailService : IEmailService
         var body = $"""
             <h2>{_localizer["Email_Welcome_Heading"].Value}</h2>
             <p>Dear {HtmlEncode(userName)},</p>
-            <p>Welcome to the Nobodies Collective member portal!</p>
+            <p>Welcome to the Humans member portal!</p>
             <p>Here's what you can do:</p>
             <ul>
                 <li><a href="{_settings.BaseUrl}/Profile">Complete your profile</a></li>
@@ -178,7 +178,7 @@ public class SmtpEmailService : IEmailService
                 <li><a href="{_settings.BaseUrl}/Consent">Review legal documents</a></li>
             </ul>
             <p>If you have any questions, feel free to reach out to us.</p>
-            <p>Best regards,<br/>The Nobodies Collective Team</p>
+            <p>Best regards,<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -203,7 +203,7 @@ public class SmtpEmailService : IEmailService
             </ul>
             <p>If you believe this is an error or have questions, please contact us at
             <a href="mailto:{_settings.AdminAddress}">{_settings.AdminAddress}</a>.</p>
-            <p>The Nobodies Collective Team</p>
+            <p>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -225,7 +225,7 @@ public class SmtpEmailService : IEmailService
             <p><a href="{verificationUrl}">Verify Email Address</a></p>
             <p>This link will expire in 24 hours.</p>
             <p>If you did not request this change, you can safely ignore this email.</p>
-            <p>The Nobodies Collective Team</p>
+            <p>The Humans Team</p>
             """;
 
         await SendEmailAsync(toEmail, subject, body, cancellationToken);
@@ -248,7 +248,7 @@ public class SmtpEmailService : IEmailService
             <p>If you change your mind, you can cancel this request before the deletion date by visiting:</p>
             <p><a href="{_settings.BaseUrl}/Profile/Privacy">Cancel Deletion Request</a></p>
             <p>After deletion, this action cannot be undone and all your data will be permanently removed.</p>
-            <p>The Nobodies Collective Team</p>
+            <p>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -264,11 +264,11 @@ public class SmtpEmailService : IEmailService
         var body = $"""
             <h2>Account Deleted</h2>
             <p>Dear {HtmlEncode(userName)},</p>
-            <p>As requested, your Nobodies Collective account has been permanently deleted.
+            <p>As requested, your Humans account has been permanently deleted.
             All your personal data has been removed from our systems.</p>
             <p>Thank you for being part of our community. If you ever wish to rejoin,
             you're welcome to submit a new membership application.</p>
-            <p>Best wishes,<br/>The Nobodies Collective Team</p>
+            <p>Best wishes,<br/>The Humans Team</p>
             """;
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
@@ -328,17 +328,17 @@ public class SmtpEmailService : IEmailService
                 <meta charset="utf-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-                    h2 { color: #2c3e50; }
-                    a { color: #3498db; }
+                    body { font-family: 'Source Sans 3', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #3d2b1f; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #faf6f0; }
+                    h2 { color: #3d2b1f; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-weight: 600; }
+                    a { color: #8b6914; }
                     ul { padding-left: 20px; }
-                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+                    .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #c9a96e; font-size: 12px; color: #6b5a4e; }
                 </style>
             </head>
             <body>
             """ + content + $"""
                 <div class="footer">
-                    <p>Nobodies Collective<br/>
+                    <p>Humans &mdash; Nobodies Collective<br/>
                     <a href="{_settings.BaseUrl}">{_settings.BaseUrl}</a></p>
                 </div>
             </body>

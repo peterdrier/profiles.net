@@ -58,7 +58,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         _directoryService = new DirectoryService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = "Nobodies Profiles"
+            ApplicationName = "Humans"
         });
 
         return _directoryService;
@@ -76,7 +76,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
         _driveService = new DriveService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = "Nobodies Profiles"
+            ApplicationName = "Humans"
         });
 
         return _driveService;

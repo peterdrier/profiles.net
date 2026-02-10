@@ -9,20 +9,20 @@
     var currentUser = await UserManager.GetUserAsync(User);
     var displayName = currentUser?.DisplayName ?? User.Identity?.Name;
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="" asp-controller="Profile" asp-action="Index">
+        <a class="nav-link" asp-area="" asp-controller="Profile" asp-action="Index">
             @Html.Raw(string.Format(Localizer["Login_Hello"].Value, displayName))
         </a>
     </li>
     <li class="nav-item">
         <form class="form-inline" asp-area="" asp-controller="Account" asp-action="Logout" method="post">
-            <button type="submit" class="nav-link btn btn-link text-dark border-0">@Localizer["Login_Logout"]</button>
+            <button type="submit" class="nav-link btn btn-link border-0">@Localizer["Login_Logout"]</button>
         </form>
     </li>
 }
 else
 {
     <li class="nav-item">
-        <a class="nav-link text-dark" asp-area="" asp-controller="Account" asp-action="Login">@Localizer["Login_Login"]</a>
+        <a class="nav-link" asp-area="" asp-controller="Account" asp-action="Login">@Localizer["Login_Login"]</a>
     </li>
 }
 </ul>

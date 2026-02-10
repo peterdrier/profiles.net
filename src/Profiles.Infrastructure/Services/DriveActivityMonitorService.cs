@@ -304,7 +304,7 @@ public class DriveActivityMonitorService : IDriveActivityMonitorService
         _activityService = new DriveActivityService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = "Nobodies Profiles"
+            ApplicationName = "Humans"
         });
 
         return _activityService;

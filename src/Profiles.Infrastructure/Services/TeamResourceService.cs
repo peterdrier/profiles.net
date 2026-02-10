@@ -546,7 +546,7 @@ public partial class TeamResourceService : ITeamResourceService
         _driveService = new DriveService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = "Nobodies Profiles"
+            ApplicationName = "Humans"
         });
 
         return _driveService;
@@ -565,7 +565,7 @@ public partial class TeamResourceService : ITeamResourceService
         _directoryService = new DirectoryService(new BaseClientService.Initializer
         {
             HttpClientInitializer = credential,
-            ApplicationName = "Nobodies Profiles"
+            ApplicationName = "Humans"
         });
 
         return _directoryService;

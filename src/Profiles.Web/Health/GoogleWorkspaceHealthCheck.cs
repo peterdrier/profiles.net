@@ -41,7 +41,7 @@ public class GoogleWorkspaceHealthCheck : IHealthCheck
             var directoryService = new DirectoryService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = credential,
-                ApplicationName = "Nobodies Profiles Health Check"
+                ApplicationName = "Humans Health Check"
             });
 
             // List groups with max 1 result — validates credential + Admin SDK access
