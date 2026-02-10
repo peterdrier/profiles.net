@@ -3,20 +3,20 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution and project files
-COPY Profiles.slnx .
-COPY src/Profiles.Domain/Profiles.Domain.csproj src/Profiles.Domain/
-COPY src/Profiles.Application/Profiles.Application.csproj src/Profiles.Application/
-COPY src/Profiles.Infrastructure/Profiles.Infrastructure.csproj src/Profiles.Infrastructure/
-COPY src/Profiles.Web/Profiles.Web.csproj src/Profiles.Web/
+COPY Humans.slnx .
+COPY src/Humans.Domain/Humans.Domain.csproj src/Humans.Domain/
+COPY src/Humans.Application/Humans.Application.csproj src/Humans.Application/
+COPY src/Humans.Infrastructure/Humans.Infrastructure.csproj src/Humans.Infrastructure/
+COPY src/Humans.Web/Humans.Web.csproj src/Humans.Web/
 
 # Restore packages
-RUN dotnet restore Profiles.slnx
+RUN dotnet restore Humans.slnx
 
 # Copy source code
 COPY src/ src/
 
 # Build and publish
-RUN dotnet publish src/Profiles.Web/Profiles.Web.csproj -c Release -o /app/publish --no-restore
+RUN dotnet publish src/Humans.Web/Humans.Web.csproj -c Release -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
@@ -43,4 +43,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8080/health/live || exit 1
 
 # Entry point
-ENTRYPOINT ["dotnet", "Profiles.Web.dll"]
+ENTRYPOINT ["dotnet", "Humans.Web.dll"]
