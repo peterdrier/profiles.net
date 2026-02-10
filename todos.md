@@ -57,12 +57,8 @@ DB commits before Google API call. If Google fails, DB is committed but resource
 **Where:** `TeamService.cs:258,261` and `:574,577`
 
 #### P1-13: Apply configured Google group settings during provisioning
-`GoogleWorkspaceSettings.GroupSettings` properties (WhoCanViewMembership, AllowExternalMembers, etc.) are defined but never applied. Groups get Google defaults.
+`GoogleWorkspaceSettings.GroupSettings` properties (WhoCanViewMembership, AllowExternalMembers, etc.) are defined but never applied. Groups get Google defaults. Per R-04, external members must be allowed.
 **Where:** `GoogleWorkspaceSettings.cs:49-78`, `GoogleWorkspaceSyncService.cs:208-215`
-
-#### P1-06: Domain restriction decision for Google login
-Any Google account can auto-create a user. No domain restriction or approval gate. Linked to decision R-01.
-**Where:** `AccountController.cs:91`, `Program.cs:71-81`
 
 ---
 
@@ -124,7 +120,7 @@ These need production domain, IP ranges, deployment model, or infrastructure dec
 | ID | Issue | Blocked On |
 |----|-------|------------|
 | P0-01 | Lock down trusted proxy headers (IP spoofing risk) | Production reverse proxy IP ranges |
-| P0-03 | Restrict health and metrics endpoints | Deployment model (R-03) |
+| P0-03 | Restrict health and metrics endpoints | Deployment model (public OK for now per R-03, revisit post-launch) |
 | P0-04 | Enforce host header restrictions (`AllowedHosts: *`) | Production domain name |
 | P0-12 | Docker healthcheck broken (curl missing) | Docker/K8s deployment |
 | P0-13 | Replace insecure default credentials in docker-compose | Secrets management |
@@ -134,18 +130,21 @@ These need production domain, IP ranges, deployment model, or infrastructure dec
 
 ---
 
-### Decision Items
+### Decisions (Resolved)
 
-| ID | Question | Options |
-|----|----------|---------|
-| R-01 | Should registration be restricted to `@nobodies.team`? | Restrict domain / Allow any + approval / Keep open |
-| R-02 | Is anonymization sufficient for GDPR deletion? | Accept anonymization / Hard delete / Legal opinion |
-| R-03 | Should `/metrics` and health endpoints be public? | Auth-restricted / Private network / Strip details |
-| R-04 | Should Google Groups allow external members? | Members-only / Allow external / Per-group policy |
+| ID | Question | Decision |
+|----|----------|----------|
+| R-01 | Should registration be restricted to `@nobodies.team`? | **Allow any.** Volunteer approval gate is sufficient. |
+| R-02 | Is anonymization sufficient for GDPR deletion? | **Yes.** Anonymization is acceptable. |
+| R-03 | Should `/metrics` and health endpoints be public? | **Public for now.** Revisit post-launch once running in production. |
+| R-04 | Should Google Groups allow external members? | **Allow external members.** Required for the organization's needs. |
 
 ---
 
 ## Completed
+
+### P1-06: Domain restriction decision for Google login RESOLVED
+Allow any Google account — volunteer approval gate (`IsApproved`) is sufficient access control. No domain restriction needed. (Decision R-01.)
 
 ### Issue #15: Redesign legal document management DONE
 Team-scoped, multi-language legal documents with admin CRUD, folder-based GitHub sync, consent UI grouped by team with dynamic language tabs, per-document grace periods. Committed `b73982c`, `dbc6676`.
