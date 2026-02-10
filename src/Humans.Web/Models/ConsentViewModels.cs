@@ -28,6 +28,7 @@ public class ConsentDocumentViewModel
 
 public class ConsentHistoryViewModel
 {
+    public Guid DocumentVersionId { get; set; }
     public string DocumentName { get; set; } = string.Empty;
     public string VersionNumber { get; set; } = string.Empty;
     public DateTime ConsentedAt { get; set; }
@@ -42,6 +43,8 @@ public class ConsentDetailViewModel
     public DateTime EffectiveFrom { get; set; }
     public string? ChangesSummary { get; set; }
     public bool HasAlreadyConsented { get; set; }
+    public string? ConsentedByFullName { get; set; }
+    public DateTime? ConsentedAt { get; set; }
 }
 
 public class ConsentSubmitModel

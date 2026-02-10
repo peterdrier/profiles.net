@@ -128,8 +128,11 @@
         }
         else
         {
-            <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mt-4">
                 <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["ConsentReview_BackToList"]</a>
+                <div class="text-end text-muted">
+                    Agreed to by <strong>@Model.ConsentedByFullName</strong> on @Model.ConsentedAt?.ToString("d MMM yyyy") at @Model.ConsentedAt?.ToString("HH:mm") UTC
+                </div>
             </div>
         }
     </div>

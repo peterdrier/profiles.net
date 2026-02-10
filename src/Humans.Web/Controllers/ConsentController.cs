@@ -138,6 +138,7 @@ public class ConsentController : Controller
             TeamGroups = teamGroups,
             ConsentHistory = userConsents.Take(10).Select(c => new ConsentHistoryViewModel
             {
+                DocumentVersionId = c.DocumentVersionId,
                 DocumentName = c.DocumentVersion.LegalDocument.Name,
                 VersionNumber = c.DocumentVersion.VersionNumber,
                 ConsentedAt = c.ConsentedAt.ToDateTimeUtc()
@@ -165,8 +166,12 @@ public class ConsentController : Controller
             return NotFound();
         }
 
-        var hasConsented = await _dbContext.ConsentRecords
-            .AnyAsync(c => c.UserId == user.Id && c.DocumentVersionId == id);
+        var consentRecord = await _dbContext.ConsentRecords
+            .FirstOrDefaultAsync(c => c.UserId == user.Id && c.DocumentVersionId == id);
+
+        var profile = await _dbContext.Profiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == user.Id);
 
         var viewModel = new ConsentDetailViewModel
         {
@@ -176,7 +181,9 @@ public class ConsentController : Controller
             Content = new Dictionary<string, string>(version.Content, StringComparer.Ordinal),
             EffectiveFrom = version.EffectiveFrom.ToDateTimeUtc(),
             ChangesSummary = version.ChangesSummary,
-            HasAlreadyConsented = hasConsented
+            HasAlreadyConsented = consentRecord != null,
+            ConsentedByFullName = profile?.FullName,
+            ConsentedAt = consentRecord?.ConsentedAt.ToDateTimeUtc()
         };
 
         return View(viewModel);
