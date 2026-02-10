@@ -17,6 +17,7 @@ public class HumanController : Controller
     private readonly HumansDbContext _dbContext;
     private readonly UserManager<User> _userManager;
     private readonly IContactFieldService _contactFieldService;
+    private readonly IUserEmailService _userEmailService;
     private readonly IVolunteerHistoryService _volunteerHistoryService;
     private readonly ITeamService _teamService;
     private readonly IMembershipCalculator _membershipCalculator;
@@ -25,6 +26,7 @@ public class HumanController : Controller
         HumansDbContext dbContext,
         UserManager<User> userManager,
         IContactFieldService contactFieldService,
+        IUserEmailService userEmailService,
         IVolunteerHistoryService volunteerHistoryService,
         ITeamService teamService,
         IMembershipCalculator membershipCalculator)
@@ -32,6 +34,7 @@ public class HumanController : Controller
         _dbContext = dbContext;
         _userManager = userManager;
         _contactFieldService = contactFieldService;
+        _userEmailService = userEmailService;
         _volunteerHistoryService = volunteerHistoryService;
         _teamService = teamService;
         _membershipCalculator = membershipCalculator;
@@ -60,6 +63,9 @@ public class HumanController : Controller
         var canViewLegalName = isOwnProfile || isBoardMember;
 
         var contactFields = await _contactFieldService.GetVisibleContactFieldsAsync(profile.Id, viewer.Id);
+
+        var accessLevel = await _contactFieldService.GetViewerAccessLevelAsync(id, viewer.Id);
+        var visibleEmails = await _userEmailService.GetVisibleEmailsAsync(id, accessLevel);
 
         var volunteerHistory = await _volunteerHistoryService.GetAllAsync(profile.Id);
 
@@ -92,15 +98,19 @@ public class HumanController : Controller
             BurnerName = profile.BurnerName ?? string.Empty,
             FirstName = profile.FirstName ?? string.Empty,
             LastName = profile.LastName ?? string.Empty,
-            PhoneCountryCode = profile.PhoneCountryCode,
-            PhoneNumber = profile.PhoneNumber,
             City = profile.City,
             CountryCode = profile.CountryCode,
             Bio = profile.Bio,
-            DateOfBirthString = profile.DateOfBirth?.ToString("yyyy-MM-dd", null),
+            BirthdayMonth = profile.DateOfBirth?.Month,
+            BirthdayDay = profile.DateOfBirth?.Day,
             MembershipStatus = (await _membershipCalculator.ComputeStatusAsync(id)).ToString(),
             IsOwnProfile = isOwnProfile,
             CanViewLegalName = canViewLegalName,
+            UserEmails = visibleEmails.Select(e => new UserEmailDisplayViewModel
+            {
+                Email = e.Email,
+                IsNotificationTarget = e.IsNotificationTarget
+            }).ToList(),
             ContactFields = contactFields.Select(cf => new ContactFieldViewModel
             {
                 Id = cf.Id,

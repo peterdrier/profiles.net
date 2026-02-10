@@ -47,18 +47,6 @@ public class Profile
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Phone country code (e.g., "+34" for Spain, "+1" for US).
-    /// </summary>
-    [PersonalData]
-    public string? PhoneCountryCode { get; set; }
-
-    /// <summary>
-    /// Member's phone number (without country code).
-    /// </summary>
-    [PersonalData]
-    public string? PhoneNumber { get; set; }
-
-    /// <summary>
     /// Member's city.
     /// </summary>
     [PersonalData]

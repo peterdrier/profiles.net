@@ -204,7 +204,6 @@ public partial class AdminController : Controller
             LastLoginAt = user.LastLoginAt?.ToDateTimeUtc(),
             FirstName = user.Profile?.FirstName,
             LastName = user.Profile?.LastName,
-            PhoneNumber = user.Profile?.PhoneNumber,
             City = user.Profile?.City,
             CountryCode = user.Profile?.CountryCode,
             IsSuspended = user.Profile?.IsSuspended ?? false,

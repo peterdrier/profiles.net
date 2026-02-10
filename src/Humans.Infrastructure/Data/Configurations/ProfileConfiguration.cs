@@ -24,12 +24,6 @@ public class ProfileConfiguration : IEntityTypeConfiguration<Profile>
             .HasMaxLength(256)
             .IsRequired();
 
-        builder.Property(p => p.PhoneCountryCode)
-            .HasMaxLength(5);
-
-        builder.Property(p => p.PhoneNumber)
-            .HasMaxLength(50);
-
         builder.Property(p => p.City)
             .HasMaxLength(256);
 

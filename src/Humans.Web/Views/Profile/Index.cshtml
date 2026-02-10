@@ -83,12 +83,6 @@
                         </dd>
                     }
 
-                    @if (Model.CanViewLegalName)
-                    {
-                        <dt class="col-sm-3">@Localizer["Profile_Phone"]</dt>
-                        <dd class="col-sm-9">@(Model.FormattedPhoneNumber ?? Localizer["Common_NotProvided"].Value)</dd>
-                    }
-
                     <dt class="col-sm-3">@Localizer["Profile_Location"]</dt>
                     <dd class="col-sm-9">
                         @if (!string.IsNullOrEmpty(Model.City) || !string.IsNullOrEmpty(Model.CountryCode))
@@ -113,10 +107,9 @@
                     {
                         <dt class="col-sm-3">@Localizer["Profile_DateOfBirth"]</dt>
                         <dd class="col-sm-9">
-                            @if (!string.IsNullOrEmpty(Model.FormattedDateOfBirth))
+                            @if (!string.IsNullOrEmpty(Model.FormattedBirthday))
                             {
-                                @Model.FormattedDateOfBirth
-                                <small class="text-muted">(@Localizer["Profile_OnlyVisibleToYouAndBoard"])</small>
+                                @Model.FormattedBirthday
                             }
                             else
                             {
@@ -128,7 +121,7 @@
             </div>
         </div>
 
-        @if (Model.ContactFields.Count > 0)
+        @if (Model.UserEmails.Count > 0 || Model.ContactFields.Count > 0)
         {
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
@@ -140,6 +133,20 @@
                 </div>
                 <div class="card-body">
                     <dl class="row mb-0">
+                        @foreach (var email in Model.UserEmails)
+                        {
+                            <dt class="col-sm-3">
+                                <i class="fa-solid fa-envelope me-1"></i>
+                                Email
+                            </dt>
+                            <dd class="col-sm-9">
+                                @email.Email
+                                @if (email.IsNotificationTarget)
+                                {
+                                    <span class="badge bg-primary ms-1" title="Notification target"><i class="fa-solid fa-bell"></i></span>
+                                }
+                            </dd>
+                        }
                         @foreach (var field in Model.ContactFields)
                         {
                             <dt class="col-sm-3">

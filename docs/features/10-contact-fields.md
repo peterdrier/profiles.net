@@ -2,7 +2,9 @@
 
 ## Business Context
 
-Members need to share contact information (Signal, Telegram, WhatsApp, email, phone) with other members, but different contexts require different privacy levels. A member might want their Signal handle visible to all active members, but their phone number only visible to their team leads or board members.
+Members need to share contact information (Signal, Telegram, WhatsApp, Discord, phone) with other members, but different contexts require different privacy levels. A member might want their Signal handle visible to all active members, but their phone number only visible to their team leads or board members.
+
+**Note:** Email addresses are managed separately via the `UserEmail` entity (see below). The `Email` contact field type is deprecated.
 
 ## User Stories
 
@@ -13,10 +15,10 @@ Members need to share contact information (Signal, Telegram, WhatsApp, email, ph
 
 **Acceptance Criteria:**
 - Can add unlimited contact fields
-- Choose from predefined types: Email, Phone, Signal, Telegram, WhatsApp
-- Can add "Other" type with custom label (e.g., Discord, Matrix)
+- Choose from predefined types: Phone, Signal, Telegram, WhatsApp, Discord
+- Can add "Other" type with custom label (e.g., Matrix, IRC)
 - Each field has a value (the actual contact info)
-- Email-type fields are validated for proper email format (client-side and server-side)
+- Email addresses are managed separately via the Manage Emails page (`/Profile/Emails`)
 - Fields can be reordered
 
 ### US-10.2: Set Per-Field Visibility
@@ -75,11 +77,12 @@ ContactField
 ### Enums
 ```
 ContactFieldType:
-  Email = 0
+  Email = 0     [Obsolete - use UserEmail entity]
   Phone = 1
   Signal = 2
   Telegram = 3
   WhatsApp = 4
+  Discord = 5
   Other = 99
 
 ContactFieldVisibility:
@@ -158,8 +161,7 @@ Eve (active member, no shared teams) views Bob's profile:
 ### Profile Edit
 - Dynamic form with add/remove capability
 - Dropdown for field type (shows/hides custom label for "Other")
-- Text input for value (uses `type="email"` for Email fields)
-- Inline validation error for invalid email addresses (on blur and on submit)
+- Text input for value
 - Dropdown for visibility level
 - Delete button per row
 - JavaScript handles dynamic row management
@@ -182,7 +184,7 @@ IContactFieldService
 ├── GetAllContactFieldsAsync(profileId)
 │   → Returns all fields for editing (owner only)
 ├── SaveContactFieldsAsync(profileId, fields)
-│   → Upsert/delete contact fields (validates email format for Email-type fields)
+│   → Upsert/delete contact fields
 └── GetViewerAccessLevelAsync(ownerUserId, viewerUserId)
     → Determines what visibility level viewer has
 ```
@@ -206,8 +208,61 @@ CREATE INDEX IX_contact_fields_ProfileId ON contact_fields("ProfileId");
 CREATE INDEX IX_contact_fields_ProfileId_Visibility ON contact_fields("ProfileId", "Visibility");
 ```
 
+## UserEmail — Unified Email Management
+
+Email addresses are managed separately from contact fields via a dedicated `UserEmail` entity owned by `User` (not `Profile`). This ensures email verification, notification routing, and OAuth identity are all handled in one place.
+
+### UserEmail Entity
+```
+UserEmail
+├── Id: Guid
+├── UserId: Guid (FK → User)
+├── Email: string (256)
+├── IsVerified: bool
+├── IsOAuth: bool               ← true for login email, not deletable
+├── IsNotificationTarget: bool  ← exactly one per user
+├── Visibility: ContactFieldVisibility? ← null = hidden from profile
+├── VerificationSentAt: Instant?
+├── DisplayOrder: int
+├── CreatedAt: Instant
+└── UpdatedAt: Instant
+```
+
+### Constraints
+- Unique index on `Email` where `IsVerified = true` (prevents email squatting)
+- Exactly one `IsNotificationTarget = true` per user (app-level enforcement)
+- OAuth emails cannot be deleted
+
+### Manage Emails Page (`/Profile/Emails`)
+- Lists all emails: OAuth email first (non-deletable, always verified), then additional
+- Each row: email address, verified badge, notification target control, visibility dropdown, delete button
+- "Add email" form sends verification, shows pending state
+- Verification uses `UserManager.GenerateUserTokenAsync` / `VerifyUserTokenAsync`
+- 5-minute cooldown between verification requests
+
+### Service Interface
+```csharp
+IUserEmailService
+├── GetUserEmailsAsync(userId)
+│   → All emails for the user (for manage emails page)
+├── GetVisibleEmailsAsync(userId, accessLevel)
+│   → Emails visible on profile based on viewer access
+├── AddEmailAsync(userId, email)
+│   → Adds new email and returns verification token
+├── VerifyEmailAsync(userId, token)
+│   → Verifies email, returns verified address
+├── SetNotificationTargetAsync(userId, emailId)
+│   → Sets which verified email receives notifications
+├── SetVisibilityAsync(userId, emailId, visibility)
+│   → Updates profile visibility for an email
+├── DeleteEmailAsync(userId, emailId)
+│   → Removes a non-OAuth email
+└── RemoveAllEmailsAsync(userId)
+    → Removes all emails (account deletion)
+```
+
 ## Related Features
 
-- [Profiles](02-profiles.md) - Contact fields extend the profile
+- [Profiles](02-profiles.md) - Contact fields and emails extend the profile
 - [Teams](06-teams.md) - Team membership affects visibility access
 - [Administration](09-administration.md) - Board members have full visibility

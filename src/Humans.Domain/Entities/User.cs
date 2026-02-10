@@ -63,31 +63,21 @@ public class User : IdentityUser<Guid>
     public ICollection<TeamMember> TeamMemberships { get; } = new List<TeamMember>();
 
     /// <summary>
-    /// User-specified preferred email address for system notifications.
-    /// Must be verified before use.
+    /// Navigation property to email addresses.
     /// </summary>
-    [PersonalData]
-    public string? PreferredEmail { get; set; }
-
-    /// <summary>
-    /// Whether the preferred email has been verified.
-    /// </summary>
-    [PersonalData]
-    public bool PreferredEmailVerified { get; set; }
-
-    /// <summary>
-    /// When the last verification email was sent (for rate limiting).
-    /// </summary>
-    public Instant? PreferredEmailVerificationSentAt { get; set; }
+    public ICollection<UserEmail> UserEmails { get; } = new List<UserEmail>();
 
     /// <summary>
     /// Gets the effective email address for system notifications.
-    /// Returns the verified preferred email if available, otherwise the OAuth email.
+    /// Returns the verified notification-target email if available, otherwise the OAuth email.
+    /// Requires UserEmails to be loaded (Include).
     /// </summary>
-    public string? GetEffectiveEmail() =>
-        PreferredEmailVerified && !string.IsNullOrEmpty(PreferredEmail)
-            ? PreferredEmail
-            : Email;
+    public string? GetEffectiveEmail()
+    {
+        var notificationEmail = UserEmails
+            .FirstOrDefault(e => e.IsNotificationTarget && e.IsVerified);
+        return notificationEmail?.Email ?? Email;
+    }
 
     /// <summary>
     /// When the last re-consent reminder email was sent (for rate limiting).

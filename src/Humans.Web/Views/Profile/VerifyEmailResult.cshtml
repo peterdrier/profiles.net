@@ -21,7 +21,7 @@ else
 
 @if (User.Identity?.IsAuthenticated == true)
 {
-    <a asp-action="PreferredEmail" class="btn btn-primary">@Localizer["VerifyEmail_GoToSettings"]</a>
+    <a asp-action="Emails" class="btn btn-primary">@Localizer["VerifyEmail_GoToSettings"]</a>
 }
 else
 {

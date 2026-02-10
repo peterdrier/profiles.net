@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Humans.Domain.Entities;
@@ -22,7 +23,11 @@ public class DocumentVersionConfiguration : IEntityTypeConfiguration<DocumentVer
 
         builder.Property(dv => dv.Content)
             .HasColumnType("jsonb")
-            .HasDefaultValueSql("'{}'::jsonb");
+            .HasDefaultValueSql("'{}'::jsonb")
+            .HasConversion(
+                v => JsonSerializer.Serialize(v, (JsonSerializerOptions?)null),
+                v => JsonSerializer.Deserialize<Dictionary<string, string>>(v, (JsonSerializerOptions?)null)
+                     ?? new Dictionary<string, string>(StringComparer.Ordinal));
 
         builder.Property(dv => dv.EffectiveFrom)
             .IsRequired();

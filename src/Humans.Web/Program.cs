@@ -167,6 +167,7 @@ builder.Services.Configure<TeamResourceManagementSettings>(builder.Configuration
 builder.Services.AddScoped<IConsentRecordRepository, ConsentRecordRepository>();
 builder.Services.AddScoped<ITeamService, TeamService>();
 builder.Services.AddScoped<IContactFieldService, ContactFieldService>();
+builder.Services.AddScoped<IUserEmailService, UserEmailService>();
 builder.Services.AddScoped<IVolunteerHistoryService, VolunteerHistoryService>();
 builder.Services.AddScoped<ILegalDocumentSyncService, LegalDocumentSyncService>();
 // Use real Google Workspace service if credentials configured, otherwise use stub

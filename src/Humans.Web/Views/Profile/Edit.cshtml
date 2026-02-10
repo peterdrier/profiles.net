@@ -72,41 +72,6 @@
                     </div>
 
                     <hr />
-                    <h5>@Localizer["Profile_Phone"]</h5>
-
-                    <div class="row mb-3">
-                        <div class="col-md-3">
-                            <label asp-for="PhoneCountryCode" class="form-label"></label>
-                            <select asp-for="PhoneCountryCode" class="form-select">
-                                <option value="">@Localizer["ProfileEdit_Select"]</option>
-                                <option value="+34">+34 (Spain)</option>
-                                <option value="+33">+33 (France)</option>
-                                <option value="+49">+49 (Germany)</option>
-                                <option value="+39">+39 (Italy)</option>
-                                <option value="+351">+351 (Portugal)</option>
-                                <option value="+44">+44 (UK)</option>
-                                <option value="+1">+1 (US/Canada)</option>
-                                <option value="+31">+31 (Netherlands)</option>
-                                <option value="+32">+32 (Belgium)</option>
-                                <option value="+41">+41 (Switzerland)</option>
-                                <option value="+43">+43 (Austria)</option>
-                                <option value="+48">+48 (Poland)</option>
-                                <option value="+52">+52 (Mexico)</option>
-                                <option value="+54">+54 (Argentina)</option>
-                                <option value="+55">+55 (Brazil)</option>
-                                <option value="+56">+56 (Chile)</option>
-                                <option value="+57">+57 (Colombia)</option>
-                            </select>
-                            <span asp-validation-for="PhoneCountryCode" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-9">
-                            <label asp-for="PhoneNumber" class="form-label"></label>
-                            <input asp-for="PhoneNumber" class="form-control" placeholder="e.g., 612 345 678" />
-                            <span asp-validation-for="PhoneNumber" class="text-danger"></span>
-                        </div>
-                    </div>
-
-                    <hr />
                     <h5>@Localizer["Profile_Location"]</h5>
 
                     <div class="mb-3">
@@ -149,10 +114,25 @@
                     <hr />
                     <h5>@Localizer["Profile_DateOfBirth"]</h5>
                     <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label asp-for="DateOfBirthString" class="form-label"></label>
-                            <input type="date" asp-for="DateOfBirthString" class="form-control" />
-                            <div class="form-text">@Localizer["ProfileEdit_DateOfBirthHelp"]</div>
+                        <div class="col-md-3">
+                            <label asp-for="BirthdayMonth" class="form-label">@Localizer["Profile_Month"]</label>
+                            <select asp-for="BirthdayMonth" class="form-select">
+                                <option value="">—</option>
+                                @for (var m = 1; m <= 12; m++)
+                                {
+                                    <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label asp-for="BirthdayDay" class="form-label">@Localizer["Profile_Day"]</label>
+                            <select asp-for="BirthdayDay" class="form-select">
+                                <option value="">—</option>
+                                @for (var d = 1; d <= 31; d++)
+                                {
+                                    <option value="@d">@d</option>
+                                }
+                            </select>
                         </div>
                     </div>
 
@@ -174,11 +154,11 @@
                                         <div class="col-md-2">
                                             <label class="form-label small">Type</label>
                                             <select name="EditableContactFields[@i].FieldType" class="form-select form-select-sm field-type-select">
-                                                <option value="Email" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Email)">Email</option>
                                                 <option value="Phone" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Phone)">Phone</option>
                                                 <option value="Signal" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Signal)">Signal</option>
                                                 <option value="Telegram" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Telegram)">Telegram</option>
                                                 <option value="WhatsApp" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.WhatsApp)">WhatsApp</option>
+                                                <option value="Discord" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Discord)">Discord</option>
                                                 <option value="Other" selected="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Other)">Other</option>
                                             </select>
                                         </div>
@@ -190,7 +170,7 @@
 
                                         <div class="col-md-3">
                                             <label class="form-label small">Value</label>
-                                            <input type="@(Model.EditableContactFields[i].FieldType == Humans.Domain.Enums.ContactFieldType.Email ? "email" : "text")" name="EditableContactFields[@i].Value" value="@Model.EditableContactFields[i].Value" class="form-control form-control-sm contact-value-input" required placeholder="Enter contact info" />
+                                            <input type="text" name="EditableContactFields[@i].Value" value="@Model.EditableContactFields[i].Value" class="form-control form-control-sm contact-value-input" required placeholder="Enter contact info" />
                                             <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[@i].Value"></span>
                                         </div>
 
@@ -266,11 +246,11 @@
                     <hr />
 
                     <div class="mb-3">
-                        <a asp-action="PreferredEmail" class="btn btn-outline-secondary">
+                        <a asp-action="Emails" class="btn btn-outline-secondary">
                             <i class="fa-solid fa-envelope me-1"></i>
-                            @Localizer["ProfileEdit_ManagePreferredEmail"]
+                            @Localizer["Emails_ManageEmails"]
                         </a>
-                        <div class="form-text">@Localizer["ProfileEdit_PreferredEmailHelp"]</div>
+                        <div class="form-text">@Localizer["Emails_ManageEmailsHelp"]</div>
                     </div>
 
                     <hr />
@@ -419,11 +399,11 @@
                                 <div class="col-md-2">
                                     <label class="form-label small">Type</label>
                                     <select name="EditableContactFields[${index}].FieldType" class="form-select form-select-sm field-type-select">
-                                        <option value="Email">Email</option>
                                         <option value="Phone">Phone</option>
                                         <option value="Signal">Signal</option>
                                         <option value="Telegram">Telegram</option>
                                         <option value="WhatsApp">WhatsApp</option>
+                                        <option value="Discord">Discord</option>
                                         <option value="Other">Other</option>
                                     </select>
                                 </div>
@@ -435,7 +415,7 @@
 
                                 <div class="col-md-3">
                                     <label class="form-label small">Value</label>
-                                    <input type="email" name="EditableContactFields[${index}].Value" class="form-control form-control-sm contact-value-input" placeholder="Enter contact info" />
+                                    <input type="text" name="EditableContactFields[${index}].Value" class="form-control form-control-sm contact-value-input" placeholder="Enter contact info" />
                                     <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[${index}].Value"></span>
                                 </div>
 
@@ -463,43 +443,14 @@
                 return template.content.firstChild;
             }
 
-            function validateEmailField(input, typeSelect) {
-                const errorSpan = input.parentElement.querySelector('.field-validation-error');
-                if (!errorSpan) return true;
-
-                if (typeSelect.value === 'Email' && input.value.trim() !== '') {
-                    // Basic email pattern check
-                    const emailPattern = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
-                    if (!emailPattern.test(input.value.trim())) {
-                        errorSpan.textContent = 'Please enter a valid email address.';
-                        input.classList.add('is-invalid');
-                        return false;
-                    }
-                }
-                errorSpan.textContent = '';
-                input.classList.remove('is-invalid');
-                return true;
-            }
-
             function setupRow(row) {
                 const typeSelect = row.querySelector('.field-type-select');
                 const customLabelCol = row.querySelector('.custom-label-col');
-                const valueInput = row.querySelector('.contact-value-input');
                 const removeBtn = row.querySelector('.remove-contact-field');
 
                 typeSelect.addEventListener('change', function() {
                     customLabelCol.style.display = this.value === 'Other' ? 'block' : 'none';
-                    if (valueInput) {
-                        valueInput.type = this.value === 'Email' ? 'email' : 'text';
-                        validateEmailField(valueInput, typeSelect);
-                    }
                 });
-
-                if (valueInput) {
-                    valueInput.addEventListener('blur', function() {
-                        validateEmailField(valueInput, typeSelect);
-                    });
-                }
 
                 removeBtn.addEventListener('click', function() {
                     row.remove();
@@ -531,25 +482,6 @@
                 row.querySelector('.contact-value-input').focus();
             });
 
-            // Validate all email fields on form submit
-            const form = container.closest('form');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    let valid = true;
-                    container.querySelectorAll('.contact-field-row').forEach(function(row) {
-                        const typeSelect = row.querySelector('.field-type-select');
-                        const valueInput = row.querySelector('.contact-value-input');
-                        if (typeSelect && valueInput) {
-                            if (!validateEmailField(valueInput, typeSelect)) {
-                                valid = false;
-                            }
-                        }
-                    });
-                    if (!valid) {
-                        e.preventDefault();
-                    }
-                });
-            }
         })();
 
         // Volunteer History Management

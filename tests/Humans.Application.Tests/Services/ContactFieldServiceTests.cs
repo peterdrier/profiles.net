@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
@@ -222,7 +221,7 @@ public class ContactFieldServiceTests : IDisposable
 
         // Assert - should only see AllActiveProfiles field
         result.Should().HaveCount(1);
-        result[0].Label.Should().Be("Email");
+        result[0].Label.Should().Be("Phone");
     }
 
     [Fact]
@@ -250,7 +249,7 @@ public class ContactFieldServiceTests : IDisposable
         var profile = await CreateProfile(Guid.NewGuid());
         var fields = new List<ContactFieldEditDto>
         {
-            new(null, ContactFieldType.Email, null, "test@example.com", ContactFieldVisibility.AllActiveProfiles, 0),
+            new(null, ContactFieldType.Phone, null, "+34 612345678", ContactFieldVisibility.AllActiveProfiles, 0),
             new(null, ContactFieldType.Signal, null, "+1234567890", ContactFieldVisibility.MyTeams, 1)
         };
 
@@ -273,8 +272,8 @@ public class ContactFieldServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             ProfileId = profile.Id,
-            FieldType = ContactFieldType.Email,
-            Value = "old@example.com",
+            FieldType = ContactFieldType.Phone,
+            Value = "+34 612345678",
             Visibility = ContactFieldVisibility.AllActiveProfiles,
             DisplayOrder = 0,
             CreatedAt = _clock.GetCurrentInstant(),
@@ -285,7 +284,7 @@ public class ContactFieldServiceTests : IDisposable
 
         var fields = new List<ContactFieldEditDto>
         {
-            new(existingField.Id, ContactFieldType.Email, null, "new@example.com", ContactFieldVisibility.BoardOnly, 0)
+            new(existingField.Id, ContactFieldType.Phone, null, "+34 698765432", ContactFieldVisibility.BoardOnly, 0)
         };
 
         // Act
@@ -293,7 +292,7 @@ public class ContactFieldServiceTests : IDisposable
 
         // Assert
         var savedField = await _dbContext.ContactFields.FindAsync(existingField.Id);
-        savedField!.Value.Should().Be("new@example.com");
+        savedField!.Value.Should().Be("+34 698765432");
         savedField.Visibility.Should().Be(ContactFieldVisibility.BoardOnly);
     }
 
@@ -306,8 +305,8 @@ public class ContactFieldServiceTests : IDisposable
         {
             Id = Guid.NewGuid(),
             ProfileId = profile.Id,
-            FieldType = ContactFieldType.Email,
-            Value = "old@example.com",
+            FieldType = ContactFieldType.Phone,
+            Value = "+34 612345678",
             Visibility = ContactFieldVisibility.AllActiveProfiles,
             DisplayOrder = 0,
             CreatedAt = _clock.GetCurrentInstant(),
@@ -324,43 +323,6 @@ public class ContactFieldServiceTests : IDisposable
             .Where(cf => cf.ProfileId == profile.Id)
             .ToListAsync();
         remainingFields.Should().BeEmpty();
-    }
-
-    [Theory]
-    [InlineData("not-an-email")]
-    [InlineData("missing-at-sign")]
-    [InlineData("@no-local-part.com")]
-    public async Task SaveContactFields_WithInvalidEmail_ThrowsValidationException(string invalidEmail)
-    {
-        var profile = await CreateProfile(Guid.NewGuid());
-        var fields = new List<ContactFieldEditDto>
-        {
-            new(null, ContactFieldType.Email, null, invalidEmail, ContactFieldVisibility.AllActiveProfiles, 0)
-        };
-
-        var act = () => _service.SaveContactFieldsAsync(profile.Id, fields);
-
-        await act.Should().ThrowAsync<ValidationException>();
-    }
-
-    [Theory]
-    [InlineData("valid@example.com")]
-    [InlineData("user.name+tag@domain.co")]
-    public async Task SaveContactFields_WithValidEmail_Succeeds(string validEmail)
-    {
-        var profile = await CreateProfile(Guid.NewGuid());
-        var fields = new List<ContactFieldEditDto>
-        {
-            new(null, ContactFieldType.Email, null, validEmail, ContactFieldVisibility.AllActiveProfiles, 0)
-        };
-
-        await _service.SaveContactFieldsAsync(profile.Id, fields);
-
-        var savedFields = await _dbContext.ContactFields
-            .Where(cf => cf.ProfileId == profile.Id)
-            .ToListAsync();
-        savedFields.Should().HaveCount(1);
-        savedFields[0].Value.Should().Be(validEmail);
     }
 
     [Fact]
@@ -434,8 +396,8 @@ public class ContactFieldServiceTests : IDisposable
             {
                 Id = Guid.NewGuid(),
                 ProfileId = profile.Id,
-                FieldType = ContactFieldType.Email,
-                Value = "public@example.com",
+                FieldType = ContactFieldType.Phone,
+                Value = "+34 612345678",
                 Visibility = ContactFieldVisibility.AllActiveProfiles,
                 DisplayOrder = 0,
                 CreatedAt = now,

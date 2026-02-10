@@ -60,8 +60,6 @@ Profile
 ├── FirstName: string (256) [legal]
 ├── LastName: string (256) [legal]
 ├── DateOfBirth: LocalDate?
-├── PhoneCountryCode: string? (5)
-├── PhoneNumber: string? (50)
 ├── AddressLine1: string? (512)
 ├── AddressLine2: string? (512)
 ├── City: string? (256)
@@ -96,8 +94,7 @@ Profile includes a computed `MembershipStatus` property:
 |-------|--------|---------------|----------|-------|-------|
 | Burner Name | Yes | Yes | Yes | Yes | Yes |
 | Legal Name | Yes | No | No | Yes | Yes |
-| Email | Yes | No | No | Yes | Yes |
-| Phone | Yes | No | No | Yes | Yes |
+| Emails (UserEmail) | Per-field visibility | Per-field visibility | Per-field visibility | Yes | Yes |
 | City/Country | Yes | Yes | Yes | Yes | Yes |
 | Coordinates | No | No | No | Yes | Yes |
 | Bio | Yes | Yes | Yes | Yes | Yes |
@@ -143,8 +140,6 @@ Profile includes a computed `MembershipStatus` property:
 | FirstName | Required, max 256 chars |
 | LastName | Required, max 256 chars |
 | BurnerName | Optional, max 256 chars |
-| PhoneCountryCode | Optional, max 5 chars, digits + optional "+" |
-| PhoneNumber | Optional, max 50 chars |
 | Bio | Optional, max 4000 chars |
 | CountryCode | Optional, ISO 3166-1 alpha-2 |
 

@@ -48,6 +48,7 @@ public class ProcessAccountDeletionsJob
             // Find accounts where deletion is scheduled and the time has passed
             var usersToDelete = await _dbContext.Users
                 .Include(u => u.Profile)
+                .Include(u => u.UserEmails)
                 .Include(u => u.TeamMemberships)
                 .Include(u => u.RoleAssignments)
                 .Where(u => u.DeletionScheduledFor != null && u.DeletionScheduledFor <= now)
@@ -128,11 +129,11 @@ public class ProcessAccountDeletionsJob
         user.UserName = anonymizedId;
         user.NormalizedUserName = anonymizedId.ToUpperInvariant();
         user.ProfilePictureUrl = null;
-        user.PreferredEmail = null;
-        user.PreferredEmailVerified = false;
-        user.PreferredEmailVerificationSentAt = null;
         user.PhoneNumber = null;
         user.PhoneNumberConfirmed = false;
+
+        // Remove all email addresses
+        _dbContext.UserEmails.RemoveRange(user.UserEmails);
 
         // Clear deletion request fields (deletion is now complete)
         user.DeletionRequestedAt = null;
@@ -152,8 +153,6 @@ public class ProcessAccountDeletionsJob
             user.Profile.Bio = null;
             user.Profile.City = null;
             user.Profile.CountryCode = null;
-            user.Profile.PhoneCountryCode = null;
-            user.Profile.PhoneNumber = null;
             user.Profile.Latitude = null;
             user.Profile.Longitude = null;
             user.Profile.PlaceId = null;

@@ -58,6 +58,7 @@ public class SendReConsentReminderJob
 
             var userIds = usersNeedingReminder.ToList();
             var users = await _dbContext.Users
+                .Include(u => u.UserEmails)
                 .Where(u => userIds.Contains(u.Id))
                 .ToDictionaryAsync(u => u.Id, cancellationToken);
 

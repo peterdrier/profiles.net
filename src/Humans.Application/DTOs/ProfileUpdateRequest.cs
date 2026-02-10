@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using NodaTime;
 
 namespace Humans.Application.DTOs;
 
@@ -16,11 +15,17 @@ public record ProfileUpdateRequest
     [StringLength(100, ErrorMessage = "Last name cannot exceed 100 characters")]
     public required string LastName { get; init; }
 
-    public LocalDate? DateOfBirth { get; init; }
+    /// <summary>
+    /// Birthday month (1-12). Year is not stored.
+    /// </summary>
+    [Range(1, 12)]
+    public int? BirthdayMonth { get; init; }
 
-    [StringLength(20, ErrorMessage = "Phone number cannot exceed 20 characters")]
-    [Phone(ErrorMessage = "Please enter a valid phone number")]
-    public string? PhoneNumber { get; init; }
+    /// <summary>
+    /// Birthday day (1-31). Year is not stored.
+    /// </summary>
+    [Range(1, 31)]
+    public int? BirthdayDay { get; init; }
 
     [StringLength(256, ErrorMessage = "Address line 1 cannot exceed 256 characters")]
     public string? AddressLine1 { get; init; }

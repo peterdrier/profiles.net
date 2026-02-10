@@ -47,14 +47,13 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasForeignKey(tm => tm.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(u => u.UserEmails)
+            .WithOne(e => e.User)
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(u => u.Email);
 
-        builder.Property(u => u.PreferredEmail)
-            .HasMaxLength(256);
-
-        // Partial unique index: only verified preferred emails must be unique
-        builder.HasIndex(u => u.PreferredEmail)
-            .IsUnique()
-            .HasFilter("\"PreferredEmailVerified\" = true AND \"PreferredEmail\" IS NOT NULL");
+        // Ignore GetEffectiveEmail (method, not property - EF won't map it, but defensive)
     }
 }

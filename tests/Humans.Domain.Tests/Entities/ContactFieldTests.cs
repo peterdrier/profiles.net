@@ -9,11 +9,11 @@ namespace Humans.Domain.Tests.Entities;
 public class ContactFieldTests
 {
     [Theory]
-    [InlineData(ContactFieldType.Email, "Email")]
     [InlineData(ContactFieldType.Phone, "Phone")]
     [InlineData(ContactFieldType.Signal, "Signal")]
     [InlineData(ContactFieldType.Telegram, "Telegram")]
     [InlineData(ContactFieldType.WhatsApp, "WhatsApp")]
+    [InlineData(ContactFieldType.Discord, "Discord")]
     public void DisplayLabel_ForStandardType_ShouldReturnTypeName(ContactFieldType type, string expected)
     {
         var field = CreateContactField(type);

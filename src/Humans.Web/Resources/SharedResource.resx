@@ -159,9 +159,9 @@
   <data name="Profile_Title" xml:space="preserve"><value>My Profile</value></data>
   <data name="ProfileEdit_Title" xml:space="preserve"><value>Edit Profile</value></data>
   <data name="ProfilePrivacy_Title" xml:space="preserve"><value>Privacy &amp; Data</value></data>
-  <data name="PreferredEmail_Title" xml:space="preserve"><value>Preferred Email</value></data>
+  <data name="Emails_Title" xml:space="preserve"><value>Email Addresses</value></data>
   <data name="VerifyEmail_Title" xml:space="preserve"><value>Email Verification</value></data>
-  <data name="VerifyEmail_GoToSettings" xml:space="preserve"><value>Go to Preferred Email Settings</value></data>
+  <data name="VerifyEmail_GoToSettings" xml:space="preserve"><value>Go to Email Settings</value></data>
   <data name="VerifyEmail_GoHome" xml:space="preserve"><value>Go to Home Page</value></data>
 
   <!-- Profile Index View -->
@@ -199,8 +199,8 @@
   <data name="ProfileEdit_AddContactField" xml:space="preserve"><value>Add Contact Field</value></data>
   <data name="ProfileEdit_BurnerCVHelp" xml:space="preserve"><value>Document your involvement in events, roles, and camps. Entries are sorted by date (newest first).</value></data>
   <data name="ProfileEdit_AddEntry" xml:space="preserve"><value>Add Entry</value></data>
-  <data name="ProfileEdit_ManagePreferredEmail" xml:space="preserve"><value>Manage Preferred Email</value></data>
-  <data name="ProfileEdit_PreferredEmailHelp" xml:space="preserve"><value>Set a different email address for receiving system notifications.</value></data>
+  <data name="ProfileEdit_ManageEmails" xml:space="preserve"><value>Manage Email Addresses</value></data>
+  <data name="ProfileEdit_ManageEmailsHelp" xml:space="preserve"><value>Add email addresses, set notification preferences, and control profile visibility.</value></data>
 
   <!-- Profile Privacy View -->
   <data name="ProfilePrivacy_Lead" xml:space="preserve"><value>Manage your personal data and privacy settings.</value></data>
@@ -234,28 +234,16 @@
   <data name="ProfilePrivacy_ConfirmNoRecovery" xml:space="preserve"><value>After anonymization, your account cannot be recovered</value></data>
   <data name="ProfilePrivacy_YesDeleteMyAccount" xml:space="preserve"><value>Yes, Delete My Account</value></data>
 
-  <!-- Preferred Email View -->
-  <data name="PreferredEmail_Description" xml:space="preserve"><value>By default, system notifications are sent to your sign-in email. You can specify a different email address to receive these notifications.</value></data>
-  <data name="PreferredEmail_CurrentSettings" xml:space="preserve"><value>Current Email Settings</value></data>
-  <data name="PreferredEmail_SignInEmail" xml:space="preserve"><value>Sign-in Email</value></data>
-  <data name="PreferredEmail_GoogleAccount" xml:space="preserve"><value>Google Account</value></data>
-  <data name="PreferredEmail_NotSet" xml:space="preserve"><value>Not set (using sign-in email)</value></data>
-  <data name="PreferredEmail_Verified" xml:space="preserve"><value>Verified</value></data>
-  <data name="PreferredEmail_PendingVerification" xml:space="preserve"><value>Pending Verification</value></data>
-  <data name="PreferredEmail_NotificationsSentTo" xml:space="preserve"><value>Notifications Sent To</value></data>
-  <data name="PreferredEmail_Preferred" xml:space="preserve"><value>preferred</value></data>
-  <data name="PreferredEmail_SignInEmailLabel" xml:space="preserve"><value>sign-in email</value></data>
-  <data name="PreferredEmail_VerificationSent" xml:space="preserve"><value>A verification email has been sent to {0}. Please check your inbox and click the verification link.</value><comment>{0} = email address</comment></data>
-  <data name="PreferredEmail_ResendCooldown" xml:space="preserve"><value>You can request a new verification email in {0} minute(s).</value><comment>{0} = minutes remaining</comment></data>
-  <data name="PreferredEmail_SetTitle" xml:space="preserve"><value>Set Preferred Email</value></data>
-  <data name="PreferredEmail_ChangeTitle" xml:space="preserve"><value>Change Preferred Email</value></data>
-  <data name="PreferredEmail_VerificationWillBeSent" xml:space="preserve"><value>A verification email will be sent to this address.</value></data>
-  <data name="PreferredEmail_SendVerification" xml:space="preserve"><value>Send Verification Email</value></data>
-  <data name="PreferredEmail_RemoveTitle" xml:space="preserve"><value>Remove Preferred Email</value></data>
-  <data name="PreferredEmail_RemoveDescription" xml:space="preserve"><value>Remove your preferred email and use your sign-in email for all system notifications.</value></data>
-  <data name="PreferredEmail_RemoveConfirm" xml:space="preserve"><value>Are you sure you want to remove your preferred email?</value></data>
-  <data name="PreferredEmail_RemoveButton" xml:space="preserve"><value>Remove Preferred Email</value></data>
-  <data name="PreferredEmail_BackToEdit" xml:space="preserve"><value>Back to Edit Profile</value></data>
+  <!-- Emails View -->
+  <data name="Emails_Description" xml:space="preserve"><value>Manage your email addresses. Your sign-in email is always included. Add additional emails, set which one receives notifications, and control profile visibility.</value></data>
+  <data name="Emails_YourEmails" xml:space="preserve"><value>Your Email Addresses</value></data>
+  <data name="Emails_AddNew" xml:space="preserve"><value>Add Email Address</value></data>
+  <data name="Emails_VerificationWillBeSent" xml:space="preserve"><value>A verification email will be sent to this address.</value></data>
+  <data name="Emails_SendVerification" xml:space="preserve"><value>Send Verification Email</value></data>
+  <data name="Emails_ResendCooldown" xml:space="preserve"><value>You can request a new verification email in {0} minute(s).</value><comment>{0} = minutes remaining</comment></data>
+  <data name="Emails_BackToEdit" xml:space="preserve"><value>Back to Edit Profile</value></data>
+  <data name="Emails_ManageEmails" xml:space="preserve"><value>Manage Email Addresses</value></data>
+  <data name="Emails_ManageEmailsHelp" xml:space="preserve"><value>Add additional email addresses, control notifications, and set profile visibility.</value></data>
 
   <!-- Profile Controller TempData -->
   <data name="Profile_Updated" xml:space="preserve"><value>Profile updated successfully.</value></data>
@@ -763,13 +751,15 @@
   <!-- Profile Picture & DOB   -->
   <!-- ======================== -->
   <data name="Profile_ProfilePicture" xml:space="preserve"><value>Profile Picture</value></data>
-  <data name="Profile_DateOfBirth" xml:space="preserve"><value>Date of Birth</value></data>
+  <data name="Profile_DateOfBirth" xml:space="preserve"><value>Birthday</value></data>
   <data name="Profile_PictureTooLarge" xml:space="preserve"><value>Profile picture must be under 20MB.</value></data>
   <data name="Profile_PictureInvalidFormat" xml:space="preserve"><value>Profile picture must be JPEG, PNG, or WebP format.</value></data>
   <data name="ProfileEdit_GoogleAvatar" xml:space="preserve"><value>(Google avatar)</value></data>
   <data name="ProfileEdit_PictureHelp" xml:space="preserve"><value>Upload a JPEG, PNG, or WebP image (max 20MB). Large images are automatically resized. This replaces your Google avatar.</value></data>
   <data name="ProfileEdit_RemovePicture" xml:space="preserve"><value>Remove custom picture (revert to Google avatar)</value></data>
-  <data name="ProfileEdit_DateOfBirthHelp" xml:space="preserve"><value>Only visible to you and board members. Used for the team birthday calendar.</value></data>
+  <data name="ProfileEdit_DateOfBirthHelp" xml:space="preserve"><value>Only month and day are stored — we don't collect birth year.</value></data>
+  <data name="Profile_Month" xml:space="preserve"><value>Month</value></data>
+  <data name="Profile_Day" xml:space="preserve"><value>Day</value></data>
   <data name="TeamDetail_TeamLeads" xml:space="preserve"><value>Team Leads</value></data>
 
   <!-- ======================== -->

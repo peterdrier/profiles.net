@@ -63,6 +63,7 @@ public class SuspendNonCompliantMembersJob
             // Batch load all users with profiles and their team memberships (tracked for persistence)
             var users = await _dbContext.Users
                 .Include(u => u.Profile)
+                .Include(u => u.UserEmails)
                 .Include(u => u.TeamMemberships.Where(tm => tm.LeftAt == null))
                 .Where(u => usersToSuspend.Contains(u.Id))
                 .ToListAsync(cancellationToken);

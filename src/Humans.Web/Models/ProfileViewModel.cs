@@ -48,16 +48,6 @@ public class ProfileViewModel
     /// </summary>
     public bool IsOwnProfile { get; set; }
 
-    [Display(Name = "Country Code")]
-    [StringLength(5)]
-    [RegularExpression(@"^\+\d{1,4}$", ErrorMessage = "Please enter a valid country code (e.g., +34, +1)")]
-    public string? PhoneCountryCode { get; set; }
-
-    [Display(Name = "Phone Number")]
-    [StringLength(20)]
-    [RegularExpression(@"^[\d\s\-]+$", ErrorMessage = "Please enter a valid phone number")]
-    public string? PhoneNumber { get; set; }
-
     [StringLength(256)]
     public string? City { get; set; }
 
@@ -93,24 +83,37 @@ public class ProfileViewModel
     public string? Bio { get; set; }
 
     /// <summary>
-    /// Date of birth as a string for the date input (yyyy-MM-dd format).
+    /// Birthday month (1-12) for the edit form.
     /// </summary>
-    [Display(Name = "Date of Birth")]
-    public string? DateOfBirthString { get; set; }
+    [Display(Name = "Birthday")]
+    [Range(1, 12)]
+    public int? BirthdayMonth { get; set; }
 
     /// <summary>
-    /// Parsed date of birth. Returns null if invalid.
+    /// Birthday day (1-31) for the edit form.
     /// </summary>
-    public LocalDate? ParsedDateOfBirth
+    [Range(1, 31)]
+    public int? BirthdayDay { get; set; }
+
+    /// <summary>
+    /// Parsed birthday as a LocalDate with year fixed to 4 (leap year, so Feb 29 is valid).
+    /// Returns null if month/day not set or invalid.
+    /// </summary>
+    public LocalDate? ParsedBirthday
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(DateOfBirthString))
+            if (BirthdayMonth is not (>= 1 and <= 12) || BirthdayDay is not (>= 1 and <= 31))
                 return null;
 
-            var pattern = NodaTime.Text.LocalDatePattern.CreateWithInvariantCulture("yyyy-MM-dd");
-            var parseResult = pattern.Parse(DateOfBirthString);
-            return parseResult.Success ? parseResult.Value : null;
+            try
+            {
+                return new LocalDate(4, BirthdayMonth.Value, BirthdayDay.Value);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return null; // e.g. Feb 30
+            }
         }
     }
 
@@ -138,16 +141,13 @@ public class ProfileViewModel
         : ProfilePictureUrl;
 
     /// <summary>
-    /// Formatted date of birth for display.
+    /// Formatted birthday for display (e.g., "March 15").
     /// </summary>
-    public string? FormattedDateOfBirth
+    public string? FormattedBirthday
     {
         get
         {
-            if (string.IsNullOrWhiteSpace(DateOfBirthString))
-                return null;
-
-            var parsed = ParsedDateOfBirth;
+            var parsed = ParsedBirthday;
             if (parsed == null)
                 return null;
 
@@ -157,12 +157,9 @@ public class ProfileViewModel
     }
 
     /// <summary>
-    /// Gets the formatted phone number with country code.
+    /// User email addresses visible on the profile (for display).
     /// </summary>
-    public string? FormattedPhoneNumber =>
-        !string.IsNullOrEmpty(PhoneCountryCode) && !string.IsNullOrEmpty(PhoneNumber)
-            ? $"{PhoneCountryCode} {PhoneNumber}"
-            : PhoneNumber;
+    public IReadOnlyList<UserEmailDisplayViewModel> UserEmails { get; set; } = [];
 
     /// <summary>
     /// Contact fields visible to the current viewer (for display).
@@ -218,11 +215,14 @@ public class ContactFieldViewModel
     /// </summary>
     public string IconClass => FieldType switch
     {
+#pragma warning disable CS0618 // Obsolete ContactFieldType.Email kept for display of legacy data
         ContactFieldType.Email => "fa-solid fa-envelope",
+#pragma warning restore CS0618
         ContactFieldType.Phone => "fa-solid fa-phone",
         ContactFieldType.Signal => "fa-solid fa-comment-dots",
         ContactFieldType.Telegram => "fa-brands fa-telegram",
         ContactFieldType.WhatsApp => "fa-brands fa-whatsapp",
+        ContactFieldType.Discord => "fa-brands fa-discord",
         _ => "fa-solid fa-address-card"
     };
 
@@ -254,7 +254,7 @@ public class ContactFieldViewModel
 /// <summary>
 /// Contact field for editing purposes.
 /// </summary>
-public class ContactFieldEditViewModel : IValidatableObject
+public class ContactFieldEditViewModel
 {
     public Guid? Id { get; set; }
 
@@ -273,19 +273,6 @@ public class ContactFieldEditViewModel : IValidatableObject
     public ContactFieldVisibility Visibility { get; set; } = ContactFieldVisibility.AllActiveProfiles;
 
     public int DisplayOrder { get; set; }
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (FieldType == ContactFieldType.Email && !string.IsNullOrWhiteSpace(Value))
-        {
-            if (!new EmailAddressAttribute().IsValid(Value))
-            {
-                yield return new ValidationResult(
-                    "Please enter a valid email address.",
-                    [nameof(Value)]);
-            }
-        }
-    }
 }
 
 /// <summary>
@@ -360,6 +347,15 @@ public class VolunteerHistoryEntryEditViewModel
             return null;
         }
     }
+}
+
+/// <summary>
+/// User email for display on profile view.
+/// </summary>
+public class UserEmailDisplayViewModel
+{
+    public string Email { get; set; } = string.Empty;
+    public bool IsNotificationTarget { get; set; }
 }
 
 /// <summary>

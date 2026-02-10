@@ -30,9 +30,10 @@ public class ProfileController : Controller
     private readonly IEmailService _emailService;
     private readonly ITeamService _teamService;
     private readonly IMembershipCalculator _membershipCalculator;
+    private readonly IUserEmailService _userEmailService;
     private readonly IStringLocalizer<SharedResource> _localizer;
 
-    private const string EmailVerificationTokenPurpose = "PreferredEmailVerification";
+    private const string EmailVerificationTokenPurpose = "UserEmailVerification";
     private const int VerificationCooldownMinutes = 5;
     private const int MaxProfilePictureUploadBytes = 20 * 1024 * 1024; // 20MB upload limit
     private const int MaxProfilePictureLongSide = 1000;
@@ -54,6 +55,7 @@ public class ProfileController : Controller
         IEmailService emailService,
         ITeamService teamService,
         IMembershipCalculator membershipCalculator,
+        IUserEmailService userEmailService,
         IStringLocalizer<SharedResource> localizer)
     {
         _dbContext = dbContext;
@@ -66,6 +68,7 @@ public class ProfileController : Controller
         _emailService = emailService;
         _teamService = teamService;
         _membershipCalculator = membershipCalculator;
+        _userEmailService = userEmailService;
         _localizer = localizer;
     }
 
@@ -88,6 +91,10 @@ public class ProfileController : Controller
         var contactFields = profile != null
             ? await _contactFieldService.GetVisibleContactFieldsAsync(profile.Id, user.Id)
             : [];
+
+        // Get visible user emails (owner sees all visible emails)
+        var visibleEmails = await _userEmailService.GetVisibleEmailsAsync(
+            user.Id, ContactFieldVisibility.BoardOnly);
 
         // Get volunteer history entries
         var volunteerHistory = profile != null
@@ -122,18 +129,22 @@ public class ProfileController : Controller
             BurnerName = profile?.BurnerName ?? string.Empty,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
-            PhoneCountryCode = profile?.PhoneCountryCode,
-            PhoneNumber = profile?.PhoneNumber,
             City = profile?.City,
             CountryCode = profile?.CountryCode,
             Bio = profile?.Bio,
-            DateOfBirthString = profile?.DateOfBirth?.ToString("yyyy-MM-dd", null),
+            BirthdayMonth = profile?.DateOfBirth?.Month,
+            BirthdayDay = profile?.DateOfBirth?.Day,
             HasPendingConsents = pendingConsents > 0,
             PendingConsentCount = pendingConsents,
             IsApproved = profile?.IsApproved ?? false,
             MembershipStatus = (await _membershipCalculator.ComputeStatusAsync(user.Id)).ToString(),
             IsOwnProfile = true,
             CanViewLegalName = true, // User viewing their own profile
+            UserEmails = visibleEmails.Select(e => new UserEmailDisplayViewModel
+            {
+                Email = e.Email,
+                IsNotificationTarget = e.IsNotificationTarget
+            }).ToList(),
             ContactFields = contactFields.Select(cf => new ContactFieldViewModel
             {
                 Id = cf.Id,
@@ -190,15 +201,14 @@ public class ProfileController : Controller
             BurnerName = profile?.BurnerName ?? user.DisplayName,
             FirstName = profile?.FirstName ?? string.Empty,
             LastName = profile?.LastName ?? string.Empty,
-            PhoneCountryCode = profile?.PhoneCountryCode,
-            PhoneNumber = profile?.PhoneNumber,
             City = profile?.City,
             CountryCode = profile?.CountryCode,
             Latitude = profile?.Latitude,
             Longitude = profile?.Longitude,
             PlaceId = profile?.PlaceId,
             Bio = profile?.Bio,
-            DateOfBirthString = profile?.DateOfBirth?.ToString("yyyy-MM-dd", null),
+            BirthdayMonth = profile?.DateOfBirth?.Month,
+            BirthdayDay = profile?.DateOfBirth?.Day,
             CanViewLegalName = true, // User editing their own profile
             EditableContactFields = contactFields.Select(cf => new ContactFieldEditViewModel
             {
@@ -259,15 +269,13 @@ public class ProfileController : Controller
         profile.BurnerName = model.BurnerName;
         profile.FirstName = model.FirstName;
         profile.LastName = model.LastName;
-        profile.PhoneCountryCode = model.PhoneCountryCode;
-        profile.PhoneNumber = model.PhoneNumber;
         profile.City = model.City;
         profile.CountryCode = model.CountryCode;
         profile.Latitude = model.Latitude;
         profile.Longitude = model.Longitude;
         profile.PlaceId = model.PlaceId;
         profile.Bio = model.Bio;
-        profile.DateOfBirth = model.ParsedDateOfBirth;
+        profile.DateOfBirth = model.ParsedBirthday;
         profile.UpdatedAt = now;
 
         // Handle profile picture removal
@@ -402,7 +410,7 @@ public class ProfileController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> PreferredEmail()
+    public async Task<IActionResult> Emails()
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -410,13 +418,22 @@ public class ProfileController : Controller
             return NotFound();
         }
 
-        var viewModel = BuildPreferredEmailViewModel(user);
+        var viewModel = await BuildEmailsViewModelAsync(user);
         return View(viewModel);
+    }
+
+    /// <summary>
+    /// Redirect old PreferredEmail route to Emails.
+    /// </summary>
+    [HttpGet]
+    public IActionResult PreferredEmail()
+    {
+        return RedirectToAction(nameof(Emails));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SetPreferredEmail(PreferredEmailViewModel model)
+    public async Task<IActionResult> AddEmail(EmailsViewModel model)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -427,78 +444,39 @@ public class ProfileController : Controller
         if (string.IsNullOrWhiteSpace(model.NewEmail))
         {
             ModelState.AddModelError(nameof(model.NewEmail), _localizer["Profile_EnterEmail"].Value);
-            return View(nameof(PreferredEmail), BuildPreferredEmailViewModel(user));
+            return View(nameof(Emails), await BuildEmailsViewModelAsync(user));
         }
 
-        var newEmail = model.NewEmail.Trim();
-
-        // Check if same as OAuth email
-        if (string.Equals(newEmail, user.Email, StringComparison.OrdinalIgnoreCase))
+        try
         {
-            ModelState.AddModelError(nameof(model.NewEmail),
-                _localizer["Profile_AlreadySignInEmail"].Value);
-            return View(nameof(PreferredEmail), BuildPreferredEmailViewModel(user));
-        }
+            var token = await _userEmailService.AddEmailAsync(user.Id, model.NewEmail);
 
-        // Check rate limit (5 minute cooldown)
-        var now = _clock.GetCurrentInstant();
-        if (user.PreferredEmailVerificationSentAt.HasValue)
+            // Build verification URL
+            var verificationUrl = Url.Action(
+                nameof(VerifyEmail),
+                "Profile",
+                new { userId = user.Id, token = HttpUtility.UrlEncode(token) },
+                Request.Scheme);
+
+            // Send verification email
+            await _emailService.SendEmailVerificationAsync(
+                model.NewEmail.Trim(),
+                user.DisplayName,
+                verificationUrl!);
+
+            _logger.LogInformation(
+                "Sent email verification to {Email} for user {UserId}",
+                model.NewEmail, user.Id);
+
+            TempData["SuccessMessage"] = string.Format(CultureInfo.CurrentCulture, _localizer["Profile_VerificationSent"].Value, model.NewEmail.Trim());
+        }
+        catch (ValidationException ex)
         {
-            var cooldownEnd = user.PreferredEmailVerificationSentAt.Value.Plus(Duration.FromMinutes(VerificationCooldownMinutes));
-            if (now < cooldownEnd)
-            {
-                var minutesRemaining = (int)Math.Ceiling((cooldownEnd - now).TotalMinutes);
-                ModelState.AddModelError(nameof(model.NewEmail),
-                    string.Format(CultureInfo.CurrentCulture, _localizer["Profile_VerificationCooldown"].Value, minutesRemaining));
-                return View(nameof(PreferredEmail), BuildPreferredEmailViewModel(user));
-            }
+            ModelState.AddModelError(nameof(model.NewEmail), ex.Message);
+            return View(nameof(Emails), await BuildEmailsViewModelAsync(user));
         }
 
-        // Check uniqueness among verified preferred emails (case-insensitive)
-        var emailInUse = await _dbContext.Users
-            .AnyAsync(u => u.Id != user.Id
-                && u.PreferredEmailVerified
-                && u.PreferredEmail != null
-                && EF.Functions.ILike(u.PreferredEmail, newEmail));
-
-        if (emailInUse)
-        {
-            ModelState.AddModelError(nameof(model.NewEmail),
-                _localizer["Profile_EmailInUse"].Value);
-            return View(nameof(PreferredEmail), BuildPreferredEmailViewModel(user));
-        }
-
-        // Generate verification token
-        var token = await _userManager.GenerateUserTokenAsync(
-            user,
-            TokenOptions.DefaultEmailProvider,
-            EmailVerificationTokenPurpose);
-
-        // Update user with pending email
-        user.PreferredEmail = newEmail;
-        user.PreferredEmailVerified = false;
-        user.PreferredEmailVerificationSentAt = now;
-        await _userManager.UpdateAsync(user);
-
-        // Build verification URL
-        var verificationUrl = Url.Action(
-            nameof(VerifyEmail),
-            "Profile",
-            new { userId = user.Id, token = HttpUtility.UrlEncode(token) },
-            Request.Scheme);
-
-        // Send verification email
-        await _emailService.SendEmailVerificationAsync(
-            newEmail,
-            user.DisplayName,
-            verificationUrl!);
-
-        _logger.LogInformation(
-            "Sent preferred email verification to {Email} for user {UserId}",
-            newEmail, user.Id);
-
-        TempData["SuccessMessage"] = string.Format(_localizer["Profile_VerificationSent"].Value, newEmail);
-        return RedirectToAction(nameof(PreferredEmail));
+        return RedirectToAction(nameof(Emails));
     }
 
     [HttpGet]
@@ -510,56 +488,27 @@ public class ProfileController : Controller
             return VerifyEmailError(_localizer["Profile_InvalidVerificationLink"].Value);
         }
 
-        var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user == null)
+        try
+        {
+            var decodedToken = HttpUtility.UrlDecode(token);
+            var verifiedEmail = await _userEmailService.VerifyEmailAsync(userId, decodedToken);
+
+            _logger.LogInformation(
+                "User {UserId} verified email {Email}",
+                userId, verifiedEmail);
+
+            ViewData["Success"] = true;
+            ViewData["Message"] = string.Format(_localizer["Profile_EmailVerified"].Value, verifiedEmail);
+            return View("VerifyEmailResult");
+        }
+        catch (InvalidOperationException)
         {
             return VerifyEmailError(_localizer["Profile_InvalidVerificationLink"].Value);
         }
-
-        if (string.IsNullOrEmpty(user.PreferredEmail))
+        catch (ValidationException ex)
         {
-            return VerifyEmailError(_localizer["Profile_NoEmailPending"].Value);
+            return VerifyEmailError(ex.Message);
         }
-
-        // Verify the token
-        var decodedToken = HttpUtility.UrlDecode(token);
-        var isValid = await _userManager.VerifyUserTokenAsync(
-            user,
-            TokenOptions.DefaultEmailProvider,
-            EmailVerificationTokenPurpose,
-            decodedToken);
-
-        if (!isValid)
-        {
-            return VerifyEmailError(_localizer["Profile_VerificationExpired"].Value);
-        }
-
-        // Re-check uniqueness (guard against race conditions, case-insensitive)
-        var emailInUse = await _dbContext.Users
-            .AnyAsync(u => u.Id != user.Id
-                && u.PreferredEmailVerified
-                && u.PreferredEmail != null
-                && EF.Functions.ILike(u.PreferredEmail, user.PreferredEmail));
-
-        if (emailInUse)
-        {
-            user.PreferredEmail = null;
-            user.PreferredEmailVerified = false;
-            await _userManager.UpdateAsync(user);
-            return VerifyEmailError(_localizer["Profile_EmailClaimed"].Value);
-        }
-
-        // Mark as verified
-        user.PreferredEmailVerified = true;
-        await _userManager.UpdateAsync(user);
-
-        _logger.LogInformation(
-            "User {UserId} verified preferred email {Email}",
-            user.Id, user.PreferredEmail);
-
-        ViewData["Success"] = true;
-        ViewData["Message"] = string.Format(_localizer["Profile_EmailVerified"].Value, user.PreferredEmail);
-        return View("VerifyEmailResult");
     }
 
     private IActionResult VerifyEmailError(string message)
@@ -571,7 +520,7 @@ public class ProfileController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ClearPreferredEmail()
+    public async Task<IActionResult> SetNotificationTarget(Guid emailId)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -579,45 +528,112 @@ public class ProfileController : Controller
             return NotFound();
         }
 
-        var previousEmail = user.PreferredEmail;
-        user.PreferredEmail = null;
-        user.PreferredEmailVerified = false;
-        user.PreferredEmailVerificationSentAt = null;
-        await _userManager.UpdateAsync(user);
+        try
+        {
+            await _userEmailService.SetNotificationTargetAsync(user.Id, emailId);
+            TempData["SuccessMessage"] = _localizer["Profile_NotificationTargetUpdated"].Value;
+        }
+        catch (Exception ex) when (ex is ValidationException or InvalidOperationException)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
 
-        _logger.LogInformation(
-            "User {UserId} cleared preferred email (was: {Email})",
-            user.Id, previousEmail);
-
-        TempData["SuccessMessage"] = _localizer["Profile_PreferredEmailCleared"].Value;
-        return RedirectToAction(nameof(PreferredEmail));
+        return RedirectToAction(nameof(Emails));
     }
 
-    private PreferredEmailViewModel BuildPreferredEmailViewModel(User user)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SetEmailVisibility(Guid emailId, string? visibility)
     {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        ContactFieldVisibility? parsedVisibility = null;
+        if (!string.IsNullOrEmpty(visibility) && Enum.TryParse<ContactFieldVisibility>(visibility, out var v))
+        {
+            parsedVisibility = v;
+        }
+
+        try
+        {
+            await _userEmailService.SetVisibilityAsync(user.Id, emailId, parsedVisibility);
+            TempData["SuccessMessage"] = _localizer["Profile_EmailVisibilityUpdated"].Value;
+        }
+        catch (Exception ex) when (ex is ValidationException or InvalidOperationException)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Emails));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteEmail(Guid emailId)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        try
+        {
+            await _userEmailService.DeleteEmailAsync(user.Id, emailId);
+            TempData["SuccessMessage"] = _localizer["Profile_EmailDeleted"].Value;
+        }
+        catch (Exception ex) when (ex is ValidationException or InvalidOperationException)
+        {
+            TempData["ErrorMessage"] = ex.Message;
+        }
+
+        return RedirectToAction(nameof(Emails));
+    }
+
+    private async Task<EmailsViewModel> BuildEmailsViewModelAsync(User user)
+    {
+        var emails = await _userEmailService.GetUserEmailsAsync(user.Id);
+
+        // Check cooldown for adding new emails
         var now = _clock.GetCurrentInstant();
-        var canResend = true;
+        var canAdd = true;
         var minutesUntilResend = 0;
 
-        if (user.PreferredEmailVerificationSentAt.HasValue)
+        var pendingEmail = emails.FirstOrDefault(e => e.IsPendingVerification);
+        if (pendingEmail != null)
         {
-            var cooldownEnd = user.PreferredEmailVerificationSentAt.Value.Plus(Duration.FromMinutes(VerificationCooldownMinutes));
-            if (now < cooldownEnd)
+            // Look up the actual verification sent time from DB
+            var pendingRecord = await _dbContext.UserEmails
+                .AsNoTracking()
+                .FirstOrDefaultAsync(e => e.Id == pendingEmail.Id);
+
+            if (pendingRecord?.VerificationSentAt.HasValue == true)
             {
-                canResend = false;
-                minutesUntilResend = (int)Math.Ceiling((cooldownEnd - now).TotalMinutes);
+                var cooldownEnd = pendingRecord.VerificationSentAt.Value.Plus(Duration.FromMinutes(VerificationCooldownMinutes));
+                if (now < cooldownEnd)
+                {
+                    canAdd = false;
+                    minutesUntilResend = (int)Math.Ceiling((cooldownEnd - now).TotalMinutes);
+                }
             }
         }
 
-        var isPending = !string.IsNullOrEmpty(user.PreferredEmail) && !user.PreferredEmailVerified;
-
-        return new PreferredEmailViewModel
+        return new EmailsViewModel
         {
-            OAuthEmail = user.Email ?? string.Empty,
-            CurrentPreferredEmail = user.PreferredEmail,
-            IsVerified = user.PreferredEmailVerified,
-            IsPendingVerification = isPending,
-            CanResendVerification = canResend,
+            Emails = emails.Select(e => new EmailRowViewModel
+            {
+                Id = e.Id,
+                Email = e.Email,
+                IsVerified = e.IsVerified,
+                IsOAuth = e.IsOAuth,
+                IsNotificationTarget = e.IsNotificationTarget,
+                Visibility = e.Visibility,
+                IsPendingVerification = e.IsPendingVerification
+            }).ToList(),
+            CanAddEmail = canAdd,
             MinutesUntilResend = minutesUntilResend
         };
     }
@@ -669,7 +685,8 @@ public class ProfileController : Controller
             "User {UserId} requested account deletion. Scheduled for {DeletionDate}",
             user.Id, deletionDate);
 
-        // Send confirmation email
+        // Send confirmation email - load UserEmails for GetEffectiveEmail()
+        await _dbContext.Entry(user).Collection(u => u.UserEmails).LoadAsync();
         var effectiveEmail = user.GetEffectiveEmail();
         if (effectiveEmail != null)
         {
@@ -758,6 +775,12 @@ public class ProfileController : Controller
             .Where(ra => ra.UserId == user.Id)
             .ToListAsync();
 
+        var userEmails = await _dbContext.UserEmails
+            .AsNoTracking()
+            .Where(e => e.UserId == user.Id)
+            .OrderBy(e => e.DisplayOrder)
+            .ToListAsync();
+
         var export = new
         {
             ExportedAt = _clock.GetCurrentInstant().ToString(null, CultureInfo.InvariantCulture),
@@ -766,19 +789,23 @@ public class ProfileController : Controller
                 user.Id,
                 user.Email,
                 user.DisplayName,
-                user.PreferredEmail,
-                user.PreferredEmailVerified,
                 CreatedAt = user.CreatedAt.ToString(null, CultureInfo.InvariantCulture),
                 LastLoginAt = user.LastLoginAt?.ToString(null, CultureInfo.InvariantCulture)
             },
+            UserEmails = userEmails.Select(e => new
+            {
+                e.Email,
+                e.IsVerified,
+                e.IsOAuth,
+                e.IsNotificationTarget,
+                e.Visibility
+            }),
             Profile = profile != null ? new
             {
                 profile.BurnerName,
                 profile.FirstName,
                 profile.LastName,
-                DateOfBirth = profile.DateOfBirth?.ToString("yyyy-MM-dd", null),
-                profile.PhoneCountryCode,
-                profile.PhoneNumber,
+                Birthday = profile.DateOfBirth != null ? $"{profile.DateOfBirth.Value.Month:D2}-{profile.DateOfBirth.Value.Day:D2}" : null,
                 profile.City,
                 profile.CountryCode,
                 profile.Bio,

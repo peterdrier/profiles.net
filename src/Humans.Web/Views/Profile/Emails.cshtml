@@ -1,0 +1,182 @@
+@model Humans.Web.Models.EmailsViewModel
+@{
+    ViewData["Title"] = Localizer["Emails_Title"].Value;
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <h1>@Localizer["Emails_Title"]</h1>
+        <p class="text-muted">
+            @Localizer["Emails_Description"]
+        </p>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">@Localizer["Emails_YourEmails"]</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status</th>
+                                <th>Notifications</th>
+                                <th>Profile Visibility</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var email in Model.Emails)
+                            {
+                                <tr>
+                                    <td>
+                                        <code>@email.Email</code>
+                                        @if (email.IsOAuth)
+                                        {
+                                            <span class="badge bg-secondary ms-1">Sign-in</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (email.IsVerified)
+                                        {
+                                            <span class="badge bg-success">
+                                                <i class="fa-solid fa-check me-1"></i>Verified
+                                            </span>
+                                        }
+                                        else if (email.IsPendingVerification)
+                                        {
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fa-solid fa-clock me-1"></i>Pending
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Unverified</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (email.IsNotificationTarget)
+                                        {
+                                            <span class="badge bg-primary">
+                                                <i class="fa-solid fa-bell me-1"></i>Active
+                                            </span>
+                                        }
+                                        else if (email.IsVerified)
+                                        {
+                                            <form asp-action="SetNotificationTarget" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="emailId" value="@email.Id" />
+                                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                    Set as target
+                                                </button>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">Verify first</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (email.IsVerified)
+                                        {
+                                            <form asp-action="SetEmailVisibility" method="post" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="emailId" value="@email.Id" />
+                                                <select name="visibility" class="form-select form-select-sm" style="width: auto; display: inline-block;" onchange="this.form.submit()">
+                                                    <option value="" selected="@(email.Visibility == null)">Hidden</option>
+                                                    <option value="AllActiveProfiles" selected="@(email.Visibility == Humans.Domain.Enums.ContactFieldVisibility.AllActiveProfiles)">All members</option>
+                                                    <option value="MyTeams" selected="@(email.Visibility == Humans.Domain.Enums.ContactFieldVisibility.MyTeams)">My teams</option>
+                                                    <option value="LeadsAndBoard" selected="@(email.Visibility == Humans.Domain.Enums.ContactFieldVisibility.LeadsAndBoard)">Leads + Board</option>
+                                                    <option value="BoardOnly" selected="@(email.Visibility == Humans.Domain.Enums.ContactFieldVisibility.BoardOnly)">Board only</option>
+                                                </select>
+                                            </form>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted small">—</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        @if (!email.IsOAuth)
+                                        {
+                                            <form asp-action="DeleteEmail" method="post" class="d-inline"
+                                                  data-confirm="Are you sure you want to remove this email?">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="emailId" value="@email.Id" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">@Localizer["Emails_AddNew"]</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="AddEmail" method="post">
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="NewEmail" class="form-label"></label>
+                        <input asp-for="NewEmail" class="form-control" type="email"
+                               placeholder="you@example.com" />
+                        <span asp-validation-for="NewEmail" class="text-danger"></span>
+                        <div class="form-text">
+                            @Localizer["Emails_VerificationWillBeSent"]
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary"
+                            @(Model.CanAddEmail ? "" : "disabled")>
+                        <i class="fa-solid fa-paper-plane me-1"></i>
+                        @Localizer["Emails_SendVerification"]
+                    </button>
+
+                    @if (!Model.CanAddEmail)
+                    {
+                        <small class="text-muted ms-2">
+                            @string.Format(Localizer["Emails_ResendCooldown"].Value, Model.MinutesUntilResend)
+                        </small>
+                    }
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a asp-action="Edit" class="btn btn-outline-secondary">
+                <i class="fa-solid fa-arrow-left me-1"></i>
+                @Localizer["Emails_BackToEdit"]
+            </a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

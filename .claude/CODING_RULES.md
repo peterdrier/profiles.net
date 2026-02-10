@@ -1,5 +1,9 @@
 # Coding Rules
 
+## Critical: Keep It Simple
+
+Do not over-engineer. Build the simplest thing that works. Avoid unnecessary abstractions, extra configuration options, migration steps for existing data that doesn't need fixing, or defensive code for scenarios that won't happen. When in doubt, do less.
+
 ## Critical: Answer Questions First, Wait for Approval
 
 When the user asks a question, answer the question and stop. Do not infer what work should be done from the question. Wait for explicit approval before making any code changes.

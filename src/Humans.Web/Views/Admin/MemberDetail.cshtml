@@ -82,12 +82,6 @@
                         <dd class="col-sm-9">@Model.FirstName @Model.LastName</dd>
                     }
 
-                    @if (!string.IsNullOrEmpty(Model.PhoneNumber))
-                    {
-                        <dt class="col-sm-3">@Localizer["Profile_Phone"]</dt>
-                        <dd class="col-sm-9">@Model.PhoneNumber</dd>
-                    }
-
                     @if (!string.IsNullOrEmpty(Model.City))
                     {
                         <dt class="col-sm-3">@Localizer["Profile_Location"]</dt>
