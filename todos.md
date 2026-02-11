@@ -1,6 +1,6 @@
 # Release TODOs
 
-Audit date: 2026-02-05 | Last updated: 2026-02-10
+Audit date: 2026-02-05 | Last updated: 2026-02-11
 
 ---
 
@@ -225,3 +225,6 @@ Committed `f04c8cf`.
 ### P1-15: Team Join view passes GUID where slug expected FIXED
 ### Drive Activity API monitoring DONE
 Committed `f04c8cf`. Closes GitHub #11.
+
+### Codebase simplification: remove dead code and unnecessary abstractions DONE
+Deleted unimplemented `IApplicationService`, unused `ProfileUpdateRequest` DTO, `IConsentRecordRepository` + `ConsentRecordRepository` (inlined into `MembershipCalculator`), and `IVolunteerHistoryService` interface (concrete class registered directly). Fixed duplicate Debug sink in appsettings.Development.json. Improved disabled sync jobs comment. Committed `251da28`.
