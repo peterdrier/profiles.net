@@ -103,7 +103,7 @@ public partial class AdminController : Controller
         return View(viewModel);
     }
 
-    [HttpGet("Members")]
+    [HttpGet("Humans")]
     public async Task<IActionResult> Members(string? search, string? filter, int page = 1)
     {
         var pageSize = 20;
@@ -155,7 +155,7 @@ public partial class AdminController : Controller
         return View(viewModel);
     }
 
-    [HttpGet("Members/{id}")]
+    [HttpGet("Humans/{id}")]
     public async Task<IActionResult> MemberDetail(Guid id)
     {
         var user = await _dbContext.Users
@@ -424,7 +424,7 @@ public partial class AdminController : Controller
         return RedirectToAction(nameof(ApplicationDetail), new { id });
     }
 
-    [HttpPost("Members/{id}/Suspend")]
+    [HttpPost("Humans/{id}/Suspend")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> SuspendMember(Guid id, string? notes)
     {
@@ -459,7 +459,7 @@ public partial class AdminController : Controller
         return RedirectToAction(nameof(MemberDetail), new { id });
     }
 
-    [HttpPost("Members/{id}/Unsuspend")]
+    [HttpPost("Humans/{id}/Unsuspend")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UnsuspendMember(Guid id)
     {
@@ -493,7 +493,7 @@ public partial class AdminController : Controller
         return RedirectToAction(nameof(MemberDetail), new { id });
     }
 
-    [HttpPost("Members/{id}/Approve")]
+    [HttpPost("Humans/{id}/Approve")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApproveVolunteer(Guid id)
     {
@@ -731,7 +731,7 @@ public partial class AdminController : Controller
         return View(viewModel);
     }
 
-    [HttpGet("Members/{id}/Roles/Add")]
+    [HttpGet("Humans/{id}/Roles/Add")]
     public async Task<IActionResult> AddRole(Guid id)
     {
         var user = await _dbContext.Users.FindAsync(id);
@@ -752,7 +752,7 @@ public partial class AdminController : Controller
         return View(viewModel);
     }
 
-    [HttpPost("Members/{id}/Roles/Add")]
+    [HttpPost("Humans/{id}/Roles/Add")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> AddRole(Guid id, CreateRoleAssignmentViewModel model)
     {
@@ -1072,7 +1072,7 @@ public partial class AdminController : Controller
         return View("GoogleSyncAudit", viewModel);
     }
 
-    [HttpGet("Members/{id}/GoogleSyncAudit")]
+    [HttpGet("Humans/{id}/GoogleSyncAudit")]
     public async Task<IActionResult> MemberGoogleSyncAudit(Guid id)
     {
         var user = await _dbContext.Users

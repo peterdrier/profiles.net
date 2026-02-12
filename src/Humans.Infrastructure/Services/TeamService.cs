@@ -513,6 +513,13 @@ public partial class TeamService : ITeamService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
+        // Admins can approve any team
+        var isAdmin = await IsUserAdminAsync(userId, cancellationToken);
+        if (isAdmin)
+        {
+            return true;
+        }
+
         // Board members can approve any team
         var isBoardMember = await IsUserBoardMemberAsync(userId, cancellationToken);
         if (isBoardMember)
@@ -540,6 +547,18 @@ public partial class TeamService : ITeamService
     {
         return await _dbContext.TeamMembers
             .AnyAsync(tm => tm.TeamId == teamId && tm.UserId == userId && tm.LeftAt == null && tm.Role == TeamMemberRole.Lead, cancellationToken);
+    }
+
+    public async Task<bool> IsUserAdminAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var now = _clock.GetCurrentInstant();
+        return await _dbContext.RoleAssignments
+            .AnyAsync(ra =>
+                ra.UserId == userId &&
+                ra.RoleName == RoleNames.Admin &&
+                ra.ValidFrom <= now &&
+                (ra.ValidTo == null || ra.ValidTo > now),
+                cancellationToken);
     }
 
     public async Task<bool> IsUserBoardMemberAsync(Guid userId, CancellationToken cancellationToken = default)

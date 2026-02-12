@@ -103,8 +103,9 @@ public class TeamController : Controller
         var isMember = await _teamService.IsUserMemberOfTeamAsync(team.Id, user.Id);
         var isLead = await _teamService.IsUserLeadOfTeamAsync(team.Id, user.Id);
         var isBoardMember = await _teamService.IsUserBoardMemberAsync(user.Id);
+        var isAdmin = await _teamService.IsUserAdminAsync(user.Id);
         var pendingRequest = await _teamService.GetUserPendingRequestAsync(team.Id, user.Id);
-        var canManage = isLead || isBoardMember;
+        var canManage = isLead || isBoardMember || isAdmin;
 
         var pendingRequestCount = 0;
         if (canManage)

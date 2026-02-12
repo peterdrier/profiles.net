@@ -78,7 +78,7 @@ System administrators need comprehensive tools to manage members, review applica
 - New profiles default to `IsApproved = false`
 - User sees "Pending Approval" alert on their profile page
 - Dashboard shows count of pending volunteers
-- Board can filter member list to show only pending volunteers (`/Admin/Members?filter=pending`)
+- Board can filter member list to show only pending volunteers (`/Admin/Humans?filter=pending`)
 - Board can approve a volunteer from member detail page
 - `SystemTeamSyncJob` only enrolls approved, non-suspended profiles in Volunteers team
 - Approval is logged for audit
@@ -123,11 +123,11 @@ Approval and consent completion both trigger `SyncVolunteersMembershipForUserAsy
 | Route | Action | Description |
 |-------|--------|-------------|
 | `/Admin` | Index | Dashboard |
-| `/Admin/Members` | Members | Member list with search |
-| `/Admin/Members/{id}` | MemberDetail | Individual member view |
-| `/Admin/Members/{id}/Approve` | ApproveVolunteer | POST: Approve volunteer |
-| `/Admin/Members/{id}/Suspend` | SuspendMember | POST: Suspend member |
-| `/Admin/Members/{id}/Unsuspend` | UnsuspendMember | POST: Unsuspend member |
+| `/Admin/Humans` | Members | Member list with search |
+| `/Admin/Humans/{id}` | MemberDetail | Individual member view |
+| `/Admin/Humans/{id}/Approve` | ApproveVolunteer | POST: Approve volunteer |
+| `/Admin/Humans/{id}/Suspend` | SuspendMember | POST: Suspend member |
+| `/Admin/Humans/{id}/Unsuspend` | UnsuspendMember | POST: Unsuspend member |
 | `/Admin/Applications` | Applications | Application list |
 | `/Admin/Applications/{id}` | ApplicationDetail | Application review |
 | `/Admin/Applications/{id}/Action` | ApplicationAction | POST: Process application |
@@ -339,9 +339,9 @@ _logger.LogInformation(
 
 | Action | Link | Badge |
 |--------|------|-------|
-| Review Pending Volunteers | `/Admin/Members?filter=pending` | Pending count |
+| Review Pending Volunteers | `/Admin/Humans?filter=pending` | Pending count |
 | Review Applications | `/Admin/Applications` | Pending count |
-| Manage Members | `/Admin/Members` | - |
+| Manage Humans | `/Admin/Humans` | - |
 | Manage Teams | `/Admin/Teams` | - |
 | Manage Roles | `/Admin/Roles` | - |
 | Legal Documents | `/Admin/LegalDocuments` | - |

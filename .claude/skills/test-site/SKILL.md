@@ -115,7 +115,7 @@ For each suite in scope, follow the steps below. After each step, report PASS/FA
 **Goal:** Verify admin panel functionality. Requires Admin or Board role.
 
 1. Navigate to `/Admin`. Confirm the dashboard loads with metric cards (members, pending approvals, pending consents, etc.) and recent activity.
-2. Navigate to `/Admin/Members`. Confirm the member list loads. Try the search box with a partial name or email.
+2. Navigate to `/Admin/Humans`. Confirm the member list loads. Try the search box with a partial name or email.
 3. Click on any member to view their detail page. Verify it shows: profile info, role assignments, consent records, and audit log entries.
 4. Navigate to `/Admin/Teams`. Confirm the team list loads with system teams marked.
 5. Navigate to `/Admin/Roles`. Confirm it shows current role assignments (Admin, Board, Lead).

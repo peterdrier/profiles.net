@@ -63,7 +63,9 @@
                         <td>
                             @if (team.PendingRequestCount > 0)
                             {
-                                <span class="badge bg-warning">@team.PendingRequestCount</span>
+                                <a asp-controller="TeamAdmin" asp-action="Requests" asp-route-slug="@team.Slug">
+                                    <span class="badge bg-warning">@team.PendingRequestCount</span>
+                                </a>
                             }
                             else
                             {

@@ -70,7 +70,7 @@ These are areas that have had recent bugs. Pay extra attention:
 - The consent checkbox uses setCustomValidity for localized validation
 - The "Already Consented" state shows who consented and when
 
-### /Admin/Members/{id}
+### /Admin/Humans/{id}
 - Shows full audit trail for the member
 - Role assignments show ValidFrom/ValidTo (temporal)
 - "Approve" button only appears for unapproved volunteers

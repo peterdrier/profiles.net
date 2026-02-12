@@ -145,7 +145,7 @@ Displays all audit log entries with filtering by action type. Features:
 
 Displays all audit entries for a specific Google resource, queried by `ResourceId`. Shows structured Google sync details: user email, role, sync source, success/failure status, and error messages. Accessed via "Audit" button on each row of the Google Sync page.
 
-### Per-User Google Sync Audit (`/Admin/Members/{id}/GoogleSyncAudit`)
+### Per-User Google Sync Audit (`/Admin/Humans/{id}/GoogleSyncAudit`)
 
 Displays all Google sync audit entries affecting a specific user, queried by `RelatedEntityId = userId` where `ResourceId IS NOT NULL`. Includes the Google resource name via navigation property. Accessed via "View Google Sync Audit" button on the Member Detail page sidebar.
 
