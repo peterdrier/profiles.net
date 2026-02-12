@@ -46,9 +46,11 @@
                         <span asp-validation-for="ConfirmAccuracy" class="text-danger d-block"></span>
                     </div>
 
+                    <p class="text-danger fw-semibold mb-3">Asociado applications will be available soon.</p>
+
                     <div class="d-flex justify-content-between">
                         <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
-                        <button type="submit" class="btn btn-primary">@Localizer["GovernanceCreate_SubmitApplication"]</button>
+                        <button type="submit" class="btn btn-primary" disabled>@Localizer["GovernanceCreate_SubmitApplication"]</button>
                     </div>
                 </form>
             </div>

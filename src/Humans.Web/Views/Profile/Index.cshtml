@@ -43,11 +43,11 @@
                     <div class="col-md-3">
                         @if (!string.IsNullOrEmpty(Model.EffectiveProfilePictureUrl))
                         {
-                            <img src="@Model.EffectiveProfilePictureUrl" alt="Profile" class="rounded-circle img-fluid" style="width: 100px; height: 100px; object-fit: cover;" />
+                            <img src="@Model.EffectiveProfilePictureUrl" alt="Profile" class="rounded-circle img-fluid" style="width: 160px; height: 160px; object-fit: cover;" />
                         }
                         else
                         {
-                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 100px; height: 100px; font-size: 2rem;">
+                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 160px; height: 160px; font-size: 3.2rem;">
                                 @(string.IsNullOrEmpty(Model.BurnerName) ? "?" : Model.BurnerName[0])
                             </div>
                         }
