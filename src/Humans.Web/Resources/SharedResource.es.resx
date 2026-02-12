@@ -197,6 +197,8 @@
   <data name="ProfileEdit_CityHelp" xml:space="preserve"><value>Busque su ciudad para establecer su ubicaci&#xF3;n.</value></data>
   <data name="ProfileEdit_CurrentLocation" xml:space="preserve"><value>Ubicaci&#xF3;n actual:</value></data>
   <data name="ProfileEdit_BioHelp" xml:space="preserve"><value>Cu&#xE9;ntenos un poco sobre usted.</value></data>
+  <data name="Profile_Pronouns" xml:space="preserve"><value>Pronombres</value></data>
+  <data name="ProfileEdit_PronounsPlaceholder" xml:space="preserve"><value>p. ej., elle, ella, &#xE9;l</value></data>
   <data name="ProfileEdit_ContactInfoHelp" xml:space="preserve"><value>A&#xF1;ada formas de contacto para que otros miembros puedan comunicarse con usted. Controle qui&#xE9;n puede ver cada dato.</value></data>
   <data name="ProfileEdit_AddContactField" xml:space="preserve"><value>A&#xF1;adir campo de contacto</value></data>
   <data name="ProfileEdit_BurnerCVHelp" xml:space="preserve"><value>Documente su participaci&#xF3;n en eventos, roles y campamentos. Las entradas se ordenan por fecha (m&#xE1;s recientes primero).</value></data>
@@ -308,6 +310,7 @@
   <data name="Governance_LongTermMembers" xml:space="preserve"><value>Miembros comprometidos a largo plazo</value></data>
   <data name="Governance_BoardReviews" xml:space="preserve"><value>La junta directiva revisa las solicitudes en funci&#xF3;n de la implicaci&#xF3;n comunitaria y la alineaci&#xF3;n con la misi&#xF3;n del colectivo.</value></data>
   <data name="Governance_NoteNotRequired" xml:space="preserve"><value>Nota: No necesita ser asociado para acceder a los recursos o participar en eventos.</value></data>
+  <data name="Governance_Statutes" xml:space="preserve"><value>Estatutos</value></data>
 
   <!-- Governance Create View -->
   <data name="GovernanceCreate_NewApplication" xml:space="preserve"><value>Nueva solicitud</value></data>
@@ -427,6 +430,7 @@
   <data name="TeamDetail_TeamManagement" xml:space="preserve"><value>Gesti&#xF3;n del equipo</value></data>
   <data name="TeamDetail_PendingRequests" xml:space="preserve"><value>Solicitudes pendientes</value></data>
   <data name="TeamDetail_ManageResources" xml:space="preserve"><value>Gestionar recursos</value></data>
+  <data name="TeamDetail_Resources" xml:space="preserve"><value>Recursos</value></data>
   <data name="TeamDetail_ManageConsents" xml:space="preserve"><value>Documentos legales</value></data>
 
   <!-- My Teams View -->
@@ -722,8 +726,8 @@
   <data name="TeamAdmin_SystemTeamRolesInfo" xml:space="preserve"><value>Este es un equipo gestionado por el sistema. Los roles de los miembros no se pueden cambiar manualmente.</value></data>
   <data name="TeamAdmin_DemoteConfirm" xml:space="preserve"><value>&#xBF;Degradar a este usuario a Miembro?</value></data>
   <data name="TeamAdmin_DemoteToMember" xml:space="preserve"><value>Degradar a Miembro</value></data>
-  <data name="TeamAdmin_PromoteConfirm" xml:space="preserve"><value>&#xBF;Ascender a este usuario a Metalead?</value></data>
-  <data name="TeamAdmin_PromoteToMetalead" xml:space="preserve"><value>Ascender a Metalead</value></data>
+  <data name="TeamAdmin_PromoteConfirm" xml:space="preserve"><value>&#xBF;Ascender a este usuario a Lead?</value></data>
+  <data name="TeamAdmin_PromoteToMetalead" xml:space="preserve"><value>Ascender a Lead</value></data>
   <data name="TeamAdmin_RemoveConfirm" xml:space="preserve"><value>&#xBF;Eliminar a este miembro del equipo?</value></data>
   <data name="TeamAdmin_Remove" xml:space="preserve"><value>Eliminar</value></data>
   <data name="TeamAdmin_NoMembers" xml:space="preserve"><value>A&#xFA;n no hay miembros en este equipo.</value></data>

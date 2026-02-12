@@ -52,6 +52,7 @@ public class SystemTeamSyncJob
             await SyncVolunteersTeamAsync(cancellationToken);
             await SyncMetaleadsTeamAsync(cancellationToken);
             await SyncBoardTeamAsync(cancellationToken);
+            await SyncAsociadosTeamAsync(cancellationToken);
 
             _logger.LogInformation("Completed system team sync");
         }
@@ -156,6 +157,36 @@ public class SystemTeamSyncJob
         // Additionally filter by Board-team-required consents
         var eligibleSet = await _membershipCalculator.GetUsersWithAllRequiredConsentsForTeamAsync(
             boardMemberIds, SystemTeamIds.Board, cancellationToken);
+
+        await SyncTeamMembershipAsync(team, eligibleSet.ToList(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Syncs the Asociados team membership based on approved applications.
+    /// Members: All users with an approved Asociado application.
+    /// </summary>
+    public async Task SyncAsociadosTeamAsync(CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Syncing Asociados team");
+
+        var team = await GetSystemTeamAsync(SystemTeamType.Asociados, cancellationToken);
+        if (team == null)
+        {
+            _logger.LogWarning("Asociados system team not found");
+            return;
+        }
+
+        // Get all users with approved Asociado applications
+        var asociadoUserIds = await _dbContext.Applications
+            .AsNoTracking()
+            .Where(a => a.Status == ApplicationStatus.Approved)
+            .Select(a => a.UserId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        // Additionally filter by Asociados-team-required consents
+        var eligibleSet = await _membershipCalculator.GetUsersWithAllRequiredConsentsForTeamAsync(
+            asociadoUserIds, SystemTeamIds.Asociados, cancellationToken);
 
         await SyncTeamMembershipAsync(team, eligibleSet.ToList(), cancellationToken);
     }

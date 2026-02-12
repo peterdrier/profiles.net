@@ -83,6 +83,12 @@ public class Profile
     public string? Bio { get; set; }
 
     /// <summary>
+    /// Member's pronouns (e.g., "they/them", "she/her").
+    /// </summary>
+    [PersonalData]
+    public string? Pronouns { get; set; }
+
+    /// <summary>
     /// Member's date of birth.
     /// </summary>
     [PersonalData]

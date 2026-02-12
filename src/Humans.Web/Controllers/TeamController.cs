@@ -128,6 +128,14 @@ public class TeamController : Controller
             p => p.UserId,
             p => Url.Action("Picture", "Profile", new { id = p.Id })!);
 
+        // Load active Google resources for this team
+        var googleResources = await _dbContext.GoogleResources
+            .AsNoTracking()
+            .Where(gr => gr.TeamId == team.Id && gr.IsActive)
+            .OrderBy(gr => gr.ResourceType)
+            .ThenBy(gr => gr.Name, StringComparer.Ordinal)
+            .ToListAsync();
+
         var viewModel = new TeamDetailViewModel
         {
             Id = team.Id,
@@ -139,6 +147,19 @@ public class TeamController : Controller
             IsSystemTeam = team.IsSystemTeam,
             SystemTeamType = team.SystemTeamType != SystemTeamType.None ? team.SystemTeamType.ToString() : null,
             CreatedAt = team.CreatedAt.ToDateTimeUtc(),
+            Resources = googleResources.Select(gr => new TeamResourceLinkViewModel
+            {
+                Name = gr.Name,
+                Url = gr.Url,
+                IconClass = gr.ResourceType switch
+                {
+                    GoogleResourceType.DriveFolder => "fa-solid fa-folder",
+                    GoogleResourceType.DriveFile => "fa-solid fa-file",
+                    GoogleResourceType.SharedDrive => "fa-solid fa-hard-drive",
+                    GoogleResourceType.Group => "fa-solid fa-users",
+                    _ => "fa-solid fa-link"
+                }
+            }).ToList(),
             Members = activeMembers
                 .OrderBy(m => m.Role)
                 .ThenBy(m => m.JoinedAt)

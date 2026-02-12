@@ -82,6 +82,10 @@ public class ProfileViewModel
     [DataType(DataType.MultilineText)]
     public string? Bio { get; set; }
 
+    [StringLength(100)]
+    [Display(Name = "Pronouns")]
+    public string? Pronouns { get; set; }
+
     /// <summary>
     /// Birthday month (1-12) for the edit form.
     /// </summary>

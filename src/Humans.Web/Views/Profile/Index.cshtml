@@ -54,6 +54,10 @@
                     </div>
                     <div class="col-md-9">
                         <h4>@(string.IsNullOrEmpty(Model.BurnerName) ? Model.DisplayName : Model.BurnerName)</h4>
+                        @if (!string.IsNullOrEmpty(Model.Pronouns))
+                        {
+                            <span class="text-muted me-2">@Model.Pronouns</span>
+                        }
                         <span class="badge @(Model.MembershipStatus == "Active" ? "bg-success" : Model.MembershipStatus == "Suspended" ? "bg-danger" : "bg-secondary")">
                             @Model.MembershipStatus
                         </span>

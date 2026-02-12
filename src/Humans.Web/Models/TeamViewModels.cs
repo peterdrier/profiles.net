@@ -38,6 +38,7 @@ public class TeamDetailViewModel
     public DateTime CreatedAt { get; set; }
 
     public List<TeamMemberViewModel> Members { get; set; } = [];
+    public List<TeamResourceLinkViewModel> Resources { get; set; } = [];
 
     // Current user context
     public bool IsCurrentUserMember { get; set; }
@@ -242,4 +243,14 @@ public class AdminTeamViewModel
     public int MemberCount { get; set; }
     public int PendingRequestCount { get; set; }
     public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>
+/// Simplified resource link for display on team detail page.
+/// </summary>
+public class TeamResourceLinkViewModel
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Url { get; set; }
+    public string IconClass { get; set; } = string.Empty;
 }

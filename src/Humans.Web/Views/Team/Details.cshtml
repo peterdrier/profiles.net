@@ -43,7 +43,7 @@
                     }
                     @if (Model.IsCurrentUserMetalead)
                     {
-                        <span class="badge bg-primary">Metalead</span>
+                        <span class="badge bg-primary">@Localizer["Profile_Lead"]</span>
                     }
                 </div>
             </div>
@@ -68,6 +68,34 @@
                 <small class="text-muted">@Localizer["TeamDetail_Created"] @Model.CreatedAt.ToString("MMMM d, yyyy")</small>
             </div>
         </div>
+
+        @if (Model.Resources.Count > 0)
+        {
+            <div class="card mb-4">
+                <div class="card-header">
+                    <span>@Localizer["TeamDetail_Resources"]</span>
+                </div>
+                <div class="card-body py-2">
+                    <div class="d-flex flex-wrap gap-2">
+                        @foreach (var resource in Model.Resources)
+                        {
+                            @if (!string.IsNullOrEmpty(resource.Url))
+                            {
+                                <a href="@resource.Url" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+                                    <i class="@resource.IconClass me-1"></i> @resource.Name
+                                </a>
+                            }
+                            else
+                            {
+                                <span class="btn btn-sm btn-outline-secondary disabled">
+                                    <i class="@resource.IconClass me-1"></i> @resource.Name
+                                </span>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
+        }
 
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -104,7 +132,7 @@
                                             </div>
                                         }
                                         <div class="fw-semibold small">@member.DisplayName</div>
-                                        <span class="badge bg-primary">Metalead</span>
+                                        <span class="badge bg-primary">@Localizer["Profile_Lead"]</span>
                                     </div>
                                 </div>
                             }

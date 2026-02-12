@@ -102,6 +102,7 @@ public class HumanController : Controller
             City = profile.City,
             CountryCode = profile.CountryCode,
             Bio = profile.Bio,
+            Pronouns = profile.Pronouns,
             BirthdayMonth = profile.DateOfBirth?.Month,
             BirthdayDay = profile.DateOfBirth?.Day,
             MembershipStatus = (await _membershipCalculator.ComputeStatusAsync(id)).ToString(),

@@ -3,6 +3,7 @@ using System;
 using Humans.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NodaTime;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Humans.Infrastructure.Migrations
 {
     [DbContext(typeof(HumansDbContext))]
-    partial class HumansDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260212021232_AddPronounsToProfile")]
+    partial class AddPronounsToProfile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -668,18 +671,6 @@ namespace Humans.Infrastructure.Migrations
                             RequiresApproval = false,
                             Slug = "board",
                             SystemTeamType = "Board",
-                            UpdatedAt = NodaTime.Instant.FromUnixTimeTicks(17702491570000000L)
-                        },
-                        new
-                        {
-                            Id = new Guid("00000000-0000-0000-0001-000000000004"),
-                            CreatedAt = NodaTime.Instant.FromUnixTimeTicks(17702491570000000L),
-                            Description = "Voting members with approved asociado applications",
-                            IsActive = true,
-                            Name = "Asociados",
-                            RequiresApproval = false,
-                            Slug = "asociados",
-                            SystemTeamType = "Asociados",
                             UpdatedAt = NodaTime.Instant.FromUnixTimeTicks(17702491570000000L)
                         });
                 });

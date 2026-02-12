@@ -111,6 +111,12 @@
                         <div class="form-text">@Localizer["ProfileEdit_BioHelp"]</div>
                     </div>
 
+                    <div class="mb-3">
+                        <label asp-for="Pronouns" class="form-label"></label>
+                        <input asp-for="Pronouns" class="form-control" placeholder="@Localizer["ProfileEdit_PronounsPlaceholder"].Value" />
+                        <span asp-validation-for="Pronouns" class="text-danger"></span>
+                    </div>
+
                     <hr />
                     <h5>@Localizer["Profile_DateOfBirth"]</h5>
                     <div class="row mb-3">

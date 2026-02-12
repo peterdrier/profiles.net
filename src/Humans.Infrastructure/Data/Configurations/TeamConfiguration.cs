@@ -105,6 +105,18 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
                 SystemTeamType = SystemTeamType.Board,
                 CreatedAt = SeedTimestamp,
                 UpdatedAt = SeedTimestamp
+            },
+            new
+            {
+                Id = Guid.Parse("00000000-0000-0000-0001-000000000004"),
+                Name = "Asociados",
+                Description = "Voting members with approved asociado applications",
+                Slug = "asociados",
+                IsActive = true,
+                RequiresApproval = false,
+                SystemTeamType = SystemTeamType.Asociados,
+                CreatedAt = SeedTimestamp,
+                UpdatedAt = SeedTimestamp
             });
     }
 }

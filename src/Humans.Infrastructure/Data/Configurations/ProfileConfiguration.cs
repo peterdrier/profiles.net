@@ -36,6 +36,9 @@ public class ProfileConfiguration : IEntityTypeConfiguration<Profile>
         builder.Property(p => p.Bio)
             .HasMaxLength(4000);
 
+        builder.Property(p => p.Pronouns)
+            .HasMaxLength(100);
+
         builder.Property(p => p.AdminNotes)
             .HasMaxLength(4000);
 

@@ -133,6 +133,7 @@ public class ProfileController : Controller
             City = profile?.City,
             CountryCode = profile?.CountryCode,
             Bio = profile?.Bio,
+            Pronouns = profile?.Pronouns,
             BirthdayMonth = profile?.DateOfBirth?.Month,
             BirthdayDay = profile?.DateOfBirth?.Day,
             HasPendingConsents = pendingConsents > 0,
@@ -208,6 +209,7 @@ public class ProfileController : Controller
             Longitude = profile?.Longitude,
             PlaceId = profile?.PlaceId,
             Bio = profile?.Bio,
+            Pronouns = profile?.Pronouns,
             BirthdayMonth = profile?.DateOfBirth?.Month,
             BirthdayDay = profile?.DateOfBirth?.Day,
             CanViewLegalName = true, // User editing their own profile
@@ -276,6 +278,7 @@ public class ProfileController : Controller
         profile.Longitude = model.Longitude;
         profile.PlaceId = model.PlaceId;
         profile.Bio = model.Bio;
+        profile.Pronouns = model.Pronouns;
         profile.DateOfBirth = model.ParsedBirthday;
         profile.UpdatedAt = now;
 
@@ -810,6 +813,7 @@ public class ProfileController : Controller
                 profile.City,
                 profile.CountryCode,
                 profile.Bio,
+                profile.Pronouns,
                 profile.IsSuspended,
                 HasCustomProfilePicture = profile.HasCustomProfilePicture,
                 CreatedAt = profile.CreatedAt.ToString(null, CultureInfo.InvariantCulture),

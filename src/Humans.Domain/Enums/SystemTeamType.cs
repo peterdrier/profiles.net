@@ -26,5 +26,11 @@ public enum SystemTeamType
     /// Board members with active RoleAssignment.
     /// Auto-synced from RoleAssignment table.
     /// </summary>
-    Board = 3
+    Board = 3,
+
+    /// <summary>
+    /// Asociados (voting members) with approved applications.
+    /// Auto-synced based on Application status.
+    /// </summary>
+    Asociados = 4
 }
