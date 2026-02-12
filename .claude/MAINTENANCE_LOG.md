@@ -12,6 +12,7 @@ Tracks when recurring maintenance processes were last run.
 | Feature spec sync | 2026-02-12 | 2026-03-12 | Monthly | docs/features/ vs implementation |
 | i18n audit | — | — | Monthly | Missing translations |
 | Data model doc sync | 2026-02-12 | As needed | As needed | .claude/DATA_MODEL.md vs entities |
+| Navigation audit | 2026-02-12 | 2026-03-12 | Monthly | `/nav-audit` — discoverability, backlinks |
 | GDPR audit | — | — | Quarterly | Exports, consent, PII logging |
 | NuGet full update | — | — | Monthly | Non-security package updates |
 | GitHub issue triage | — | — | Weekly | Sync issues vs todos.md |
