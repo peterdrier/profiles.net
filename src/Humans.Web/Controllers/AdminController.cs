@@ -29,6 +29,7 @@ public partial class AdminController : Controller
     private readonly IGoogleSyncService _googleSyncService;
     private readonly IAuditLogService _auditLogService;
     private readonly IMembershipCalculator _membershipCalculator;
+    private readonly IRoleAssignmentService _roleAssignmentService;
     private readonly ILegalDocumentSyncService _legalDocumentSyncService;
     private readonly GitHubSettings _githubSettings;
     private readonly IClock _clock;
@@ -43,6 +44,7 @@ public partial class AdminController : Controller
         IGoogleSyncService googleSyncService,
         IAuditLogService auditLogService,
         IMembershipCalculator membershipCalculator,
+        IRoleAssignmentService roleAssignmentService,
         ILegalDocumentSyncService legalDocumentSyncService,
         IOptions<GitHubSettings> githubSettings,
         IClock clock,
@@ -56,6 +58,7 @@ public partial class AdminController : Controller
         _googleSyncService = googleSyncService;
         _auditLogService = auditLogService;
         _membershipCalculator = membershipCalculator;
+        _roleAssignmentService = roleAssignmentService;
         _legalDocumentSyncService = legalDocumentSyncService;
         _githubSettings = githubSettings.Value;
         _clock = clock;
@@ -790,14 +793,13 @@ public partial class AdminController : Controller
 
         var now = _clock.GetCurrentInstant();
 
-        // Check if user already has an active assignment for this role
-        var existingActive = await _dbContext.RoleAssignments
-            .AnyAsync(ra => ra.UserId == id
-                && ra.RoleName == model.RoleName
-                && ra.ValidFrom <= now
-                && (ra.ValidTo == null || ra.ValidTo > now));
+        // Prevent overlapping role windows at application layer.
+        // This also blocks creating a "current" open-ended assignment
+        // when a future assignment for the same role already exists.
+        var hasOverlap = await _roleAssignmentService.HasOverlappingAssignmentAsync(
+            id, model.RoleName, now);
 
-        if (existingActive)
+        if (hasOverlap)
         {
             TempData["ErrorMessage"] = string.Format(_localizer["Admin_RoleAlreadyActive"].Value, model.RoleName);
             return RedirectToAction(nameof(MemberDetail), new { id });

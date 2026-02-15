@@ -8,7 +8,12 @@ public class GoogleResourceConfiguration : IEntityTypeConfiguration<GoogleResour
 {
     public void Configure(EntityTypeBuilder<GoogleResource> builder)
     {
-        builder.ToTable("google_resources");
+        builder.ToTable("google_resources", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_google_resources_exactly_one_owner",
+                "(\"TeamId\" IS NOT NULL AND \"UserId\" IS NULL) OR (\"TeamId\" IS NULL AND \"UserId\" IS NOT NULL)");
+        });
 
         builder.HasKey(gr => gr.Id);
 

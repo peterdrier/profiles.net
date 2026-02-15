@@ -399,7 +399,10 @@ namespace Humans.Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"IsActive\" = true AND \"TeamId\" IS NOT NULL");
 
-                    b.ToTable("google_resources", (string)null);
+                    b.ToTable("google_resources", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_google_resources_exactly_one_owner", "(\"TeamId\" IS NOT NULL AND \"UserId\" IS NULL) OR (\"TeamId\" IS NULL AND \"UserId\" IS NOT NULL)");
+                        });
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.LegalDocument", b =>
@@ -592,7 +595,10 @@ namespace Humans.Infrastructure.Migrations
 
                     b.HasIndex("UserId", "RoleName", "ValidFrom");
 
-                    b.ToTable("role_assignments", (string)null);
+                    b.ToTable("role_assignments", (string)null, t =>
+                        {
+                            t.HasCheckConstraint("CK_role_assignments_valid_window", "\"ValidTo\" IS NULL OR \"ValidTo\" > \"ValidFrom\"");
+                        });
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.Team", b =>
