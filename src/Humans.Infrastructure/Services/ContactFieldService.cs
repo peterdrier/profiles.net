@@ -195,7 +195,7 @@ public class ContactFieldService : IContactFieldService
             .Where(tm => tm.Team.SystemTeamType != SystemTeamType.Volunteers)
             .Select(tm => tm.TeamId)
             .ToHashSet();
-        
+
         var sharesTeam = _cachedViewerTeamIds.Intersect(ownerTeamIds).Any();
         if (sharesTeam)
         {

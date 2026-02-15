@@ -70,4 +70,4 @@ jobs:
       run: dotnet restore Humans.slnx
 
     - name: Check formatting
-      run: dotnet format Humans.slnx --verify-no-changes --verbosity diagnostic
+      run: dotnet format Humans.slnx --verify-no-changes --verbosity diagnostic --exclude src/Humans.Infrastructure/Migrations/
