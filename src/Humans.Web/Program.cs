@@ -195,6 +195,7 @@ builder.Services.AddScoped<ProcessAccountDeletionsJob>();
 builder.Services.AddScoped<SuspendNonCompliantMembersJob>();
 builder.Services.AddScoped<GoogleResourceReconciliationJob>();
 builder.Services.AddScoped<DriveActivityMonitorJob>();
+builder.Services.AddScoped<ProcessGoogleSyncOutboxJob>();
 
 // Configure Response Compression
 builder.Services.AddResponseCompression(options =>
@@ -447,6 +448,11 @@ RecurringJob.AddOrUpdate<SuspendNonCompliantMembersJob>(
     "suspend-non-compliant-members",
     job => job.ExecuteAsync(CancellationToken.None),
     "30 4 * * *");
+
+RecurringJob.AddOrUpdate<ProcessGoogleSyncOutboxJob>(
+    "process-google-sync-outbox",
+    job => job.ExecuteAsync(CancellationToken.None),
+    Cron.Minutely);
 
 RecurringJob.AddOrUpdate<DriveActivityMonitorJob>(
     "drive-activity-monitor",

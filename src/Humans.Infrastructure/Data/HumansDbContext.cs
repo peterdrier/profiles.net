@@ -28,6 +28,7 @@ public class HumansDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
     public DbSet<TeamJoinRequest> TeamJoinRequests => Set<TeamJoinRequest>();
     public DbSet<TeamJoinRequestStateHistory> TeamJoinRequestStateHistories => Set<TeamJoinRequestStateHistory>();
     public DbSet<GoogleResource> GoogleResources => Set<GoogleResource>();
+    public DbSet<GoogleSyncOutboxEvent> GoogleSyncOutboxEvents => Set<GoogleSyncOutboxEvent>();
     public DbSet<ContactField> ContactFields => Set<ContactField>();
     public DbSet<UserEmail> UserEmails => Set<UserEmail>();
     public DbSet<VolunteerHistoryEntry> VolunteerHistoryEntries => Set<VolunteerHistoryEntry>();

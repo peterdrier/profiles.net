@@ -405,6 +405,55 @@ namespace Humans.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Humans.Domain.Entities.GoogleSyncOutboxEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeduplicationKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Instant>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Instant?>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RetryCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<Guid>("TeamId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique();
+
+                    b.HasIndex("ProcessedAt", "OccurredAt");
+
+                    b.HasIndex("TeamId", "UserId", "ProcessedAt");
+
+                    b.ToTable("google_sync_outbox", (string)null);
+                });
+
             modelBuilder.Entity("Humans.Domain.Entities.LegalDocument", b =>
                 {
                     b.Property<Guid>("Id")

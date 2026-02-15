@@ -10,7 +10,7 @@ Execution log for `docs/2026-02-15-codex-plan.md` with checkpoint-based iteratio
 4. Commit a checkpoint.
 
 ## Current Phase
-`Phase 2` (canonical membership lifecycle) -> `Phase 3` (admin legal-docs decomposition)
+`Phase 3` (admin legal-docs decomposition) -> `Phase 4` (Google sync outbox boundary)
 
 ## Decisions
 - 2026-02-15: Do **not** add DB exclusion/non-overlap constraint for role windows in Phase 1.
@@ -74,6 +74,24 @@ Execution log for `docs/2026-02-15-codex-plan.md` with checkpoint-based iteratio
 - 2026-02-15: Validation pass attempted.
   - `dotnet build Humans.slnx --no-restore` is still blocked by restricted network to NuGet (`NU1301`), even after setting `DOTNET_CLI_HOME` to a writable workspace folder.
 - 2026-02-15: Removed local build artifact folder `.dotnet/` from workspace.
+- 2026-02-15: Checkpoint commit created: `fd4708d` (`refactor(admin): extract legal docs feature slice service/controller`).
+- 2026-02-15: Phase 4 outbox boundary started.
+  - Added outbox model/configuration/migration:
+    - `GoogleSyncOutboxEvent`
+    - `GoogleSyncOutboxEventConfiguration`
+    - `20260215193000_AddGoogleSyncOutbox.cs`
+  - Updated `HumansDbContext` and model snapshot with `google_sync_outbox`.
+  - Updated `TeamService` to enqueue outbox events for add/remove membership changes instead of direct Google sync calls in-request.
+  - Added outbox processor job:
+    - `ProcessGoogleSyncOutboxJob`
+  - Registered/scheduled outbox processing in `Program.cs` (`Cron.Minutely`).
+  - Added focused outbox job tests:
+    - `ProcessGoogleSyncOutboxJobTests`
+- 2026-02-15: Validation pass attempted for Phase 4.
+  - `dotnet build Humans.slnx --no-restore` remains blocked by network/package cache limits:
+    - `NU1301` (cannot reach NuGet signature endpoint)
+    - `NU1101` (required packages/analyzers not available offline)
+- 2026-02-15: Removed regenerated local build artifact folder `.dotnet/` from workspace.
 
 ## Next Step
-- Create Phase 3 checkpoint commit, then start Phase 4 with an outbox entity/configuration/migration skeleton.
+- Create a Phase 4 checkpoint commit, then continue with optional startup modularization if time remains.

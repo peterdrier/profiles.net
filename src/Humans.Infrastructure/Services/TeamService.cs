@@ -16,20 +16,17 @@ namespace Humans.Infrastructure.Services;
 public partial class TeamService : ITeamService
 {
     private readonly HumansDbContext _dbContext;
-    private readonly IGoogleSyncService _googleSyncService;
     private readonly IAuditLogService _auditLogService;
     private readonly IClock _clock;
     private readonly ILogger<TeamService> _logger;
 
     public TeamService(
         HumansDbContext dbContext,
-        IGoogleSyncService googleSyncService,
         IAuditLogService auditLogService,
         IClock clock,
         ILogger<TeamService> logger)
     {
         _dbContext = dbContext;
-        _googleSyncService = googleSyncService;
         _auditLogService = auditLogService;
         _clock = clock;
         _logger = logger;
@@ -274,6 +271,11 @@ public partial class TeamService : ITeamService
             $"{joiningUser?.DisplayName ?? userId.ToString()} joined {team.Name} directly",
             userId, joiningUser?.DisplayName ?? userId.ToString(),
             relatedEntityId: userId, relatedEntityType: "User");
+        EnqueueGoogleSyncOutboxEvent(
+            member.Id,
+            teamId,
+            userId,
+            GoogleSyncOutboxEventTypes.AddUserToTeamResources);
 
         try
         {
@@ -290,9 +292,6 @@ public partial class TeamService : ITeamService
 
             throw;
         }
-
-        // Sync Google resources
-        await _googleSyncService.AddUserToTeamResourcesAsync(teamId, userId, cancellationToken);
 
         _logger.LogInformation("User {UserId} joined team {TeamId} directly", userId, teamId);
 
@@ -328,11 +327,13 @@ public partial class TeamService : ITeamService
             $"{leavingUser?.DisplayName ?? userId.ToString()} left {team.Name}",
             userId, leavingUser?.DisplayName ?? userId.ToString(),
             relatedEntityId: userId, relatedEntityType: "User");
+        EnqueueGoogleSyncOutboxEvent(
+            member.Id,
+            teamId,
+            userId,
+            GoogleSyncOutboxEventTypes.RemoveUserFromTeamResources);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-
-        // Sync Google resources
-        await _googleSyncService.RemoveUserFromTeamResourcesAsync(teamId, userId, cancellationToken);
 
         _logger.LogInformation("User {UserId} left team {TeamId}", userId, teamId);
     }
@@ -391,6 +392,11 @@ public partial class TeamService : ITeamService
             $"Join request for {request.Team?.Name ?? request.TeamId.ToString()} approved",
             approverUserId, approver?.DisplayName ?? approverUserId.ToString(),
             relatedEntityId: request.UserId, relatedEntityType: "User");
+        EnqueueGoogleSyncOutboxEvent(
+            member.Id,
+            request.TeamId,
+            request.UserId,
+            GoogleSyncOutboxEventTypes.AddUserToTeamResources);
 
         try
         {
@@ -408,9 +414,6 @@ public partial class TeamService : ITeamService
 
             throw;
         }
-
-        // Sync Google resources
-        await _googleSyncService.AddUserToTeamResourcesAsync(request.TeamId, request.UserId, cancellationToken);
 
         _logger.LogInformation("Approver {ApproverId} approved join request {RequestId} for user {UserId} to team {TeamId}",
             approverUserId, requestId, request.UserId, request.TeamId);
@@ -647,11 +650,13 @@ public partial class TeamService : ITeamService
             $"Member removed from {team.Name}",
             actorUserId, actor?.DisplayName ?? actorUserId.ToString(),
             relatedEntityId: userId, relatedEntityType: "User");
+        EnqueueGoogleSyncOutboxEvent(
+            member.Id,
+            teamId,
+            userId,
+            GoogleSyncOutboxEventTypes.RemoveUserFromTeamResources);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
-
-        // Sync Google resources
-        await _googleSyncService.RemoveUserFromTeamResourcesAsync(teamId, userId, cancellationToken);
 
         _logger.LogInformation("Actor {ActorId} removed user {UserId} from team {TeamId}", actorUserId, userId, teamId);
     }
@@ -667,6 +672,23 @@ public partial class TeamService : ITeamService
             .OrderBy(tm => tm.Role)
             .ThenBy(tm => tm.JoinedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    private void EnqueueGoogleSyncOutboxEvent(
+        Guid teamMemberId,
+        Guid teamId,
+        Guid userId,
+        string eventType)
+    {
+        _dbContext.GoogleSyncOutboxEvents.Add(new GoogleSyncOutboxEvent
+        {
+            Id = Guid.NewGuid(),
+            EventType = eventType,
+            TeamId = teamId,
+            UserId = userId,
+            OccurredAt = _clock.GetCurrentInstant(),
+            DeduplicationKey = $"{teamMemberId}:{eventType}"
+        });
     }
 
     private static string GenerateSlug(string name)
