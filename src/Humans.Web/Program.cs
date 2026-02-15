@@ -20,6 +20,7 @@ using OpenTelemetry.Trace;
 using Humans.Domain.Entities;
 using Humans.Infrastructure.Data;
 using Humans.Web.Authorization;
+using Humans.Web.Extensions;
 using Humans.Web.Health;
 using Microsoft.Extensions.Localization;
 using Npgsql;
