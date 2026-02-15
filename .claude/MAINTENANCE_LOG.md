@@ -4,7 +4,7 @@ Tracks when recurring maintenance processes were last run.
 
 | Process | Last Run | Next Due | Cadence | Notes |
 |---------|----------|----------|---------|-------|
-| NuGet vulnerability check | — | — | Weekly | `dotnet list package --vulnerable` |
+| NuGet vulnerability check | 2026-02-15 | 2026-02-22 | Weekly | `dotnet list package --vulnerable` |
 | Todo audit | 2026-02-12 | 2026-02-19 | Weekly | Stale items, completed moves |
 | Code simplification | — | — | After features | Dead code, unused abstractions |
 | Static analysis | — | — | After features | ReSharper/Roslyn warnings |
@@ -15,5 +15,5 @@ Tracks when recurring maintenance processes were last run.
 | Navigation audit | 2026-02-12 | 2026-03-12 | Monthly | `/nav-audit` — discoverability, backlinks |
 | GDPR audit | — | — | Quarterly | Exports, consent, PII logging |
 | Migration squash check | — | — | Monthly | Check `/Admin/DbVersion` on prod, QA (humans.n.burn.camp), and local dev. Oldest `lastApplied` across all three is the safe squash boundary. |
-| NuGet full update | — | — | Monthly | Non-security package updates |
+| NuGet full update | 2026-02-15 | 2026-03-15 | Monthly | Non-security package updates |
 | GitHub issue triage | — | — | Weekly | Sync issues vs todos.md |
