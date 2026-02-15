@@ -1,6 +1,6 @@
 # Release TODOs
 
-Audit date: 2026-02-05 | Last updated: 2026-02-13
+Audit date: 2026-02-05 | Last updated: 2026-02-15
 
 ---
 
@@ -8,19 +8,9 @@ Audit date: 2026-02-05 | Last updated: 2026-02-13
 
 ### Priority 1: Bugs
 
-#### P1-16: Stubs silently activate in production if Google credentials missing
-`StubTeamResourceService` creates real DB records with fake Google IDs when credentials are missing. No startup warning. Fix: fail fast in production, or health check reports degraded.
-**Where:** `Program.cs:146-157`
-
 #### P1-12: Google group sync misses paginated results
 `Members.List()` and `Permissions.List()` don't handle `NextPageToken`. Groups with >200 members will have members silently dropped or removed.
 **Where:** `GoogleWorkspaceSyncService.cs:334,554`
-
-#### G-05: No reminder frequency tracking (spam risk)
-`SendReConsentReminderJob` sends reminders on every execution with no cooldown. Needs `LastConsentReminderSentAt` field and 7-day cooldown. Requires migration.
-
-#### P2-06: Schedule orphaned SendReConsentReminderJob
-The job class exists but isn't registered in DI or scheduled. Volunteers get suspended without warning because no reminders are sent.
 
 ---
 
@@ -36,13 +26,9 @@ Drive Activity API returns `people/` IDs instead of email addresses. Need to res
 
 ### Priority 3: Data Integrity & Security
 
-#### P1-09: Enforce uniqueness for active role assignments
-Partial unique index only covers `ValidTo IS NULL`. Future-dated assignments can overlap. Fix with PostgreSQL exclusion constraint on `tsrange(valid_from, valid_to)`.
-**Where:** `RoleAssignmentConfiguration.cs:39`, `AdminController.cs:663-674`
-
-#### P1-07: Add transactional consistency for Google sync
-DB commits before Google API call. If Google fails, DB is committed but resources are out of sync. Fix: outbox pattern or reconciliation.
-**Where:** `TeamService.cs:258,261` and `:574,577`
+#### P1-09: Enforce uniqueness for active role assignments (DB-level)
+App-layer overlap guard added (`RoleAssignmentService.HasOverlappingAssignmentAsync`), but DB-level exclusion constraint on `tsrange(valid_from, valid_to)` is still deferred. Low urgency since admin UI validates before insert.
+**Where:** `RoleAssignmentConfiguration.cs`
 
 #### P1-13: Apply configured Google group settings during provisioning
 `GoogleWorkspaceSettings.GroupSettings` properties (WhoCanViewMembership, AllowExternalMembers, etc.) are defined but never applied. Groups get Google defaults. Per R-04, external members must be allowed.
@@ -82,7 +68,7 @@ Helper methods re-query resources already loaded by parent methods. Redundant DB
 `MemberDetail` loads ALL applications and consent records via `Include` when it only needs a few. `Members` list relies on implicit Include behavior.
 
 #### G-08: Centralize admin business logic into services
-All business logic lives in `AdminController`. Extract to service interfaces for testability and reuse.
+Legal docs slice extracted to `AdminLegalDocumentsController` + `IAdminLegalDocumentService`. Remaining: role management, member management, application review slices still in `AdminController`.
 
 #### G-09: Team membership caching
 Every page load queries team memberships. At ~500 users, in-memory cache with short TTL would eliminate most DB hits.
@@ -107,14 +93,12 @@ These need production domain, IP ranges, deployment model, or infrastructure dec
 
 | ID | Issue | Blocked On |
 |----|-------|------------|
-| P0-01 | Lock down trusted proxy headers (IP spoofing risk) | Production reverse proxy IP ranges |
 | P0-03 | Restrict health and metrics endpoints | Deployment model (public OK for now per R-03, revisit post-launch) |
-| P0-04 | Enforce host header restrictions (`AllowedHosts: *`) | Production domain name |
 | P0-12 | Docker healthcheck broken (curl missing) | Docker/K8s deployment |
 | P0-13 | Replace insecure default credentials in docker-compose | Secrets management |
 | P2-01 | Persist Data Protection keys | Production storage decision |
 | P2-02 | Add explicit cookie/security policy settings | Production HTTPS setup |
-| P2-05 | Improve consent metadata fidelity (IP/UA accuracy) | P0-01 (proxy trust) |
+| P2-05 | Improve consent metadata fidelity (IP/UA accuracy) | Verify proxy trust is working correctly post-deploy |
 
 ---
 
@@ -130,6 +114,21 @@ These need production domain, IP ranges, deployment model, or infrastructure dec
 ---
 
 ## Completed
+
+### P1-16: Fail fast in production if Google credentials missing DONE
+`AddHumansInfrastructure` throws `InvalidOperationException` at startup in Production if Google Workspace credentials are not configured. Stubs still available in Development/Staging.
+
+### P2-06 + G-05: Register, schedule, and configure SendReConsentReminderJob DONE
+Job registered in DI, scheduled daily at 04:00 (before suspension job at 04:30). Cooldown and days-before-suspension now configurable via `Email:ConsentReminderDaysBeforeSuspension` (prod: 30, QA: 3) and `Email:ConsentReminderCooldownDays` (prod: 7, QA: 1). G-05 cooldown was already implemented in code.
+
+### P0-01: Lock down trusted proxy headers DONE
+`KnownProxies` set to `46.225.30.76` in `Program.cs`. Consent records and audit logs will now capture real client IPs.
+
+### P0-04: Enforce host header restrictions DONE
+`AllowedHosts` set to `humans.nobodies.team;humans.n.burn.camp;localhost`. QA override in `appsettings.Staging.json`.
+
+### P1-07: Add transactional consistency for Google sync DONE
+Outbox pattern implemented: `TeamService` enqueues `GoogleSyncOutboxEvent` rows instead of calling Google API in-request. `ProcessGoogleSyncOutboxJob` drains the outbox with retry logic (max 10 attempts).
 
 ### #3: Full Lead rename (domain, DB, code) DONE
 Renamed all internal "Lead" references across domain, application, infrastructure, web, tests, migrations, resources, and documentation.

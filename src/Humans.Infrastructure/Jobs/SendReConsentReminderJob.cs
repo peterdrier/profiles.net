@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NodaTime;
 using Humans.Application.Interfaces;
+using Humans.Infrastructure.Configuration;
 using Humans.Infrastructure.Data;
 
 namespace Humans.Infrastructure.Jobs;
@@ -15,6 +17,7 @@ public class SendReConsentReminderJob
     private readonly IMembershipCalculator _membershipCalculator;
     private readonly ILegalDocumentSyncService _legalDocService;
     private readonly IEmailService _emailService;
+    private readonly EmailSettings _emailSettings;
     private readonly ILogger<SendReConsentReminderJob> _logger;
     private readonly IClock _clock;
 
@@ -23,6 +26,7 @@ public class SendReConsentReminderJob
         IMembershipCalculator membershipCalculator,
         ILegalDocumentSyncService legalDocService,
         IEmailService emailService,
+        IOptions<EmailSettings> emailSettings,
         ILogger<SendReConsentReminderJob> logger,
         IClock clock)
     {
@@ -30,20 +34,24 @@ public class SendReConsentReminderJob
         _membershipCalculator = membershipCalculator;
         _legalDocService = legalDocService;
         _emailService = emailService;
+        _emailSettings = emailSettings.Value;
         _logger = logger;
         _clock = clock;
     }
 
     /// <summary>
     /// Sends re-consent reminders to members who haven't consented to required documents.
+    /// Uses ConsentReminderDaysBeforeSuspension and ConsentReminderCooldownDays from EmailSettings.
     /// </summary>
-    /// <param name="daysBeforeSuspension">Number of days before suspension to send reminder.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task ExecuteAsync(int daysBeforeSuspension = 7, CancellationToken cancellationToken = default)
+    public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
+        var daysBeforeSuspension = _emailSettings.ConsentReminderDaysBeforeSuspension;
+        var cooldownDays = _emailSettings.ConsentReminderCooldownDays;
+
         _logger.LogInformation(
-            "Starting re-consent reminder job at {Time}, {Days} days before suspension",
-            _clock.GetCurrentInstant(), daysBeforeSuspension);
+            "Starting re-consent reminder job at {Time}, {Days} days before suspension, {Cooldown}-day cooldown",
+            _clock.GetCurrentInstant(), daysBeforeSuspension, cooldownDays);
 
         try
         {
@@ -63,7 +71,7 @@ public class SendReConsentReminderJob
                 .ToDictionaryAsync(u => u.Id, cancellationToken);
 
             var now = _clock.GetCurrentInstant();
-            var cooldown = Duration.FromDays(7);
+            var cooldown = Duration.FromDays(cooldownDays);
             var sentCount = 0;
 
             foreach (var userId in userIds)

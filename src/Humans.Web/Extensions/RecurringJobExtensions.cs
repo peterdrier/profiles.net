@@ -39,6 +39,15 @@ public static class RecurringJobExtensions
             job => job.ExecuteAsync(CancellationToken.None),
             "30 4 * * *");
 
+        // Send re-consent reminders before suspension job runs.
+        // Runs daily at 04:00, 30 minutes before SuspendNonCompliantMembersJob.
+        // Timing controlled by Email:ConsentReminderDaysBeforeSuspension and
+        // Email:ConsentReminderCooldownDays in appsettings.
+        RecurringJob.AddOrUpdate<SendReConsentReminderJob>(
+            "send-reconsent-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 4 * * *");
+
         RecurringJob.AddOrUpdate<ProcessGoogleSyncOutboxJob>(
             "process-google-sync-outbox",
             job => job.ExecuteAsync(CancellationToken.None),

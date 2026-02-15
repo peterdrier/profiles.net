@@ -54,4 +54,16 @@ public class EmailSettings
     /// Base URL for links in emails.
     /// </summary>
     public string BaseUrl { get; set; } = "https://profiles.nobodies.team";
+
+    /// <summary>
+    /// Days before suspension to start sending re-consent reminders.
+    /// Production: 30, QA: 3.
+    /// </summary>
+    public int ConsentReminderDaysBeforeSuspension { get; set; } = 30;
+
+    /// <summary>
+    /// Minimum days between re-consent reminders for the same user.
+    /// Production: 7, QA: 1.
+    /// </summary>
+    public int ConsentReminderCooldownDays { get; set; } = 7;
 }

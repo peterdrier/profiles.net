@@ -2,8 +2,6 @@ using Humans.Application.Interfaces;
 using Humans.Infrastructure.Configuration;
 using Humans.Infrastructure.Jobs;
 using Humans.Infrastructure.Services;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Humans.Web.Extensions;
 
@@ -11,7 +9,8 @@ public static class InfrastructureServiceCollectionExtensions
 {
     public static IServiceCollection AddHumansInfrastructure(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.Configure<GitHubSettings>(configuration.GetSection(GitHubSettings.SectionName));
         services.Configure<EmailSettings>(configuration.GetSection(EmailSettings.SectionName));
@@ -26,12 +25,20 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAdminLegalDocumentService, AdminLegalDocumentService>();
 
         var googleWorkspaceConfig = configuration.GetSection(GoogleWorkspaceSettings.SectionName);
-        if (!string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyPath"]) ||
-            !string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyJson"]))
+        var hasGoogleCredentials = !string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyPath"]) ||
+                                   !string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyJson"]);
+
+        if (hasGoogleCredentials)
         {
             services.AddScoped<IGoogleSyncService, GoogleWorkspaceSyncService>();
             services.AddScoped<ITeamResourceService, TeamResourceService>();
             services.AddScoped<IDriveActivityMonitorService, DriveActivityMonitorService>();
+        }
+        else if (environment.IsProduction())
+        {
+            throw new InvalidOperationException(
+                "Google Workspace credentials are required in production. " +
+                "Set GoogleWorkspace:ServiceAccountKeyPath or GoogleWorkspace:ServiceAccountKeyJson.");
         }
         else
         {
@@ -46,6 +53,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<SystemTeamSyncJob>();
         services.AddScoped<SyncLegalDocumentsJob>();
+        services.AddScoped<SendReConsentReminderJob>();
         services.AddScoped<ProcessAccountDeletionsJob>();
         services.AddScoped<SuspendNonCompliantMembersJob>();
         services.AddScoped<GoogleResourceReconciliationJob>();

@@ -154,7 +154,7 @@ builder.Services.AddHealthChecks()
     .AddCheck<GitHubHealthCheck>("github")
     .AddCheck<GoogleWorkspaceHealthCheck>("google-workspace");
 
-builder.Services.AddHumansInfrastructure(builder.Configuration);
+builder.Services.AddHumansInfrastructure(builder.Configuration, builder.Environment);
 
 // Configure Response Compression
 builder.Services.AddResponseCompression(options =>
@@ -190,6 +190,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+    options.KnownProxies.Add(System.Net.IPAddress.Parse("46.225.30.76"));
 });
 
 // Configure Localization
