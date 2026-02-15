@@ -169,6 +169,7 @@ builder.Services.AddScoped<IContactFieldService, ContactFieldService>();
 builder.Services.AddScoped<IUserEmailService, UserEmailService>();
 builder.Services.AddScoped<VolunteerHistoryService>();
 builder.Services.AddScoped<ILegalDocumentSyncService, LegalDocumentSyncService>();
+builder.Services.AddScoped<IAdminLegalDocumentService, AdminLegalDocumentService>();
 // Use real Google Workspace service if credentials configured, otherwise use stub
 var googleWorkspaceConfig = builder.Configuration.GetSection(GoogleWorkspaceSettings.SectionName);
 if (!string.IsNullOrEmpty(googleWorkspaceConfig["ServiceAccountKeyPath"]) ||

@@ -10,7 +10,7 @@ Execution log for `docs/2026-02-15-codex-plan.md` with checkpoint-based iteratio
 4. Commit a checkpoint.
 
 ## Current Phase
-`Phase 0` (baseline) -> `Phase 1` (data integrity + app-layer overlap validation)
+`Phase 2` (canonical membership lifecycle) -> `Phase 3` (admin legal-docs decomposition)
 
 ## Decisions
 - 2026-02-15: Do **not** add DB exclusion/non-overlap constraint for role windows in Phase 1.
@@ -37,7 +37,8 @@ Execution log for `docs/2026-02-15-codex-plan.md` with checkpoint-based iteratio
     - `RoleAssignmentService`
   - Wired overlap guard into admin role assignment flow (`AdminController.AddRole`).
   - Added tests for overlap behavior: `RoleAssignmentServiceTests`.
-- 2026-02-15: Phase 2 implementation (in progress).
+- 2026-02-15: Checkpoint commit created: `794d2d4` (`phase1: add integrity checks and role overlap guard`).
+- 2026-02-15: Phase 2 implementation completed.
   - Added consolidated snapshot DTO: `MembershipSnapshot`.
   - Extended `IMembershipCalculator` with `GetMembershipSnapshotAsync`.
   - Implemented snapshot aggregation in `MembershipCalculator`.
@@ -51,6 +52,28 @@ Execution log for `docs/2026-02-15-codex-plan.md` with checkpoint-based iteratio
   - Added tests:
     - `MembershipCalculatorTests` (approval gate + snapshot behavior)
     - `ProfileTests` updated with Pending/not-approved coverage.
+- 2026-02-15: Checkpoint commit created: `e02db5e` (`phase2: unify membership snapshot and approval gate`).
+- 2026-02-15: Phase 3 extraction started (controller slice).
+  - Added `AdminLegalDocumentsController` with legal-doc admin actions moved out of `AdminController`.
+  - Removed legal-doc actions and legal-doc-specific constructor dependencies from `AdminController`.
+  - Kept route paths under `/Admin/...` unchanged via attribute routes.
+  - Updated cross-controller links to legal-doc routes:
+    - `src/Humans.Web/Views/Admin/Index.cshtml`
+    - `src/Humans.Web/Views/Team/Details.cshtml`
+- 2026-02-15: Phase 3 service extraction completed for legal-doc slice.
+  - Added interface + contracts:
+    - `IAdminLegalDocumentService`
+    - `AdminLegalDocumentUpsertRequest`
+    - `GitHubFolderPathNormalizationResult`
+  - Added implementation:
+    - `AdminLegalDocumentService`
+  - Refactored `AdminLegalDocumentsController` to delegate data/query/update/sync behavior to service.
+  - Registered service in DI (`Program.cs`).
+  - Added focused tests:
+    - `AdminLegalDocumentServiceTests`
+- 2026-02-15: Validation pass attempted.
+  - `dotnet build Humans.slnx --no-restore` is still blocked by restricted network to NuGet (`NU1301`), even after setting `DOTNET_CLI_HOME` to a writable workspace folder.
+- 2026-02-15: Removed local build artifact folder `.dotnet/` from workspace.
 
 ## Next Step
-- Run a static validation pass for Phase 2 edits and checkpoint commit.
+- Create Phase 3 checkpoint commit, then start Phase 4 with an outbox entity/configuration/migration skeleton.

@@ -1,16 +1,13 @@
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
-using Microsoft.Extensions.Options;
 using NodaTime;
 using Humans.Application.Interfaces;
 using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Infrastructure.Configuration;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Jobs;
 using Humans.Web.Extensions;
@@ -21,7 +18,7 @@ namespace Humans.Web.Controllers;
 
 [Authorize(Roles = "Board,Admin")]
 [Route("Admin")]
-public partial class AdminController : Controller
+public class AdminController : Controller
 {
     private readonly HumansDbContext _dbContext;
     private readonly UserManager<User> _userManager;
@@ -30,8 +27,6 @@ public partial class AdminController : Controller
     private readonly IAuditLogService _auditLogService;
     private readonly IMembershipCalculator _membershipCalculator;
     private readonly IRoleAssignmentService _roleAssignmentService;
-    private readonly ILegalDocumentSyncService _legalDocumentSyncService;
-    private readonly GitHubSettings _githubSettings;
     private readonly IClock _clock;
     private readonly ILogger<AdminController> _logger;
     private readonly SystemTeamSyncJob _systemTeamSyncJob;
@@ -45,8 +40,6 @@ public partial class AdminController : Controller
         IAuditLogService auditLogService,
         IMembershipCalculator membershipCalculator,
         IRoleAssignmentService roleAssignmentService,
-        ILegalDocumentSyncService legalDocumentSyncService,
-        IOptions<GitHubSettings> githubSettings,
         IClock clock,
         ILogger<AdminController> logger,
         SystemTeamSyncJob systemTeamSyncJob,
@@ -59,8 +52,6 @@ public partial class AdminController : Controller
         _auditLogService = auditLogService;
         _membershipCalculator = membershipCalculator;
         _roleAssignmentService = roleAssignmentService;
-        _legalDocumentSyncService = legalDocumentSyncService;
-        _githubSettings = githubSettings.Value;
         _clock = clock;
         _logger = logger;
         _systemTeamSyncJob = systemTeamSyncJob;
@@ -1160,334 +1151,6 @@ public partial class AdminController : Controller
 
         return View(new AdminConfigurationViewModel { Items = items });
     }
-
-    [HttpGet("LegalDocuments")]
-    public async Task<IActionResult> LegalDocuments(Guid? teamId)
-    {
-        var query = _dbContext.LegalDocuments
-            .Include(d => d.Team)
-            .Include(d => d.Versions)
-            .AsQueryable();
-
-        if (teamId.HasValue)
-        {
-            query = query.Where(d => d.TeamId == teamId.Value);
-        }
-
-        var documents = await query
-            .OrderBy(d => d.Team.Name)
-            .ThenBy(d => d.Name)
-            .ToListAsync();
-
-        var now = _clock.GetCurrentInstant();
-
-        var viewModel = new LegalDocumentListViewModel
-        {
-            FilterTeamId = teamId,
-            Teams = await GetTeamSelectItems(),
-            Documents = documents.Select(d =>
-            {
-                var currentVersion = d.Versions
-                    .Where(v => v.EffectiveFrom <= now)
-                    .MaxBy(v => v.EffectiveFrom);
-
-                return new LegalDocumentListItemViewModel
-                {
-                    Id = d.Id,
-                    Name = d.Name,
-                    TeamName = d.Team.Name,
-                    TeamId = d.TeamId,
-                    IsRequired = d.IsRequired,
-                    IsActive = d.IsActive,
-                    GracePeriodDays = d.GracePeriodDays,
-                    CurrentVersion = currentVersion?.VersionNumber,
-                    LastSyncedAt = d.LastSyncedAt != default ? d.LastSyncedAt.ToDateTimeUtc() : null,
-                    VersionCount = d.Versions.Count
-                };
-            }).ToList()
-        };
-
-        return View(viewModel);
-    }
-
-    [HttpGet("LegalDocuments/Create")]
-    public async Task<IActionResult> CreateLegalDocument(Guid? teamId)
-    {
-        var viewModel = new LegalDocumentEditViewModel
-        {
-            TeamId = teamId ?? Guid.Empty,
-            Teams = await GetTeamSelectItems()
-        };
-
-        return View(viewModel);
-    }
-
-    [HttpPost("LegalDocuments/Create")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> CreateLegalDocument(LegalDocumentEditViewModel model)
-    {
-        var folderPath = NormalizeGitHubFolderPath(model.GitHubFolderPath);
-
-        if (!ModelState.IsValid)
-        {
-            model.Teams = await GetTeamSelectItems();
-            return View(model);
-        }
-
-        var now = _clock.GetCurrentInstant();
-
-        var document = new LegalDocument
-        {
-            Id = Guid.NewGuid(),
-            Name = model.Name,
-            TeamId = model.TeamId,
-            IsRequired = model.IsRequired,
-            IsActive = model.IsActive,
-            GracePeriodDays = model.GracePeriodDays,
-            GitHubFolderPath = folderPath,
-            CurrentCommitSha = string.Empty,
-            CreatedAt = now
-        };
-
-        _dbContext.LegalDocuments.Add(document);
-        await _dbContext.SaveChangesAsync();
-
-        var currentUser = await _userManager.GetUserAsync(User);
-        _logger.LogInformation("Admin {AdminId} created legal document {DocumentId} ({Name})",
-            currentUser?.Id, document.Id, document.Name);
-
-        // Attempt initial sync immediately
-        if (!string.IsNullOrEmpty(document.GitHubFolderPath))
-        {
-            try
-            {
-                var result = await _legalDocumentSyncService.SyncDocumentAsync(document.Id);
-                TempData["SuccessMessage"] = result != null
-                    ? $"Legal document '{document.Name}' created. {result}"
-                    : $"Legal document '{document.Name}' created. GitHub content is already up to date.";
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Initial sync failed for new document {DocumentId}", document.Id);
-                TempData["SuccessMessage"] = $"Legal document '{document.Name}' created.";
-                TempData["ErrorMessage"] = $"Initial sync failed: {ex.Message}";
-            }
-        }
-        else
-        {
-            TempData["SuccessMessage"] = $"Legal document '{document.Name}' created. Set a GitHub Folder Path and sync to add content.";
-        }
-
-        return RedirectToAction(nameof(LegalDocuments));
-    }
-
-    [HttpGet("LegalDocuments/{id}/Edit")]
-    public async Task<IActionResult> EditLegalDocument(Guid id)
-    {
-        var document = await _dbContext.LegalDocuments
-            .Include(d => d.Versions)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (document == null)
-        {
-            return NotFound();
-        }
-
-        var now = _clock.GetCurrentInstant();
-        var currentVersion = document.Versions
-            .Where(v => v.EffectiveFrom <= now)
-            .MaxBy(v => v.EffectiveFrom);
-
-        var viewModel = new LegalDocumentEditViewModel
-        {
-            Id = document.Id,
-            Name = document.Name,
-            TeamId = document.TeamId,
-            IsRequired = document.IsRequired,
-            IsActive = document.IsActive,
-            GracePeriodDays = document.GracePeriodDays,
-            GitHubFolderPath = document.GitHubFolderPath,
-            Teams = await GetTeamSelectItems(),
-            CurrentVersion = currentVersion?.VersionNumber,
-            LastSyncedAt = document.LastSyncedAt != default ? document.LastSyncedAt.ToDateTimeUtc() : null,
-            VersionCount = document.Versions.Count,
-            Versions = document.Versions
-                .OrderByDescending(v => v.EffectiveFrom)
-                .Select(v => new DocumentVersionSummaryViewModel
-                {
-                    Id = v.Id,
-                    VersionNumber = v.VersionNumber,
-                    CommitSha = v.CommitSha,
-                    EffectiveFrom = v.EffectiveFrom.ToDateTimeUtc(),
-                    CreatedAt = v.CreatedAt.ToDateTimeUtc(),
-                    ChangesSummary = v.ChangesSummary,
-                    RequiresReConsent = v.RequiresReConsent,
-                    LanguageCount = v.Content.Count,
-                    Languages = v.Content.Keys.Order(StringComparer.Ordinal).ToList()
-                })
-                .ToList()
-        };
-
-        return View(viewModel);
-    }
-
-    [HttpPost("LegalDocuments/{id}/Edit")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> EditLegalDocument(Guid id, LegalDocumentEditViewModel model)
-    {
-        if (id != model.Id)
-        {
-            return BadRequest();
-        }
-
-        var folderPath = NormalizeGitHubFolderPath(model.GitHubFolderPath);
-
-        if (!ModelState.IsValid)
-        {
-            model.Teams = await GetTeamSelectItems();
-            return View(model);
-        }
-
-        var document = await _dbContext.LegalDocuments.FindAsync(id);
-        if (document == null)
-        {
-            return NotFound();
-        }
-
-        document.Name = model.Name;
-        document.TeamId = model.TeamId;
-        document.IsRequired = model.IsRequired;
-        document.IsActive = model.IsActive;
-        document.GracePeriodDays = model.GracePeriodDays;
-        document.GitHubFolderPath = folderPath;
-
-        await _dbContext.SaveChangesAsync();
-
-        var currentUser = await _userManager.GetUserAsync(User);
-        _logger.LogInformation("Admin {AdminId} updated legal document {DocumentId}", currentUser?.Id, id);
-
-        TempData["SuccessMessage"] = $"Legal document '{document.Name}' updated successfully.";
-        return RedirectToAction(nameof(LegalDocuments));
-    }
-
-    [HttpPost("LegalDocuments/{id}/Archive")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ArchiveLegalDocument(Guid id)
-    {
-        var document = await _dbContext.LegalDocuments.FindAsync(id);
-        if (document == null)
-        {
-            return NotFound();
-        }
-
-        document.IsActive = false;
-        await _dbContext.SaveChangesAsync();
-
-        var currentUser = await _userManager.GetUserAsync(User);
-        _logger.LogInformation("Admin {AdminId} archived legal document {DocumentId}", currentUser?.Id, id);
-
-        TempData["SuccessMessage"] = $"Legal document '{document.Name}' archived.";
-        return RedirectToAction(nameof(LegalDocuments));
-    }
-
-    [HttpPost("LegalDocuments/{id}/Sync")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SyncLegalDocument(Guid id)
-    {
-        try
-        {
-            var result = await _legalDocumentSyncService.SyncDocumentAsync(id);
-            var currentUser = await _userManager.GetUserAsync(User);
-            _logger.LogInformation("Admin {AdminId} triggered sync for legal document {DocumentId}", currentUser?.Id, id);
-
-            TempData["SuccessMessage"] = result ?? "Document is already up to date.";
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error syncing legal document {DocumentId}", id);
-            TempData["ErrorMessage"] = $"Sync failed: {ex.Message}";
-        }
-
-        return RedirectToAction(nameof(EditLegalDocument), new { id });
-    }
-
-    [HttpPost("LegalDocuments/{id}/Versions/{versionId}/Summary")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UpdateVersionSummary(Guid id, Guid versionId, [FromForm] string changesSummary)
-    {
-        var version = await _dbContext.Set<DocumentVersion>()
-            .FirstOrDefaultAsync(v => v.Id == versionId && v.LegalDocumentId == id);
-
-        if (version == null)
-        {
-            return NotFound();
-        }
-
-        version.ChangesSummary = string.IsNullOrWhiteSpace(changesSummary) ? null : changesSummary.Trim();
-        await _dbContext.SaveChangesAsync();
-
-        TempData["SuccessMessage"] = "Version summary updated.";
-        return RedirectToAction(nameof(EditLegalDocument), new { id });
-    }
-
-    private async Task<List<TeamSelectItem>> GetTeamSelectItems()
-    {
-        return await _dbContext.Teams
-            .Where(t => t.IsActive)
-            .OrderBy(t => t.SystemTeamType)
-            .ThenBy(t => t.Name)
-            .Select(t => new TeamSelectItem { Id = t.Id, Name = t.Name })
-            .ToListAsync();
-    }
-
-    /// <summary>
-    /// Normalizes a GitHub folder path input. Accepts either a plain folder path
-    /// (e.g. "Volunteer/") or a full GitHub URL (e.g.
-    /// "https://github.com/owner/repo/tree/branch/Volunteer").
-    /// Returns the extracted folder path, or null with a ModelState error if the URL
-    /// doesn't match the configured repository.
-    /// </summary>
-    private string? NormalizeGitHubFolderPath(string? input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return null;
-        }
-
-        input = input.Trim();
-
-        // Match GitHub URLs: https://github.com/{owner}/{repo}/tree/{branch}/{path}
-        var match = GitHubUrlPattern().Match(input);
-
-        if (!match.Success)
-        {
-            // Not a URL — treat as a plain folder path
-            return input.TrimEnd('/') + "/";
-        }
-
-        var owner = match.Groups["owner"].Value;
-        var repo = match.Groups["repo"].Value;
-        var branch = match.Groups["branch"].Value;
-        var path = match.Groups["path"].Value;
-
-        if (!string.Equals(owner, _githubSettings.Owner, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(repo, _githubSettings.Repository, StringComparison.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError(nameof(LegalDocumentEditViewModel.GitHubFolderPath),
-                $"URL points to {owner}/{repo}, but the configured repository is {_githubSettings.Owner}/{_githubSettings.Repository}.");
-            return null;
-        }
-
-        if (!string.Equals(branch, _githubSettings.Branch, StringComparison.OrdinalIgnoreCase))
-        {
-            ModelState.AddModelError(nameof(LegalDocumentEditViewModel.GitHubFolderPath),
-                $"URL points to branch '{branch}', but the configured branch is '{_githubSettings.Branch}'.");
-            return null;
-        }
-
-        return path.TrimEnd('/') + "/";
-    }
-
     [HttpGet("DbVersion")]
     [AllowAnonymous]
     [Produces("application/json")]
@@ -1503,9 +1166,6 @@ public partial class AdminController : Controller
             pendingCount = pending.Count()
         });
     }
-
-    [GeneratedRegex(@"^https?://github\.com/(?<owner>[^/]+)/(?<repo>[^/]+)/tree/(?<branch>[^/]+)/(?<path>[^\s]+)$", RegexOptions.IgnoreCase | RegexOptions.NonBacktracking)]
-    private static partial Regex GitHubUrlPattern();
 
     /// <summary>
     /// Checks whether the current user can assign/end the specified role.
