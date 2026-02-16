@@ -8,11 +8,6 @@ Audit date: 2026-02-05 | Last updated: 2026-02-16
 
 ### Priority 1: GDPR & Security (Pre-Launch Blockers)
 
-#### P1-19: Sanitize markdown-to-HTML in consent review (XSS)
-`Review.cshtml` renders legal document markdown via `@Html.Raw()`. Combined with CSP `unsafe-inline`, a compromised GitHub repo could inject scripts. Add an HTML sanitizer (e.g. `HtmlSanitizer` NuGet) to the render path.
-**Where:** `Views/Consent/Review.cshtml:89,148`, `Program.cs:330`
-**Source:** Multi-model production readiness assessment (2026-02-16), Codex unique finding
-
 ---
 
 ### Priority 2: User-Facing Features & Improvements
@@ -116,6 +111,9 @@ Email subjects are localized but body content is still inline HTML with string i
 ---
 
 ## Completed
+
+### P1-19: Sanitize markdown-to-HTML in consent and governance views DONE
+Added `HtmlSanitizer` (Ganss.Xss) to both `Consent/Review.cshtml` and `Governance/Index.cshtml` markdown render paths. Markdig output is now sanitized before `@Html.Raw()`. Committed `34a8f79`.
 
 ### P1-18: Account deletion Google deprovisioning DISMISSED
 Not needed — users lose team memberships (and thus Google permissions) at the start of the deletion flow, not at the 30-day anonymization step. The overnight sync job provides a second check by removing any stale permissions it finds.
