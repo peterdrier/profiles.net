@@ -8,11 +8,6 @@ Audit date: 2026-02-05 | Last updated: 2026-02-16
 
 ### Priority 1: GDPR & Security (Pre-Launch Blockers)
 
-#### P1-18: Account deletion must trigger Google deprovisioning
-When a user account is anonymized, their Google Group memberships and Drive permissions are not revoked. Former members retain access until manual intervention. The deletion job should call `RemoveUserFromAllResourcesAsync` before anonymizing.
-**Where:** `ProcessAccountDeletionsJob.cs`, `GoogleWorkspaceSyncService.cs:592`
-**Source:** Multi-model production readiness assessment (2026-02-16), consensus Codex + Gemini + Claude
-
 #### P1-19: Sanitize markdown-to-HTML in consent review (XSS)
 `Review.cshtml` renders legal document markdown via `@Html.Raw()`. Combined with CSP `unsafe-inline`, a compromised GitHub repo could inject scripts. Add an HTML sanitizer (e.g. `HtmlSanitizer` NuGet) to the render path.
 **Where:** `Views/Consent/Review.cshtml:89,148`, `Program.cs:330`
@@ -121,6 +116,9 @@ Email subjects are localized but body content is still inline HTML with string i
 ---
 
 ## Completed
+
+### P1-18: Account deletion Google deprovisioning DISMISSED
+Not needed — users lose team memberships (and thus Google permissions) at the start of the deletion flow, not at the 30-day anonymization step. The overnight sync job provides a second check by removing any stale permissions it finds.
 
 ### P1-17: GDPR anonymization — clear all PII fields DONE
 Added missing field clearings to `ProcessAccountDeletionsJob.AnonymizeUserAsync`: `Pronouns`, `DateOfBirth`, `ProfilePictureData`, `ProfilePictureContentType`, `EmergencyContactName`, `EmergencyContactPhone`, `EmergencyContactRelationship`. Also added removal of `VolunteerHistoryEntries` and `ContactFields` related entities. Committed `84f0538`.

@@ -169,6 +169,84 @@ Profile includes a computed `MembershipStatus` property:
 3. **Unsuspend Member**: Clear suspension status
 4. **Edit Admin Notes**: Internal notes not visible to member
 
+## GDPR Data Rights
+
+### Data Export (Right of Access)
+
+Members can download all their personal data as JSON from `/Profile/DownloadData`. The export includes profile fields, contact fields, volunteer history, consent records, team memberships, applications, and role assignments. Response headers disable caching (`no-store`).
+
+**Route:** `GET /Profile/DownloadData`
+
+### Account Deletion (Right to Erasure)
+
+Members can request account deletion from the Privacy page (`/Profile/Privacy`). The process uses a 30-day grace period with anonymization rather than hard delete (per decision R-02).
+
+#### Deletion Workflow
+
+```
+User requests deletion (/Profile/RequestDeletion)
+    │
+    ├── DeletionRequestedAt = now
+    ├── DeletionScheduledFor = now + 30 days
+    ├── Confirmation email sent
+    │
+    │   ┌─────────────────────────────────────┐
+    │   │  30-day grace period                │
+    │   │  • User retains full access         │
+    │   │  • User can cancel at any time      │
+    │   │    via /Profile/CancelDeletion      │
+    │   └─────────────────────────────────────┘
+    │
+    ▼ Grace period expires
+ProcessAccountDeletionsJob (daily)
+    │
+    ├── Anonymize user record
+    │   • DisplayName → "Deleted User"
+    │   • Email → "deleted-{id}@deleted.local"
+    │   • Phone, pronouns, DOB, profile picture → null
+    │   • Emergency contact fields → null
+    │
+    ├── Remove related data
+    │   • UserEmails (all removed)
+    │   • ContactFields (all removed)
+    │   • VolunteerHistoryEntries (all removed)
+    │
+    ├── End memberships
+    │   • TeamMemberships: LeftAt = now
+    │   • RoleAssignments: ValidTo = now
+    │
+    ├── Disable login
+    │   • LockoutEnd = DateTimeOffset.MaxValue
+    │   • SecurityStamp rotated
+    │
+    ├── Audit log: AccountAnonymized
+    ├── Confirmation email to original address
+    │
+    └── Preserved for audit trail:
+        • ConsentRecords (immutable, anonymized via user FK)
+        • Applications (anonymized via user FK)
+```
+
+#### Google Workspace Deprovisioning
+
+Google permissions (Shared Drive access, Group memberships) are **not** revoked by the deletion job directly. Instead, deprovisioning happens through the normal membership lifecycle:
+
+1. The anonymization job ends all team memberships (`LeftAt = now`)
+2. The overnight sync job (`SystemTeamSyncJob` / `GoogleResourceReconciliationJob`) detects the ended memberships and removes the corresponding Google permissions
+
+This two-step approach ensures Google deprovisioning uses the same tested code path as any other team departure, rather than a separate deletion-specific implementation.
+
+> **Note:** The automated sync jobs are currently disabled during initial rollout. Google permissions are managed manually via the "Sync Now" button at `/Admin/GoogleSync` until automated sync is validated. Sync jobs must be able to add members reliably before removal logic is enabled.
+
+#### Routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/Profile/Privacy` | GET | View deletion status, data export link |
+| `/Profile/RequestDeletion` | POST | Start 30-day deletion countdown |
+| `/Profile/CancelDeletion` | POST | Cancel pending deletion |
+| `/Profile/DownloadData` | GET | Download personal data as JSON |
+
 ## Related Features
 
 - [Authentication](01-authentication.md) - Profile created after first login

@@ -118,6 +118,35 @@ Day 30: Suspension (handled by SuspendJob)
 
 ---
 
+### ProcessAccountDeletionsJob
+
+**Purpose**: Anonymize accounts where the 30-day GDPR deletion grace period has expired.
+
+**Schedule**: Daily
+
+**Process**:
+```
+1. Find users where DeletionScheduledFor <= now
+2. For each user:
+   a. Anonymize user record (display name, email, phone, pronouns, DOB, profile picture, emergency contacts)
+   b. Remove related data (UserEmails, ContactFields, VolunteerHistoryEntries)
+   c. End all team memberships (LeftAt = now)
+   d. End active role assignments (ValidTo = now)
+   e. Disable login (LockoutEnd = MaxValue, rotate SecurityStamp)
+   f. Clear DeletionRequestedAt / DeletionScheduledFor
+   g. Audit log: AccountAnonymized
+   h. Send confirmation email to original address
+3. SaveChanges (single transaction for all users)
+```
+
+**Google deprovisioning**: Not handled by this job. Team membership endings (step 2c) are picked up by the normal sync jobs (`SystemTeamSyncJob` / `GoogleResourceReconciliationJob`), which remove the corresponding Google Group memberships and Shared Drive permissions. This keeps deprovisioning on the same code path as any other team departure.
+
+**Preserved for audit trail**: ConsentRecords and Applications are kept (anonymized implicitly via the user record). ConsentRecords are immutable (DB triggers prevent UPDATE/DELETE).
+
+See [Profiles — Account Deletion](02-profiles.md#account-deletion-right-to-erasure) for the full user-facing workflow.
+
+---
+
 ### SystemTeamSyncJob
 
 **Purpose**: Maintain automatic membership for the three system teams based on eligibility criteria. Also syncs Google Shared Drive and Group permissions for each membership change.
