@@ -11,6 +11,10 @@ services:
       - Authentication__Google__ClientId=${GOOGLE_CLIENT_ID}
       - Authentication__Google__ClientSecret=${GOOGLE_CLIENT_SECRET}
       - GoogleMaps__ApiKey=${GOOGLE_MAPS_API_KEY}
+      - Email__Username=${EMAIL_USERNAME}
+      - Email__Password=${EMAIL_PASSWORD}
+      - GitHub__AccessToken=${GITHUB_ACCESS_TOKEN}
+      - GoogleWorkspace__ServiceAccountKeyJson=${GOOGLE_SA_KEY_JSON}
     ports:
       - "5000:8080"
     depends_on:
