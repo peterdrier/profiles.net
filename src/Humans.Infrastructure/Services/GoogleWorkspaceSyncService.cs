@@ -175,55 +175,6 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     }
 
     /// <inheritdoc />
-    public async Task<GoogleResource> ProvisionUserFolderAsync(
-        Guid userId,
-        string folderName,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("Provisioning Drive folder '{FolderName}' for user {UserId}", folderName, userId);
-
-        var drive = await GetDriveServiceAsync();
-        var now = _clock.GetCurrentInstant();
-
-        var fileMetadata = new Google.Apis.Drive.v3.Data.File
-        {
-            Name = folderName,
-            MimeType = "application/vnd.google-apps.folder"
-        };
-
-        var request = drive.Files.Create(fileMetadata);
-        request.Fields = "id, name, webViewLink";
-        request.SupportsAllDrives = true;
-        var folder = await request.ExecuteAsync(cancellationToken);
-
-        var resource = new GoogleResource
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            ResourceType = GoogleResourceType.DriveFolder,
-            GoogleId = folder.Id,
-            Name = folder.Name,
-            Url = folder.WebViewLink,
-            ProvisionedAt = now,
-            LastSyncedAt = now,
-            IsActive = true
-        };
-
-        _dbContext.GoogleResources.Add(resource);
-
-        await _auditLogService.LogAsync(
-            AuditAction.GoogleResourceProvisioned, "GoogleResource", resource.Id,
-            $"Provisioned Drive folder '{folder.Name}' for user",
-            nameof(GoogleWorkspaceSyncService),
-            relatedEntityId: userId, relatedEntityType: "User");
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        _logger.LogInformation("Created Drive folder {FolderId} for user {UserId}", folder.Id, userId);
-        return resource;
-    }
-
-    /// <inheritdoc />
     public async Task<GoogleResource> ProvisionTeamGroupAsync(
         Guid teamId,
         string groupEmail,
@@ -411,7 +362,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     {
         var resource = await _dbContext.GoogleResources
             .Include(r => r.Team)
-            .ThenInclude(t => t!.Members)
+            .ThenInclude(t => t.Members)
             .ThenInclude(m => m.User)
             .FirstOrDefaultAsync(r => r.Id == resourceId, cancellationToken);
 
@@ -423,16 +374,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
 
         if (resource.ResourceType == GoogleResourceType.Group)
         {
-            if (resource.TeamId.HasValue)
-            {
-                await SyncTeamGroupMembersAsync(resource.TeamId.Value, cancellationToken);
-            }
-            return;
-        }
-
-        // For Shared Drive folders, sync direct permissions (add missing + remove stale)
-        if (resource.Team == null)
-        {
+            await SyncTeamGroupMembersAsync(resource.TeamId, cancellationToken);
             return;
         }
 
@@ -602,7 +544,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
 
         var resources = await _dbContext.GoogleResources
             .Include(r => r.Team)
-                .ThenInclude(t => t!.Members.Where(m => m.LeftAt == null))
+                .ThenInclude(t => t.Members.Where(m => m.LeftAt == null))
                     .ThenInclude(m => m.User)
             .Where(r => r.IsActive)
             .ToListAsync(cancellationToken);
@@ -627,7 +569,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
                     ResourceId = resource.Id,
                     ResourceName = resource.Name,
                     ResourceType = resource.ResourceType.ToString(),
-                    TeamName = resource.Team?.Name ?? string.Empty,
+                    TeamName = resource.Team.Name,
                     GoogleId = resource.GoogleId,
                     Url = resource.Url,
                     ErrorMessage = ex.Message
@@ -644,7 +586,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     private async Task<ResourceSyncDiff> PreviewGroupSyncAsync(
         GoogleResource resource, CancellationToken cancellationToken)
     {
-        var expectedEmails = resource.Team?.Members
+        var expectedEmails = resource.Team.Members
             .Where(m => m.LeftAt == null && !string.IsNullOrEmpty(m.User?.Email))
             .Select(m => m.User!.Email!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
@@ -684,7 +626,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             ResourceId = resource.Id,
             ResourceName = resource.Name,
             ResourceType = resource.ResourceType.ToString(),
-            TeamName = resource.Team?.Name ?? string.Empty,
+            TeamName = resource.Team.Name,
             GoogleId = resource.GoogleId,
             Url = resource.Url,
             MembersToAdd = expectedEmails.Except(actualEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),
@@ -696,7 +638,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
     private async Task<ResourceSyncDiff> PreviewDriveFolderSyncAsync(
         GoogleResource resource, CancellationToken cancellationToken)
     {
-        var expectedEmails = resource.Team?.Members
+        var expectedEmails = resource.Team.Members
             .Where(m => m.LeftAt == null && !string.IsNullOrEmpty(m.User?.Email))
             .Select(m => m.User!.Email!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? [];
@@ -716,7 +658,7 @@ public class GoogleWorkspaceSyncService : IGoogleSyncService
             ResourceId = resource.Id,
             ResourceName = resource.Name,
             ResourceType = resource.ResourceType.ToString(),
-            TeamName = resource.Team?.Name ?? string.Empty,
+            TeamName = resource.Team.Name,
             GoogleId = resource.GoogleId,
             Url = resource.Url,
             MembersToAdd = expectedEmails.Except(allUserEmails, StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList(),

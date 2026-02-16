@@ -4,7 +4,7 @@ using Humans.Domain.Enums;
 namespace Humans.Domain.Entities;
 
 /// <summary>
-/// Represents a Google resource (Drive folder, etc.) provisioned for a team or user.
+/// Represents a Google resource (Drive folder or Group) provisioned for a team.
 /// </summary>
 public class GoogleResource
 {
@@ -34,24 +34,14 @@ public class GoogleResource
     public string? Url { get; set; }
 
     /// <summary>
-    /// Foreign key to the team (if team resource).
+    /// Foreign key to the owning team.
     /// </summary>
-    public Guid? TeamId { get; set; }
+    public Guid TeamId { get; set; }
 
     /// <summary>
-    /// Navigation property to the team.
+    /// Navigation property to the owning team.
     /// </summary>
-    public Team? Team { get; set; }
-
-    /// <summary>
-    /// Foreign key to the user (if personal resource).
-    /// </summary>
-    public Guid? UserId { get; set; }
-
-    /// <summary>
-    /// Navigation property to the user.
-    /// </summary>
-    public User? User { get; set; }
+    public Team Team { get; set; } = null!;
 
     /// <summary>
     /// When the resource was provisioned.

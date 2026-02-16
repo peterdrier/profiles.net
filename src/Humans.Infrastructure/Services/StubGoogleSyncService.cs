@@ -40,28 +40,6 @@ public class StubGoogleSyncService : IGoogleSyncService
         return Task.FromResult(resource);
     }
 
-    public Task<GoogleResource> ProvisionUserFolderAsync(
-        Guid userId,
-        string folderName,
-        CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation("[STUB] Would provision Google Drive folder '{FolderName}' for user {UserId}", folderName, userId);
-
-        // Return a stub resource
-        var resource = new GoogleResource
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            GoogleId = $"stub-folder-{Guid.NewGuid():N}",
-            Name = folderName,
-            Url = "https://drive.google.com/stub",
-            ProvisionedAt = NodaTime.SystemClock.Instance.GetCurrentInstant(),
-            IsActive = true
-        };
-
-        return Task.FromResult(resource);
-    }
-
     public Task SyncResourcePermissionsAsync(Guid resourceId, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("[STUB] Would sync permissions for resource {ResourceId}", resourceId);

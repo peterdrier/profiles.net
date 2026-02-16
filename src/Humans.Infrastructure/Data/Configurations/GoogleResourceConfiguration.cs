@@ -8,12 +8,7 @@ public class GoogleResourceConfiguration : IEntityTypeConfiguration<GoogleResour
 {
     public void Configure(EntityTypeBuilder<GoogleResource> builder)
     {
-        builder.ToTable("google_resources", table =>
-        {
-            table.HasCheckConstraint(
-                "CK_google_resources_exactly_one_owner",
-                "(\"TeamId\" IS NOT NULL AND \"UserId\" IS NULL) OR (\"TeamId\" IS NULL AND \"UserId\" IS NOT NULL)");
-        });
+        builder.ToTable("google_resources");
 
         builder.HasKey(gr => gr.Id);
 
@@ -38,20 +33,14 @@ public class GoogleResourceConfiguration : IEntityTypeConfiguration<GoogleResour
         builder.Property(gr => gr.ErrorMessage)
             .HasMaxLength(2000);
 
-        builder.HasOne(gr => gr.User)
-            .WithMany()
-            .HasForeignKey(gr => gr.UserId)
-            .OnDelete(DeleteBehavior.SetNull);
-
         builder.HasIndex(gr => gr.GoogleId);
 
         builder.HasIndex(gr => gr.TeamId);
-        builder.HasIndex(gr => gr.UserId);
         builder.HasIndex(gr => gr.IsActive);
 
         // Filtered unique index: one active resource per (Team, GoogleId)
         builder.HasIndex(gr => new { gr.TeamId, gr.GoogleId })
-            .HasFilter("\"IsActive\" = true AND \"TeamId\" IS NOT NULL")
+            .HasFilter("\"IsActive\" = true")
             .IsUnique();
     }
 }

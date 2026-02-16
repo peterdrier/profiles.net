@@ -127,8 +127,7 @@ GoogleResource
 ├── GoogleId: string (256) [unique, Google's ID]
 ├── Name: string (512)
 ├── Url: string? (2048) [Google Drive URL]
-├── TeamId: Guid? (FK → Team, optional)
-├── UserId: Guid? (FK → User, optional)
+├── TeamId: Guid (FK → Team, required)
 ├── ProvisionedAt: Instant
 ├── LastSyncedAt: Instant?
 ├── IsActive: bool

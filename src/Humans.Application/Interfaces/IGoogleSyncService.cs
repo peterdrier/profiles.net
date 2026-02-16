@@ -1,6 +1,5 @@
 using Humans.Application.DTOs;
 using Humans.Domain.Entities;
-using Humans.Domain.Enums;
 
 namespace Humans.Application.Interfaces;
 
@@ -18,18 +17,6 @@ public interface IGoogleSyncService
     /// <returns>The created Google resource.</returns>
     Task<GoogleResource> ProvisionTeamFolderAsync(
         Guid teamId,
-        string folderName,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Provisions a new Google Drive folder for a user.
-    /// </summary>
-    /// <param name="userId">The user ID.</param>
-    /// <param name="folderName">The folder name.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The created Google resource.</returns>
-    Task<GoogleResource> ProvisionUserFolderAsync(
-        Guid userId,
         string folderName,
         CancellationToken cancellationToken = default);
 

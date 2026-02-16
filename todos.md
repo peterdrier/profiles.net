@@ -8,11 +8,6 @@ Audit date: 2026-02-05 | Last updated: 2026-02-16
 
 ### Priority 1: GDPR & Security (Pre-Launch Blockers)
 
-#### P1-17: GDPR anonymization incomplete — missing PII fields
-`ProcessAccountDeletionsJob.AnonymizeUserAsync` clears core profile fields but misses: `EmergencyContactName`, `EmergencyContactPhone`, `EmergencyContactRelation`, `Pronouns`, `DateOfBirth`, `ProfilePictureData` (byte[]), and `VolunteerHistoryEntries` (related entity). Emergency contacts are third-party personal data — highest priority.
-**Where:** `ProcessAccountDeletionsJob.cs:124-192`
-**Source:** Multi-model production readiness assessment (2026-02-16), consensus Claude + Codex
-
 #### P1-18: Account deletion must trigger Google deprovisioning
 When a user account is anonymized, their Google Group memberships and Drive permissions are not revoked. Former members retain access until manual intervention. The deletion job should call `RemoveUserFromAllResourcesAsync` before anonymizing.
 **Where:** `ProcessAccountDeletionsJob.cs`, `GoogleWorkspaceSyncService.cs:592`
@@ -22,14 +17,6 @@ When a user account is anonymized, their Google Group memberships and Drive perm
 `Review.cshtml` renders legal document markdown via `@Html.Raw()`. Combined with CSP `unsafe-inline`, a compromised GitHub repo could inject scripts. Add an HTML sanitizer (e.g. `HtmlSanitizer` NuGet) to the render path.
 **Where:** `Views/Consent/Review.cshtml:89,148`, `Program.cs:330`
 **Source:** Multi-model production readiness assessment (2026-02-16), Codex unique finding
-
-#### P1-21: Add missing database constraints (pre-production window)
-Add before production data exists — these become painful to add retroactively:
-- `google_resources`: CHECK constraint requiring exactly one of `team_id`/`user_id` non-null
-- `role_assignments`: CHECK constraint `valid_to IS NULL OR valid_to > valid_from`
-- See also P1-09 for the exclusion constraint on temporal overlap
-**Where:** New migration
-**Source:** Multi-model refactoring recommendations (2026-02-15), Claude unique finding
 
 ---
 
@@ -134,6 +121,12 @@ Email subjects are localized but body content is still inline HTML with string i
 ---
 
 ## Completed
+
+### P1-17: GDPR anonymization — clear all PII fields DONE
+Added missing field clearings to `ProcessAccountDeletionsJob.AnonymizeUserAsync`: `Pronouns`, `DateOfBirth`, `ProfilePictureData`, `ProfilePictureContentType`, `EmergencyContactName`, `EmergencyContactPhone`, `EmergencyContactRelationship`. Also added removal of `VolunteerHistoryEntries` and `ContactFields` related entities. Committed `84f0538`.
+
+### P1-21: Add missing database constraints DONE (already existed)
+Both CHECK constraints (`CK_google_resources_exactly_one_owner`, `CK_role_assignments_valid_window`) were already applied in the `AddPreProdIntegrityAndGoogleSyncOutbox` migration. The P1-09 temporal exclusion constraint remains tracked separately.
 
 ### P0-12: Docker healthcheck DONE
 Added `curl` to runtime image and `HEALTHCHECK` directive hitting `/health/live`. Coolify/Docker will detect unhealthy containers.
