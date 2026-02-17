@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NodaTime;
 using Humans.Application.Interfaces;
+using Humans.Infrastructure.Services;
 
 namespace Humans.Infrastructure.Jobs;
 
@@ -11,15 +12,18 @@ namespace Humans.Infrastructure.Jobs;
 public class GoogleResourceReconciliationJob
 {
     private readonly IGoogleSyncService _googleSyncService;
+    private readonly HumansMetricsService _metrics;
     private readonly ILogger<GoogleResourceReconciliationJob> _logger;
     private readonly IClock _clock;
 
     public GoogleResourceReconciliationJob(
         IGoogleSyncService googleSyncService,
+        HumansMetricsService metrics,
         ILogger<GoogleResourceReconciliationJob> logger,
         IClock clock)
     {
         _googleSyncService = googleSyncService;
+        _metrics = metrics;
         _logger = logger;
         _clock = clock;
     }
@@ -31,10 +35,12 @@ public class GoogleResourceReconciliationJob
         try
         {
             await _googleSyncService.SyncAllResourcesAsync(cancellationToken);
+            _metrics.RecordJobRun("google_resource_reconciliation", "success");
             _logger.LogInformation("Completed nightly Google resource reconciliation");
         }
         catch (Exception ex)
         {
+            _metrics.RecordJobRun("google_resource_reconciliation", "failure");
             _logger.LogError(ex, "Error during nightly Google resource reconciliation");
             throw;
         }

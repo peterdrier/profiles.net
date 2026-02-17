@@ -130,6 +130,11 @@ public sealed class HumansMetricsService : IDisposable
             observeValues: ObserveApplicationsPending,
             description: "Pending applications by status");
 
+        HumansMeter.CreateObservableGauge(
+            "humans.google_sync_outbox_pending",
+            observeValue: () => _snapshot.PendingOutboxEvents,
+            description: "Unprocessed Google sync outbox events");
+
         // Timer: fire immediately, then every 60 seconds
         _refreshTimer = new Timer(
             callback: _ => _ = RefreshSnapshotAsync(),
@@ -273,6 +278,10 @@ public sealed class HumansMetricsService : IDisposable
             var applicationsUnderReview = await db.Applications
                 .CountAsync(a => a.Status == ApplicationStatus.UnderReview);
 
+            // google_sync_outbox_pending
+            var pendingOutboxEvents = await db.GoogleSyncOutboxEvents
+                .CountAsync(e => !e.ProcessedAt.HasValue);
+
             _snapshot = new GaugeSnapshot
             {
                 ActiveCount = activeCount,
@@ -293,7 +302,8 @@ public sealed class HumansMetricsService : IDisposable
                 GoogleResources = googleResources,
                 LegalDocumentsActive = legalDocumentsActive,
                 ApplicationsSubmitted = applicationsSubmitted,
-                ApplicationsUnderReview = applicationsUnderReview
+                ApplicationsUnderReview = applicationsUnderReview,
+                PendingOutboxEvents = pendingOutboxEvents
             };
 
             _logger.LogDebug("Metrics snapshot refreshed: {Active} active, {Suspended} suspended, {Pending} pending",
@@ -340,5 +350,6 @@ public sealed class HumansMetricsService : IDisposable
         public int LegalDocumentsActive { get; init; }
         public int ApplicationsSubmitted { get; init; }
         public int ApplicationsUnderReview { get; init; }
+        public int PendingOutboxEvents { get; init; }
     }
 }

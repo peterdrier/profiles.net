@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using NodaTime;
 using Humans.Application.Interfaces;
+using Humans.Infrastructure.Services;
 
 namespace Humans.Infrastructure.Jobs;
 
@@ -10,15 +11,18 @@ namespace Humans.Infrastructure.Jobs;
 public class GoogleResourceProvisionJob
 {
     private readonly IGoogleSyncService _googleService;
+    private readonly HumansMetricsService _metrics;
     private readonly ILogger<GoogleResourceProvisionJob> _logger;
     private readonly IClock _clock;
 
     public GoogleResourceProvisionJob(
         IGoogleSyncService googleService,
+        HumansMetricsService metrics,
         ILogger<GoogleResourceProvisionJob> logger,
         IClock clock)
     {
         _googleService = googleService;
+        _metrics = metrics;
         _logger = logger;
         _clock = clock;
     }
@@ -38,12 +42,14 @@ public class GoogleResourceProvisionJob
         try
         {
             var resource = await _googleService.ProvisionTeamFolderAsync(teamId, folderName, cancellationToken);
+            _metrics.RecordJobRun("google_resource_provision", "success");
             _logger.LogInformation(
                 "Successfully provisioned folder with Google ID {GoogleId}",
                 resource.GoogleId);
         }
         catch (Exception ex)
         {
+            _metrics.RecordJobRun("google_resource_provision", "failure");
             _logger.LogError(ex, "Error provisioning team folder for team {TeamId}", teamId);
             throw;
         }
@@ -59,10 +65,12 @@ public class GoogleResourceProvisionJob
         try
         {
             await _googleService.SyncAllResourcesAsync(cancellationToken);
+            _metrics.RecordJobRun("google_resource_provision", "success");
             _logger.LogInformation("Completed Google resource permission sync");
         }
         catch (Exception ex)
         {
+            _metrics.RecordJobRun("google_resource_provision", "failure");
             _logger.LogError(ex, "Error syncing Google resource permissions");
             throw;
         }
