@@ -542,6 +542,7 @@
   <data name="Email_VerifyEmail_Subject" xml:space="preserve"><value>Verifichi il Suo indirizzo email</value></data>
   <data name="Email_DeletionRequested_Subject" xml:space="preserve"><value>Eliminazione dell'account richiesta</value></data>
   <data name="Email_AccountDeleted_Subject" xml:space="preserve"><value>Il Suo account è stato eliminato</value></data>
+  <data name="Email_AddedToTeam_Subject" xml:space="preserve"><value>&#xC8; stato/a aggiunto/a al team {0}</value><comment>{0} = team name</comment></data>
 
   <!-- ======================== -->
   <!-- My Teams View (missing)  -->
@@ -795,5 +796,14 @@
   <data name="Map_Count" xml:space="preserve"><value>{0} volontari con posizione</value></data>
   <data name="Map_None" xml:space="preserve"><value>Nessun volontario ha ancora impostato la propria posizione.</value></data>
   <data name="Map_Privacy" xml:space="preserve"><value>Vengono mostrati solo i membri che hanno impostato la propria posizione. La posizione &#xE8; approssimativa e basata sulla citt&#xE0;.</value></data>
+
+  <!-- ======================== -->
+  <!-- Contribution & Board     -->
+  <!-- ======================== -->
+  <data name="Profile_ContributionInterests" xml:space="preserve"><value>Come vorrei contribuire</value></data>
+  <data name="ProfileEdit_ContributionInterestsHelp" xml:space="preserve"><value>Condividi le tue competenze, interessi e come vorresti partecipare. Visibile a tutti i membri.</value></data>
+  <data name="Profile_BoardNotes" xml:space="preserve"><value>Note per il Consiglio</value></data>
+  <data name="ProfileEdit_BoardNotesHelp" xml:space="preserve"><value>Note private per il Consiglio. Visibili solo a te e ai membri del Consiglio.</value></data>
+  <data name="Profile_BoardInformation" xml:space="preserve"><value>Consiglio &amp; informazioni private</value></data>
 
 </root>
