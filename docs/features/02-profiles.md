@@ -188,13 +188,23 @@ User requests deletion (/Profile/RequestDeletion)
     │
     ├── DeletionRequestedAt = now
     ├── DeletionScheduledFor = now + 30 days
+    ├── End memberships (immediate)
+    │   • TeamMemberships: LeftAt = now
+    │   • RoleAssignments: ValidTo = now
+    │   • Audit log: MembershipsRevokedOnDeletionRequest
     ├── Confirmation email sent
     │
     │   ┌─────────────────────────────────────┐
     │   │  30-day grace period                │
-    │   │  • User retains full access         │
+    │   │  • User can still log in            │
     │   │  • User can cancel at any time      │
     │   │    via /Profile/CancelDeletion      │
+    │   │  • Memberships already revoked      │
+    │   │  • Cancellation does NOT restore    │
+    │   │    memberships (must rejoin teams)   │
+    │   │  • System sync auto-re-enrolls in   │
+    │   │    Volunteers if user is still       │
+    │   │    approved with valid consents      │
     │   └─────────────────────────────────────┘
     │
     ▼ Grace period expires
@@ -211,9 +221,9 @@ ProcessAccountDeletionsJob (daily)
     │   • ContactFields (all removed)
     │   • VolunteerHistoryEntries (all removed)
     │
-    ├── End memberships
-    │   • TeamMemberships: LeftAt = now
-    │   • RoleAssignments: ValidTo = now
+    ├── End memberships (safety net, idempotent)
+    │   • TeamMemberships: LeftAt = now (only if still null)
+    │   • RoleAssignments: ValidTo = now (only if still null)
     │
     ├── Disable login
     │   • LockoutEnd = DateTimeOffset.MaxValue

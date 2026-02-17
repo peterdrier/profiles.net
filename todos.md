@@ -25,9 +25,6 @@ Localization gaps (English remains in some views), verify `Application.Language`
 #### #33: Add Discord integration to sync team/role-based server roles via API
 Discord bot integration to automatically assign/remove Discord server roles based on Humans team memberships and role assignments. Configurable team→Discord role mappings, drift detection, audit logging, and manual sync UI at `/Admin/DiscordSync`.
 
-#### #32: Fix Lead role — remove standalone RoleAssignment, derive from TeamMemberRole.Lead only
-`RoleNames.Lead` exists as an assignable governance role in Admin → Roles, but Lead should be derived solely from `TeamMemberRole.Lead` on user-created teams. Remove Lead from assignable roles, clean up orphaned RoleAssignment records, keep existing `SystemTeamSyncJob` derivation logic.
-
 #### #27: Revoke team memberships immediately on deletion request
 Currently users keep full access during the 30-day deletion grace period. Should immediately remove from all teams and end role assignments on request. Returning users must re-consent and rejoin. Google deprovisioning via normal sync job.
 
@@ -138,6 +135,9 @@ Admin email previews (`/Admin/EmailPreview`) use duplicated static HTML in `Admi
 ---
 
 ## Completed
+
+### #32: Fix Lead role — remove standalone RoleAssignment DONE
+Removed `RoleNames.Lead` from assignable roles, data migration to soft-end orphaned assignments, fixed Leads team sync on role change, consolidated consent eligibility into `GetRequiredTeamIdsForUserAsync`, fixed HumanController missing ViewModel properties, added 8 unit tests. Committed `5acfa4f`.
 
 ### #34: Add environment banner for non-production deployments DONE
 Colored banner below navbar in non-production environments. Committed `66c19f1`.

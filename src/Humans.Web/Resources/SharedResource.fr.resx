@@ -218,6 +218,7 @@
   <data name="ProfilePrivacy_DownloadMyData" xml:space="preserve"><value>T&#xE9;l&#xE9;charger mes donn&#xE9;es</value></data>
   <data name="ProfilePrivacy_DeleteTitle" xml:space="preserve"><value>Supprimer votre compte</value></data>
   <data name="ProfilePrivacy_DeleteDescription" xml:space="preserve"><value>Demandez la suppression de votre compte et de vos donn&#xE9;es personnelles.</value></data>
+  <data name="ProfilePrivacy_DeleteImmediateRevocation" xml:space="preserve"><value>Vos appartenances aux &#xE9;quipes, attributions de r&#xF4;les et acc&#xE8;s aux ressources partag&#xE9;es (Google Drive, Groupes) seront r&#xE9;voqu&#xE9;s imm&#xE9;diatement</value></data>
   <data name="ProfilePrivacy_DeleteGracePeriod" xml:space="preserve"><value>Un d&#xE9;lai de gr&#xE2;ce de 30 jours vous permet d'annuler la demande</value></data>
   <data name="ProfilePrivacy_DeleteAnonymized" xml:space="preserve"><value>Apr&#xE8;s 30 jours, vos informations personnelles seront anonymis&#xE9;es et l'acc&#xE8;s d&#xE9;finitivement bloqu&#xE9;</value></data>
   <data name="ProfilePrivacy_DeleteRetained" xml:space="preserve"><value>Les enregistrements anonymis&#xE9;s sont conserv&#xE9;s &#xE0; des fins de conformit&#xE9; l&#xE9;gale et d'audit, mais ne peuvent pas &#xEA;tre associ&#xE9;s &#xE0; votre identit&#xE9;</value></data>
@@ -231,10 +232,9 @@
   <data name="ProfilePrivacy_ViewFullPolicy" xml:space="preserve"><value>Voir la politique de confidentialit&#xE9; compl&#xE8;te</value></data>
   <data name="ProfilePrivacy_ConfirmDeletion" xml:space="preserve"><value>Confirmer la suppression du compte</value></data>
   <data name="ProfilePrivacy_ConfirmDeletionQuestion" xml:space="preserve"><value>&#xCA;tes-vous s&#xFB;r de vouloir demander la suppression de votre compte ?</value></data>
-  <data name="ProfilePrivacy_ConfirmAnonymized30Days" xml:space="preserve"><value>Vos informations personnelles seront anonymis&#xE9;es dans 30 jours</value></data>
-  <data name="ProfilePrivacy_ConfirmCanCancel" xml:space="preserve"><value>Vous pouvez annuler cette demande &#xE0; tout moment avant la date d'anonymisation</value></data>
-  <data name="ProfilePrivacy_ConfirmNoRecovery" xml:space="preserve"><value>Apr&#xE8;s l'anonymisation, votre compte ne pourra pas &#xEA;tre r&#xE9;cup&#xE9;r&#xE9;</value></data>
   <data name="ProfilePrivacy_YesDeleteMyAccount" xml:space="preserve"><value>Oui, supprimer mon compte</value></data>
+  <data name="ProfilePrivacy_DeletionAccessRevoked" xml:space="preserve"><value>Vos appartenances aux &#xE9;quipes et attributions de r&#xF4;les ont &#xE9;t&#xE9; r&#xE9;voqu&#xE9;es.</value></data>
+  <data name="ProfilePrivacy_CancelNoRestore" xml:space="preserve"><value>L'annulation ne restaurera pas vos anciennes appartenances aux &#xE9;quipes. Vous devrez rejoindre les &#xE9;quipes &#xE0; nouveau.</value></data>
 
   <!-- Preferred Email View -->
   <data name="PreferredEmail_Description" xml:space="preserve"><value>Par d&#xE9;faut, les notifications du syst&#xE8;me sont envoy&#xE9;es &#xE0; votre adresse de connexion. Vous pouvez sp&#xE9;cifier une adresse e-mail diff&#xE9;rente pour recevoir ces notifications.</value></data>
