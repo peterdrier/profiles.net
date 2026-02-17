@@ -59,7 +59,9 @@
                         <strong>@Localizer["ProfilePrivacy_DeletionPending"]</strong><br />
                         @string.Format(Localizer["ProfilePrivacy_DeletionScheduledFor"].Value, Model.DeletionScheduledFor?.ToString("MMMM d, yyyy"))
                     </div>
+                    <p>@Localizer["ProfilePrivacy_DeletionAccessRevoked"]</p>
                     <p>@Localizer["ProfilePrivacy_DeletionCancelInfo"]</p>
+                    <p class="text-muted"><small>@Localizer["ProfilePrivacy_CancelNoRestore"]</small></p>
                     <form asp-action="CancelDeletion" method="post">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-success">
@@ -71,6 +73,7 @@
                 {
                     <p>@Localizer["ProfilePrivacy_DeleteDescription"]</p>
                     <ul>
+                        <li><strong>@Localizer["ProfilePrivacy_DeleteImmediateRevocation"]</strong></li>
                         <li>@Localizer["ProfilePrivacy_DeleteGracePeriod"]</li>
                         <li>@Localizer["ProfilePrivacy_DeleteAnonymized"]</li>
                         <li>@Localizer["ProfilePrivacy_DeleteRetained"]</li>
@@ -109,9 +112,10 @@
                 <div class="modal-body">
                     <p>@Localizer["ProfilePrivacy_ConfirmDeletionQuestion"]</p>
                     <ul>
-                        <li>@Localizer["ProfilePrivacy_ConfirmAnonymized30Days"]</li>
-                        <li>@Localizer["ProfilePrivacy_ConfirmCanCancel"]</li>
-                        <li>@Localizer["ProfilePrivacy_ConfirmNoRecovery"]</li>
+                        <li><strong>@Localizer["ProfilePrivacy_DeleteImmediateRevocation"]</strong></li>
+                        <li>@Localizer["ProfilePrivacy_DeleteGracePeriod"]</li>
+                        <li>@Localizer["ProfilePrivacy_DeleteAnonymized"]</li>
+                        <li>@Localizer["ProfilePrivacy_DeleteRetained"]</li>
                     </ul>
                 </div>
                 <div class="modal-footer">

@@ -189,8 +189,8 @@ public class ProcessAccountDeletionsJob
             _dbContext.VolunteerHistoryEntries.RemoveRange(volunteerHistory);
         }
 
-        // End team memberships
-        foreach (var membership in user.TeamMemberships)
+        // End team memberships (only active ones — may already be ended by RequestDeletion)
+        foreach (var membership in user.TeamMemberships.Where(m => m.LeftAt == null))
         {
             membership.LeftAt = now;
         }

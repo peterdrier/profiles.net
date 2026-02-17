@@ -23,4 +23,5 @@ public enum AuditAction
     TeamJoinRequestRejected,
     TeamMemberRoleChanged,
     AnomalousPermissionDetected,
+    MembershipsRevokedOnDeletionRequest,
 }

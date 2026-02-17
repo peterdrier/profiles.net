@@ -32,6 +32,7 @@ public class ProfileController : Controller
     private readonly ITeamService _teamService;
     private readonly IMembershipCalculator _membershipCalculator;
     private readonly IUserEmailService _userEmailService;
+    private readonly IAuditLogService _auditLogService;
     private readonly IStringLocalizer<SharedResource> _localizer;
 
     private const string EmailVerificationTokenPurpose = "UserEmailVerification";
@@ -57,6 +58,7 @@ public class ProfileController : Controller
         ITeamService teamService,
         IMembershipCalculator membershipCalculator,
         IUserEmailService userEmailService,
+        IAuditLogService auditLogService,
         IStringLocalizer<SharedResource> localizer)
     {
         _dbContext = dbContext;
@@ -70,6 +72,7 @@ public class ProfileController : Controller
         _teamService = teamService;
         _membershipCalculator = membershipCalculator;
         _userEmailService = userEmailService;
+        _auditLogService = auditLogService;
         _localizer = localizer;
     }
 
@@ -691,9 +694,35 @@ public class ProfileController : Controller
         user.DeletionScheduledFor = deletionDate;
         await _userManager.UpdateAsync(user);
 
+        // Revoke team memberships and role assignments immediately
+        await _dbContext.Entry(user).Collection(u => u.TeamMemberships).LoadAsync();
+        await _dbContext.Entry(user).Collection(u => u.RoleAssignments).LoadAsync();
+
+        var endedMemberships = 0;
+        foreach (var membership in user.TeamMemberships.Where(m => m.LeftAt == null))
+        {
+            membership.LeftAt = now;
+            endedMemberships++;
+        }
+
+        var endedRoles = 0;
+        foreach (var role in user.RoleAssignments.Where(r => r.ValidTo == null))
+        {
+            role.ValidTo = now;
+            endedRoles++;
+        }
+
+        await _auditLogService.LogAsync(
+            AuditAction.MembershipsRevokedOnDeletionRequest, "User", user.Id,
+            $"Revoked {endedMemberships} team membership(s) and {endedRoles} role assignment(s) on deletion request",
+            user.Id, user.DisplayName);
+
+        await _dbContext.SaveChangesAsync();
+
         _logger.LogWarning(
-            "User {UserId} requested account deletion. Scheduled for {DeletionDate}",
-            user.Id, deletionDate);
+            "User {UserId} requested account deletion. Scheduled for {DeletionDate}. " +
+            "Revoked {MembershipCount} memberships and {RoleCount} roles immediately",
+            user.Id, deletionDate, endedMemberships, endedRoles);
 
         // Send confirmation email - load UserEmails for GetEffectiveEmail()
         await _dbContext.Entry(user).Collection(u => u.UserEmails).LoadAsync();

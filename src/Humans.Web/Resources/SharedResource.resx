@@ -220,6 +220,7 @@
   <data name="ProfilePrivacy_DownloadMyData" xml:space="preserve"><value>Download My Data</value></data>
   <data name="ProfilePrivacy_DeleteTitle" xml:space="preserve"><value>Delete Your Account</value></data>
   <data name="ProfilePrivacy_DeleteDescription" xml:space="preserve"><value>Request deletion of your account and personal data.</value></data>
+  <data name="ProfilePrivacy_DeleteImmediateRevocation" xml:space="preserve"><value>Your team memberships, role assignments, and access to shared resources (Google Drive, Groups) will be revoked immediately</value></data>
   <data name="ProfilePrivacy_DeleteGracePeriod" xml:space="preserve"><value>A 30-day grace period allows you to cancel the request</value></data>
   <data name="ProfilePrivacy_DeleteAnonymized" xml:space="preserve"><value>After 30 days, your personal information will be anonymized and access permanently blocked</value></data>
   <data name="ProfilePrivacy_DeleteRetained" xml:space="preserve"><value>Anonymized records are retained for legal compliance and audit purposes but cannot be linked to your identity</value></data>
@@ -233,10 +234,9 @@
   <data name="ProfilePrivacy_ViewFullPolicy" xml:space="preserve"><value>View Full Privacy Policy</value></data>
   <data name="ProfilePrivacy_ConfirmDeletion" xml:space="preserve"><value>Confirm Account Deletion</value></data>
   <data name="ProfilePrivacy_ConfirmDeletionQuestion" xml:space="preserve"><value>Are you sure you want to request deletion of your account?</value></data>
-  <data name="ProfilePrivacy_ConfirmAnonymized30Days" xml:space="preserve"><value>Your personal information will be anonymized in 30 days</value></data>
-  <data name="ProfilePrivacy_ConfirmCanCancel" xml:space="preserve"><value>You can cancel this request at any time before the anonymization date</value></data>
-  <data name="ProfilePrivacy_ConfirmNoRecovery" xml:space="preserve"><value>After anonymization, your account cannot be recovered</value></data>
   <data name="ProfilePrivacy_YesDeleteMyAccount" xml:space="preserve"><value>Yes, Delete My Account</value></data>
+  <data name="ProfilePrivacy_DeletionAccessRevoked" xml:space="preserve"><value>Your team memberships and role assignments have been revoked.</value></data>
+  <data name="ProfilePrivacy_CancelNoRestore" xml:space="preserve"><value>Cancelling will not restore your previous team memberships. You will need to rejoin teams.</value></data>
 
   <!-- Emails View -->
   <data name="Emails_Description" xml:space="preserve"><value>Manage your email addresses. Your sign-in email is always included. Add additional emails, set which one receives notifications, and control profile visibility.</value></data>

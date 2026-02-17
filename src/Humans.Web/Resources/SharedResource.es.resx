@@ -220,6 +220,7 @@
   <data name="ProfilePrivacy_DownloadMyData" xml:space="preserve"><value>Descargar mis datos</value></data>
   <data name="ProfilePrivacy_DeleteTitle" xml:space="preserve"><value>Eliminar su cuenta</value></data>
   <data name="ProfilePrivacy_DeleteDescription" xml:space="preserve"><value>Solicite la eliminaci&#xF3;n de su cuenta y datos personales.</value></data>
+  <data name="ProfilePrivacy_DeleteImmediateRevocation" xml:space="preserve"><value>Sus membres&#xED;as de equipo, asignaciones de roles y acceso a recursos compartidos (Google Drive, Grupos) ser&#xE1;n revocados inmediatamente</value></data>
   <data name="ProfilePrivacy_DeleteGracePeriod" xml:space="preserve"><value>Un periodo de gracia de 30 d&#xED;as le permite cancelar la solicitud</value></data>
   <data name="ProfilePrivacy_DeleteAnonymized" xml:space="preserve"><value>Despu&#xE9;s de 30 d&#xED;as, su informaci&#xF3;n personal ser&#xE1; anonimizada y el acceso bloqueado permanentemente</value></data>
   <data name="ProfilePrivacy_DeleteRetained" xml:space="preserve"><value>Los registros anonimizados se conservan con fines de cumplimiento legal y auditor&#xED;a, pero no pueden vincularse a su identidad</value></data>
@@ -233,10 +234,9 @@
   <data name="ProfilePrivacy_ViewFullPolicy" xml:space="preserve"><value>Ver pol&#xED;tica de privacidad completa</value></data>
   <data name="ProfilePrivacy_ConfirmDeletion" xml:space="preserve"><value>Confirmar eliminaci&#xF3;n de cuenta</value></data>
   <data name="ProfilePrivacy_ConfirmDeletionQuestion" xml:space="preserve"><value>&#xBF;Est&#xE1; seguro de que desea solicitar la eliminaci&#xF3;n de su cuenta?</value></data>
-  <data name="ProfilePrivacy_ConfirmAnonymized30Days" xml:space="preserve"><value>Su informaci&#xF3;n personal ser&#xE1; anonimizada en 30 d&#xED;as</value></data>
-  <data name="ProfilePrivacy_ConfirmCanCancel" xml:space="preserve"><value>Puede cancelar esta solicitud en cualquier momento antes de la fecha de anonimizaci&#xF3;n</value></data>
-  <data name="ProfilePrivacy_ConfirmNoRecovery" xml:space="preserve"><value>Despu&#xE9;s de la anonimizaci&#xF3;n, su cuenta no podr&#xE1; ser recuperada</value></data>
   <data name="ProfilePrivacy_YesDeleteMyAccount" xml:space="preserve"><value>S&#xED;, eliminar mi cuenta</value></data>
+  <data name="ProfilePrivacy_DeletionAccessRevoked" xml:space="preserve"><value>Sus membres&#xED;as de equipo y asignaciones de roles han sido revocadas.</value></data>
+  <data name="ProfilePrivacy_CancelNoRestore" xml:space="preserve"><value>Cancelar no restaurar&#xE1; sus membres&#xED;as de equipo anteriores. Deber&#xE1; volver a unirse a los equipos.</value></data>
 
   <!-- Preferred Email View -->
   <data name="PreferredEmail_Description" xml:space="preserve"><value>Por defecto, las notificaciones del sistema se env&#xED;an a su correo de inicio de sesi&#xF3;n. Puede especificar una direcci&#xF3;n de correo diferente para recibir estas notificaciones.</value></data>
