@@ -19,6 +19,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Humans.Domain.Entities;
 using Humans.Infrastructure.Data;
+using Humans.Infrastructure.Services;
 using Humans.Web.Authorization;
 using Humans.Web.Extensions;
 using Humans.Web.Health;
@@ -238,6 +239,10 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
 });
 
 var app = builder.Build();
+
+// Eagerly resolve HumansMetricsService so the background gauge-refresh timer starts
+// immediately — otherwise observable gauges emit nothing until first injection.
+app.Services.GetRequiredService<HumansMetricsService>();
 
 // Localization diagnostic check
 {

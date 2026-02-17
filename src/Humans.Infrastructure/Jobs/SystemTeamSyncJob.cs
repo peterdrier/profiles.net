@@ -6,6 +6,7 @@ using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
+using Humans.Infrastructure.Services;
 
 namespace Humans.Infrastructure.Jobs;
 
@@ -19,6 +20,7 @@ public class SystemTeamSyncJob
     private readonly IGoogleSyncService _googleSyncService;
     private readonly IAuditLogService _auditLogService;
     private readonly IEmailService _emailService;
+    private readonly HumansMetricsService _metrics;
     private readonly ILogger<SystemTeamSyncJob> _logger;
     private readonly IClock _clock;
 
@@ -28,6 +30,7 @@ public class SystemTeamSyncJob
         IGoogleSyncService googleSyncService,
         IAuditLogService auditLogService,
         IEmailService emailService,
+        HumansMetricsService metrics,
         ILogger<SystemTeamSyncJob> logger,
         IClock clock)
     {
@@ -36,6 +39,7 @@ public class SystemTeamSyncJob
         _googleSyncService = googleSyncService;
         _auditLogService = auditLogService;
         _emailService = emailService;
+        _metrics = metrics;
         _logger = logger;
         _clock = clock;
     }
@@ -57,10 +61,12 @@ public class SystemTeamSyncJob
             await SyncBoardTeamAsync(cancellationToken);
             await SyncAsociadosTeamAsync(cancellationToken);
 
+            _metrics.RecordJobRun("system_team_sync", "success");
             _logger.LogInformation("Completed system team sync");
         }
         catch (Exception ex)
         {
+            _metrics.RecordJobRun("system_team_sync", "failure");
             _logger.LogError(ex, "Error during system team sync");
             throw;
         }
