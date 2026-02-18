@@ -309,7 +309,7 @@ public class ProfileController : Controller
                 model.SelectedTier = profile.MembershipTier;
             }
 
-            profile.MembershipTier = model.SelectedTier;
+            // profile.MembershipTier = model.SelectedTier; // Removed: Tier is set only on Board approval
 
             // Validate motivation is required for Colaborador/Asociado
             if (model.SelectedTier != MembershipTier.Volunteer &&
@@ -497,7 +497,8 @@ public class ProfileController : Controller
             await _emailService.SendEmailVerificationAsync(
                 model.NewEmail.Trim(),
                 user.DisplayName,
-                verificationUrl!);
+                verificationUrl!,
+                user.PreferredLanguage);
 
             _logger.LogInformation(
                 "Sent email verification to {Email} for user {UserId}",
@@ -755,6 +756,7 @@ public class ProfileController : Controller
                 effectiveEmail,
                 user.DisplayName,
                 deletionDate.ToDateTimeUtc(),
+                user.PreferredLanguage,
                 CancellationToken.None);
         }
 

@@ -414,6 +414,20 @@ public class AdminController : Controller
                 _metrics.RecordApplicationProcessed("approved");
                 _logger.LogInformation("Admin {AdminId} approved application {ApplicationId}",
                     currentUser.Id, application.Id);
+
+                try
+                {
+                    var user = await _dbContext.Users.FindAsync(application.UserId);
+                    await _emailService.SendApplicationApprovedAsync(
+                        user?.Email ?? string.Empty,
+                        user?.DisplayName ?? string.Empty,
+                        user?.PreferredLanguage);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send application approval email for {ApplicationId}", application.Id);
+                }
+
                 TempData["SuccessMessage"] = _localizer["Admin_ApplicationApproved"].Value;
                 break;
 
@@ -432,6 +446,21 @@ public class AdminController : Controller
                 _metrics.RecordApplicationProcessed("rejected");
                 _logger.LogInformation("Admin {AdminId} rejected application {ApplicationId}",
                     currentUser.Id, application.Id);
+
+                try
+                {
+                    var user = await _dbContext.Users.FindAsync(application.UserId);
+                    await _emailService.SendApplicationRejectedAsync(
+                        user?.Email ?? string.Empty,
+                        user?.DisplayName ?? string.Empty,
+                        model.Notes,
+                        user?.PreferredLanguage);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to send application rejection email for {ApplicationId}", application.Id);
+                }
+
                 TempData["SuccessMessage"] = _localizer["Admin_ApplicationRejected"].Value;
                 break;
 
@@ -615,7 +644,8 @@ public class AdminController : Controller
             await _emailService.SendSignupRejectedAsync(
                 user.Email ?? string.Empty,
                 user.DisplayName,
-                reason);
+                reason,
+                user.PreferredLanguage);
         }
         catch (Exception ex)
         {

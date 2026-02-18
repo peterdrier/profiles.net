@@ -197,9 +197,12 @@ public class OnboardingReviewController : Controller
         profile.ConsentCheckAt = now;
         profile.ConsentCheckedByUserId = currentUser.Id;
         profile.ConsentCheckNotes = notes;
+        profile.IsApproved = false;
         profile.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync();
+
+        await DeprovisionApprovalGatedSystemTeamsAsync(userId);
 
         await _auditLogService.LogAsync(
             AuditAction.ConsentCheckFlagged, "Profile", userId,
@@ -248,6 +251,8 @@ public class OnboardingReviewController : Controller
 
         await _dbContext.SaveChangesAsync();
 
+        await DeprovisionApprovalGatedSystemTeamsAsync(userId);
+
         await _auditLogService.LogAsync(
             AuditAction.SignupRejected, "Profile", userId,
             $"Signup rejected by {currentUser.DisplayName}{(string.IsNullOrWhiteSpace(reason) ? "" : $": {reason}")}",
@@ -258,7 +263,8 @@ public class OnboardingReviewController : Controller
             await _emailService.SendSignupRejectedAsync(
                 profile.User.Email ?? string.Empty,
                 profile.User.DisplayName,
-                reason);
+                reason,
+                profile.User.PreferredLanguage);
         }
         catch (Exception ex)
         {
@@ -546,6 +552,18 @@ public class OnboardingReviewController : Controller
             {
                 await _syncJob.SyncAsociadosMembershipForUserAsync(application.UserId, CancellationToken.None);
             }
+
+            try
+            {
+                await _emailService.SendApplicationApprovedAsync(
+                    application.User.Email ?? string.Empty,
+                    application.User.DisplayName,
+                    application.User.PreferredLanguage);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send application approval email for {ApplicationId}", application.Id);
+            }
         }
         else
         {
@@ -560,6 +578,19 @@ public class OnboardingReviewController : Controller
             _dbContext.BoardVotes.RemoveRange(application.BoardVotes);
 
             await _dbContext.SaveChangesAsync();
+
+            try
+            {
+                await _emailService.SendApplicationRejectedAsync(
+                    application.User.Email ?? string.Empty,
+                    application.User.DisplayName,
+                    model.DecisionNote ?? string.Empty,
+                    application.User.PreferredLanguage);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send application rejection email for {ApplicationId}", application.Id);
+            }
         }
 
         _logger.LogInformation("Application {ApplicationId} finalized as {Decision} by {UserId}",
@@ -567,6 +598,13 @@ public class OnboardingReviewController : Controller
 
         TempData["SuccessMessage"] = _localizer["BoardVoting_Finalized"].Value;
         return RedirectToAction(nameof(BoardVoting));
+    }
+
+    private async Task DeprovisionApprovalGatedSystemTeamsAsync(Guid userId)
+    {
+        await _syncJob.SyncVolunteersMembershipForUserAsync(userId, CancellationToken.None);
+        await _syncJob.SyncColaboradorsMembershipForUserAsync(userId, CancellationToken.None);
+        await _syncJob.SyncAsociadosMembershipForUserAsync(userId, CancellationToken.None);
     }
 
     private static OnboardingReviewItemViewModel MapToItem(Profile profile, HashSet<Guid> pendingAppUserIds)

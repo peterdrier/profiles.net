@@ -100,6 +100,7 @@ public class SendReConsentReminderJob
                         user.DisplayName,
                         requiredDocNames,
                         daysBeforeSuspension,
+                        user.PreferredLanguage,
                         cancellationToken);
 
                     user.LastConsentReminderSentAt = now;

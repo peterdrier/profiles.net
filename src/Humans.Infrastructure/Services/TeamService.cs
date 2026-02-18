@@ -700,6 +700,7 @@ public partial class TeamService : ITeamService
             await _emailService.SendAddedToTeamAsync(
                 email, user.DisplayName, team.Name, team.Slug,
                 resources.Select(r => (r.Name, r.Url)),
+                user.PreferredLanguage,
                 cancellationToken);
         }
         catch (Exception ex)

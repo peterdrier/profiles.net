@@ -61,8 +61,10 @@ public class SmtpEmailService : IEmailService
     public async Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_ApplicationApproved_Subject"].Value;
         var body = $"""
             <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
@@ -88,8 +90,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_ApplicationRejected_Subject"].Value;
         var body = $"""
             <h2>Application Update</h2>
@@ -111,9 +115,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string documentName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        await SendReConsentsRequiredAsync(userEmail, userName, new[] { documentName }, cancellationToken);
+        await SendReConsentsRequiredAsync(userEmail, userName, new[] { documentName }, culture, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -121,8 +126,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         IEnumerable<string> documentNames,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var docs = documentNames.ToList();
         var subject = docs.Count == 1
             ? string.Format(_localizer["Email_ReConsentRequired_Subject_Single"].Value, docs[0])
@@ -151,8 +158,10 @@ public class SmtpEmailService : IEmailService
         string userName,
         IEnumerable<string> documentNames,
         int daysRemaining,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var docs = string.Join(", ", documentNames);
         var subject = string.Format(CultureInfo.CurrentCulture, _localizer["Email_ReConsentReminder_Subject"].Value, daysRemaining);
         var body = $"""
@@ -176,8 +185,10 @@ public class SmtpEmailService : IEmailService
     public async Task SendWelcomeEmailAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_Welcome_Subject"].Value;
         var body = $"""
             <h2>{_localizer["Email_Welcome_Heading"].Value}</h2>
@@ -202,8 +213,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_AccessSuspended_Subject"].Value;
         var body = $"""
             <h2>Access Suspended</h2>
@@ -228,8 +241,10 @@ public class SmtpEmailService : IEmailService
         string toEmail,
         string userName,
         string verificationUrl,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_VerifyEmail_Subject"].Value;
         var body = $"""
             <h2>Email Verification</h2>
@@ -251,8 +266,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         DateTime deletionDate,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var formattedDate = deletionDate.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture);
         var subject = _localizer["Email_DeletionRequested_Subject"].Value;
         var body = $"""
@@ -274,8 +291,10 @@ public class SmtpEmailService : IEmailService
     public async Task SendAccountDeletedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_AccountDeleted_Subject"].Value;
         var body = $"""
             <h2>Account Deleted</h2>
@@ -298,8 +317,10 @@ public class SmtpEmailService : IEmailService
         string teamName,
         string teamSlug,
         IEnumerable<(string Name, string? Url)> resources,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = string.Format(CultureInfo.CurrentCulture, _localizer["Email_AddedToTeam_Subject"].Value, teamName);
         var teamUrl = $"{_settings.BaseUrl}/Teams/{teamSlug}";
         var resourceList = resources.ToList();
@@ -330,8 +351,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string? reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = _localizer["Email_SignupRejected_Subject"].Value;
         var body = $"""
             <h2>Signup Update</h2>
@@ -354,8 +377,10 @@ public class SmtpEmailService : IEmailService
         string userName,
         string tierName,
         string expiresAt,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
+        using var _ = WithCulture(culture);
         var subject = string.Format(CultureInfo.CurrentCulture, _localizer["Email_TermRenewalReminder_Subject"].Value, tierName);
         var body = $"""
             <h2>Membership Term Renewal</h2>
@@ -369,6 +394,42 @@ public class SmtpEmailService : IEmailService
 
         await SendEmailAsync(userEmail, subject, body, cancellationToken);
         _metrics.RecordEmailSent("term_renewal_reminder");
+    }
+
+    private CultureScope WithCulture(string? culture)
+    {
+        return new CultureScope(culture);
+    }
+
+    private sealed class CultureScope : IDisposable
+    {
+        private readonly CultureInfo? _originalCulture;
+
+        public CultureScope(string? culture)
+        {
+            if (string.IsNullOrWhiteSpace(culture)) return;
+
+            try
+            {
+                _originalCulture = CultureInfo.CurrentUICulture;
+                var targetCulture = new CultureInfo(culture);
+                CultureInfo.CurrentUICulture = targetCulture;
+                CultureInfo.CurrentCulture = targetCulture;
+            }
+            catch (CultureNotFoundException)
+            {
+                _originalCulture = null;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_originalCulture != null)
+            {
+                CultureInfo.CurrentUICulture = _originalCulture;
+                CultureInfo.CurrentCulture = _originalCulture;
+            }
+        }
     }
 
     private async Task SendEmailAsync(

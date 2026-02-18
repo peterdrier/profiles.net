@@ -210,8 +210,34 @@ public class SystemTeamSyncJob
 
         var eligibleSet = await _membershipCalculator.GetUsersWithAllRequiredConsentsForTeamAsync(
             userIds, teamId, cancellationToken);
+        var eligibleUserIds = eligibleSet.ToList();
 
-        await SyncTeamMembershipAsync(team, eligibleSet.ToList(), cancellationToken);
+        // Downgrade Profile.MembershipTier for users who NO LONGER HAVE an active approved application for this tier.
+        // We check against 'userIds' (which are users with approved, non-expired applications), 
+        // NOT 'eligibleUserIds' (which is further filtered by consent).
+        var todayInstant = _clock.GetCurrentInstant();
+        var toDowngrade = await _dbContext.Profiles
+            .Where(p => p.MembershipTier == tier && !userIds.Contains(p.UserId))
+            .ToListAsync(cancellationToken);
+
+        foreach (var profile in toDowngrade)
+        {
+            profile.MembershipTier = MembershipTier.Volunteer;
+            profile.UpdatedAt = todayInstant;
+
+            await _auditLogService.LogAsync(
+                AuditAction.TierDowngraded, "Profile", profile.UserId,
+                $"Membership tier downgraded to Volunteer for {profile.User?.DisplayName ?? "User"} due to term expiry",
+                nameof(SystemTeamSyncJob),
+                relatedEntityId: profile.UserId, relatedEntityType: "User");
+        }
+
+        if (toDowngrade.Count > 0)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        await SyncTeamMembershipAsync(team, eligibleUserIds, cancellationToken);
     }
 
     /// <summary>
@@ -423,7 +449,7 @@ public class SystemTeamSyncJob
                     var email = user.GetEffectiveEmail() ?? user.Email!;
                     await _emailService.SendAddedToTeamAsync(
                         email, user.DisplayName, team.Name, team.Slug,
-                        resourceTuples, cancellationToken);
+                        resourceTuples, user.PreferredLanguage, cancellationToken);
                 }
                 catch (Exception ex)
                 {

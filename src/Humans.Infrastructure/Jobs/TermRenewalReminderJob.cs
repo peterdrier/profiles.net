@@ -100,6 +100,7 @@ public class TermRenewalReminderJob
                         application.User.DisplayName,
                         application.MembershipTier.ToString(),
                         expiresFormatted,
+                        application.User.PreferredLanguage,
                         cancellationToken);
 
                     application.RenewalReminderSentAt = _clock.GetCurrentInstant();

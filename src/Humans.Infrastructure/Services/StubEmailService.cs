@@ -30,11 +30,12 @@ public class StubEmailService : IEmailService
     public Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send application approved email to {Email} ({UserName})",
-            userEmail, userName);
+            "[STUB] Would send application approved email to {Email} ({UserName}) [Culture: {Culture}]",
+            userEmail, userName, culture);
         return Task.CompletedTask;
     }
 
@@ -42,11 +43,12 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send application rejected email to {Email} ({UserName}). Reason: {Reason}",
-            userEmail, userName, reason);
+            "[STUB] Would send application rejected email to {Email} ({UserName}) [Culture: {Culture}]. Reason: {Reason}",
+            userEmail, userName, culture, reason);
         return Task.CompletedTask;
     }
 
@@ -54,11 +56,12 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         string documentName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send re-consent required email to {Email} ({UserName}) for document: {DocumentName}",
-            userEmail, userName, documentName);
+            "[STUB] Would send re-consent required email to {Email} ({UserName}) [Culture: {Culture}] for document: {DocumentName}",
+            userEmail, userName, culture, documentName);
         return Task.CompletedTask;
     }
 
@@ -66,11 +69,12 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         IEnumerable<string> documentNames,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send re-consent required email to {Email} ({UserName}) for documents: {DocumentNames}",
-            userEmail, userName, string.Join(", ", documentNames));
+            "[STUB] Would send re-consent required email to {Email} ({UserName}) [Culture: {Culture}] for documents: {DocumentNames}",
+            userEmail, userName, culture, string.Join(", ", documentNames));
         return Task.CompletedTask;
     }
 
@@ -79,22 +83,24 @@ public class StubEmailService : IEmailService
         string userName,
         IEnumerable<string> documentNames,
         int daysRemaining,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send re-consent reminder to {Email} ({UserName}). Documents: {Documents}. Days remaining: {Days}",
-            userEmail, userName, string.Join(", ", documentNames), daysRemaining);
+            "[STUB] Would send re-consent reminder to {Email} ({UserName}) [Culture: {Culture}]. Documents: {Documents}. Days remaining: {Days}",
+            userEmail, userName, culture, string.Join(", ", documentNames), daysRemaining);
         return Task.CompletedTask;
     }
 
     public Task SendWelcomeEmailAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send welcome email to {Email} ({UserName})",
-            userEmail, userName);
+            "[STUB] Would send welcome email to {Email} ({UserName}) [Culture: {Culture}]",
+            userEmail, userName, culture);
         return Task.CompletedTask;
     }
 
@@ -102,11 +108,12 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send access suspended email to {Email} ({UserName}). Reason: {Reason}",
-            userEmail, userName, reason);
+            "[STUB] Would send access suspended email to {Email} ({UserName}) [Culture: {Culture}]. Reason: {Reason}",
+            userEmail, userName, culture, reason);
         return Task.CompletedTask;
     }
 
@@ -114,11 +121,12 @@ public class StubEmailService : IEmailService
         string toEmail,
         string userName,
         string verificationUrl,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send email verification to {Email} ({UserName}). Verification URL: {Url}",
-            toEmail, userName, verificationUrl);
+            "[STUB] Would send email verification to {Email} ({UserName}) [Culture: {Culture}]. Verification URL: {Url}",
+            toEmail, userName, culture, verificationUrl);
         return Task.CompletedTask;
     }
 
@@ -126,22 +134,24 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         DateTime deletionDate,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send account deletion requested email to {Email} ({UserName}). Deletion date: {Date}",
-            userEmail, userName, deletionDate);
+            "[STUB] Would send account deletion requested email to {Email} ({UserName}) [Culture: {Culture}]. Deletion date: {Date}",
+            userEmail, userName, culture, deletionDate);
         return Task.CompletedTask;
     }
 
     public Task SendAccountDeletedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send account deleted confirmation to {Email} ({UserName})",
-            userEmail, userName);
+            "[STUB] Would send account deleted confirmation to {Email} ({UserName}) [Culture: {Culture}]",
+            userEmail, userName, culture);
         return Task.CompletedTask;
     }
 
@@ -151,11 +161,12 @@ public class StubEmailService : IEmailService
         string teamName,
         string teamSlug,
         IEnumerable<(string Name, string? Url)> resources,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send added-to-team email to {Email} ({UserName}) for team {TeamName}",
-            userEmail, userName, teamName);
+            "[STUB] Would send added-to-team email to {Email} ({UserName}) [Culture: {Culture}] for team {TeamName}",
+            userEmail, userName, culture, teamName);
         return Task.CompletedTask;
     }
 
@@ -163,11 +174,12 @@ public class StubEmailService : IEmailService
         string userEmail,
         string userName,
         string? reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send signup rejected email to {Email} ({UserName}). Reason: {Reason}",
-            userEmail, userName, reason);
+            "[STUB] Would send signup rejected email to {Email} ({UserName}) [Culture: {Culture}]. Reason: {Reason}",
+            userEmail, userName, culture, reason);
         return Task.CompletedTask;
     }
 
@@ -176,11 +188,12 @@ public class StubEmailService : IEmailService
         string userName,
         string tierName,
         string expiresAt,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "[STUB] Would send term renewal reminder to {Email} ({UserName}) for {Tier} expiring {ExpiresAt}",
-            userEmail, userName, tierName, expiresAt);
+            "[STUB] Would send term renewal reminder to {Email} ({UserName}) [Culture: {Culture}] for {Tier} expiring {ExpiresAt}",
+            userEmail, userName, culture, tierName, expiresAt);
         return Task.CompletedTask;
     }
 }
