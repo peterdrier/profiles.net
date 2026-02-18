@@ -76,6 +76,16 @@ Due to namespace collision, use `MemberApplication` alias when referencing `Huma
 using MemberApplication = Humans.Domain.Entities.Application;
 ```
 
+## Important: UI Terminology — "Humans" Not "Members" or "Volunteers"
+
+In all user-facing text (views, localization strings, emails), use **"humans"** — not "members", "volunteers", or "users". This is the org's branded terminology. It applies across all locales (the word "humans" is kept in English even in es/de/fr/it translations). Internal code (entity names, variable names) is unaffected.
+
+Also: the system stores **birthday** (month + day only), not **date of birth** (which implies year). Use "birthday" in UI text.
+
+## Important: Coolify Docker Build Constraints
+
+Coolify strips `.git` from the Docker build context. Do NOT use `COPY .git` in the Dockerfile — it will fail on production deploys. Instead, Coolify passes `SOURCE_COMMIT` as a Docker build arg containing the full commit SHA. The `Directory.Build.props` MSBuild target for `SourceRevisionId` has a `Condition` to skip when the property is already set via `-p:`.
+
 ## Scale and Deployment Context
 
 - **Target scale: ~500 users total.** This is a small nonprofit membership system, not a high-traffic service.
