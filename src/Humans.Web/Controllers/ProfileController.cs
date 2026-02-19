@@ -113,7 +113,7 @@ public class ProfileController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> Edit()
+    public async Task<IActionResult> Edit([FromQuery] bool preview = false)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -137,7 +137,8 @@ public class ProfileController : Controller
         var hasCustomPicture = profile?.HasCustomProfilePicture == true;
 
         // Initial setup = no profile or not yet approved (onboarding)
-        var isInitialSetup = profile == null || !profile.IsApproved;
+        // ?preview=true forces initial-setup mode for testing
+        var isInitialSetup = profile == null || !profile.IsApproved || preview;
 
         // Check if tier is locked (has active/pending application)
         var hasPendingOrApprovedApplication = profile != null && await _dbContext.Applications

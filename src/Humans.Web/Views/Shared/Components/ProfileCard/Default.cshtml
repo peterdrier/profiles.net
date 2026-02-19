@@ -23,9 +23,6 @@
                 {
                     <span class="text-muted me-2">@Model.Pronouns</span>
                 }
-                <span class="badge @StatusBadgeExtensions.GetMembershipStatusBadgeClass(Model.MembershipStatus)">
-                    @Model.MembershipStatus
-                </span>
                 @if (Model.Teams.Count > 0)
                 {
                     <div class="d-flex flex-wrap gap-2 mt-2">

@@ -12,7 +12,6 @@
                             css-class="me-3" />
             <div>
                 <h1 class="mb-0">@Html.Raw(string.Format(Localizer["Dashboard_Welcome"].Value, Html.Encode(Model.DisplayName)))</h1>
-                <span class="badge @StatusBadgeExtensions.GetMembershipStatusBadgeClass(Model.MembershipStatus) fs-6">@Model.MembershipStatus</span>
             </div>
         </div>
     </div>
@@ -186,10 +185,6 @@ else if (Model.PendingConsents > 0)
             <div class="card-header">@Localizer["Dashboard_YourMembership"]</div>
             <div class="card-body">
                 <dl class="row mb-0">
-                    <dt class="col-6">@Localizer["Common_Status"]</dt>
-                    <dd class="col-6">
-                        <span class="badge @StatusBadgeExtensions.GetMembershipStatusBadgeClass(Model.MembershipStatus)">@Model.MembershipStatus</span>
-                    </dd>
                     <dt class="col-6">@Localizer["Dashboard_MemberSince"]</dt>
                     <dd class="col-6">@Model.MemberSince.ToString("MMM yyyy")</dd>
                     @if (Model.LastLogin.HasValue)

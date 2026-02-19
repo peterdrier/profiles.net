@@ -9,6 +9,9 @@
    Loaded via <link> in _Layout.cshtml
    ------------- */
 
+/* Prevent layout shift when scrollbar appears/disappears */
+html { scrollbar-gutter: stable; }
+
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
     /* Brand palette — Renaissance parchment & ink */

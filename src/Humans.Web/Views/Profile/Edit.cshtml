@@ -120,6 +120,14 @@
                         @Localizer["ProfileEdit_ContactInfoHelp"]
                     </p>
 
+                    @if (Model.EditableContactFields.Count > 0)
+                    {
+                        <div class="row g-2 mb-1 text-muted small d-none d-md-flex">
+                            <div class="col-md-2">Type</div>
+                            <div class="col-md-3">Value</div>
+                            <div class="col-md-3">Visibility</div>
+                        </div>
+                    }
                     <div id="contactFieldsContainer">
                         @for (var i = 0; i < Model.EditableContactFields.Count; i++)
                         {
@@ -130,7 +138,6 @@
                                         <input type="hidden" name="EditableContactFields[@i].DisplayOrder" value="@i" class="display-order" />
 
                                         <div class="col-md-2">
-                                            <label class="form-label small">Type</label>
                                             @{
                                                 var fieldType = Model.EditableContactFields[i].FieldType;
                                             }
@@ -145,18 +152,15 @@
                                         </div>
 
                                         <div class="col-md-2 custom-label-col" style="display: @(Model.EditableContactFields[i].FieldType == ContactFieldType.Other ? "block" : "none");">
-                                            <label class="form-label small">Label</label>
                                             <input type="text" name="EditableContactFields[@i].CustomLabel" value="@Model.EditableContactFields[i].CustomLabel" class="form-control form-control-sm custom-label-input" placeholder="e.g., Discord" />
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label small">Value</label>
                                             <input type="text" name="EditableContactFields[@i].Value" value="@Model.EditableContactFields[i].Value" class="form-control form-control-sm contact-value-input" required placeholder="Enter contact info" />
                                             <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[@i].Value"></span>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label small">Visibility</label>
                                             @{
                                                 var visibility = Model.EditableContactFields[i].Visibility;
                                             }
@@ -547,7 +551,6 @@
                                 <input type="hidden" name="EditableContactFields[${index}].DisplayOrder" value="${index}" class="display-order" />
 
                                 <div class="col-md-2">
-                                    <label class="form-label small">Type</label>
                                     <select name="EditableContactFields[${index}].FieldType" class="form-select form-select-sm field-type-select">
                                         <option value="Phone">Phone</option>
                                         <option value="Signal">Signal</option>
@@ -559,18 +562,15 @@
                                 </div>
 
                                 <div class="col-md-2 custom-label-col" style="display: none;">
-                                    <label class="form-label small">Label</label>
                                     <input type="text" name="EditableContactFields[${index}].CustomLabel" class="form-control form-control-sm custom-label-input" placeholder="e.g., Discord" />
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small">Value</label>
                                     <input type="text" name="EditableContactFields[${index}].Value" class="form-control form-control-sm contact-value-input" placeholder="Enter contact info" />
                                     <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[${index}].Value"></span>
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small">Visibility</label>
                                     <select name="EditableContactFields[${index}].Visibility" class="form-select form-select-sm">
                                         <option value="AllActiveProfiles" selected>All active members</option>
                                         <option value="MyTeams">My teams (+ leads & board)</option>

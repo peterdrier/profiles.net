@@ -1,7 +1,7 @@
 # Release TODOs
 
 Audit date: 2026-02-05
-Last synced: 2026-02-18T13:30
+Last synced: 2026-02-19T01:30
 
 ---
 
@@ -26,21 +26,21 @@ Three distinct sections: 1) General Information, 2) Contributor Information (wit
 
 ---
 
-### Priority 4: Onboarding Redesign Epic (#52)
+### Priority 4: Onboarding Redesign Epic (#52) — IMPLEMENTED, STABILIZING
 
-**Design must be finalized before implementation. Open questions need answers from Ben.**
+Core implementation landed in `8a9ee4e` with 5 follow-up fix commits (`67eb438`, `6c40f27`, `46a9046`, `f638a46`, `a49e27e`). Needs QA validation.
 
-#### #52: Redesign onboarding with three membership tiers (EPIC)
-Three tiers: Volunteer (auto-accepted after consent check), Colaborador (board vote), Asociado (board vote + TBD questions from Ben). Tier selection at signup, profile requirements vary by tier. Supersedes #28, #51.
+#### #52: Redesign onboarding with three membership tiers (EPIC) — IMPLEMENTED
+Three tiers implemented: Volunteer (auto-accepted after consent check), Colaborador (board vote), Asociado (board vote + specific questions). Tier selection at signup, MembershipCalculator computes status. Remaining: QA testing, edge cases.
 
-#### #54: Add Consent and Volunteer Coordinator roles with onboarding gate
-Two new board-appointed roles with board-level data visibility. Consent Coordinator vets incoming humans for known issues (safety gate before admission). Volunteer Coordinator facilitates onboarding and team placement (not a gate).
+#### #54: Add Consent and Volunteer Coordinator roles with onboarding gate — IMPLEMENTED
+Consent Coordinator role implemented with onboarding gate. Consent check must be cleared before volunteer is auto-approved. Remaining: QA testing.
 
-#### #53: Add board voting system for application reviews
-Board members vote Yay/Maybe/No/Abstain on each application. Spreadsheet-style dashboard with per-board-member columns, separate Colaborador/Asociado views. Final approve/deny records board meeting date + decision note.
+#### #53: Add board voting system for application reviews — IMPLEMENTED
+Board voting dashboard implemented with Yay/Maybe/No/Abstain votes, per-board-member columns, approve/reject actions. Remaining: QA testing.
 
-#### #46 Part 2: Add reject signup action
-New `RejectSignup` endpoint, reject button on HumanDetail for pending users, optional reason, email notification, audit log. Part of the Colaborador/Asociado review workflow.
+#### #46 Part 2: Add reject signup action — IMPLEMENTED
+`RejectSignup` endpoint implemented in `OnboardingReviewController`. Reject button, optional reason, email notification, audit log all in place. Committed as part of onboarding epic.
 
 ---
 
