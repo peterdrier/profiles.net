@@ -14,6 +14,7 @@ using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Services;
 using SkiaSharp;
+using Humans.Web.Extensions;
 using Humans.Web.Models;
 using MemberApplication = Humans.Domain.Entities.Application;
 
@@ -98,6 +99,12 @@ public class ProfileController : Controller
         // Get consent status for the alert banners (profile card handles its own data).
         var membershipSnapshot = await _membershipCalculator.GetMembershipSnapshotAsync(user.Id);
 
+        // Get latest tier application for the profile banner
+        var latestApplication = await _dbContext.Applications
+            .Where(a => a.UserId == user.Id)
+            .OrderByDescending(a => a.SubmittedAt)
+            .FirstOrDefaultAsync();
+
         var viewModel = new ProfileViewModel
         {
             Id = profile?.Id ?? Guid.Empty,
@@ -108,6 +115,14 @@ public class ProfileController : Controller
             IsOwnProfile = true,
             DisplayName = user.DisplayName,
         };
+
+        // Show tier application status (skip Withdrawn — not interesting)
+        if (latestApplication != null && latestApplication.Status != ApplicationStatus.Withdrawn)
+        {
+            viewModel.TierApplicationStatus = latestApplication.Status.ToString();
+            viewModel.TierApplicationTier = latestApplication.MembershipTier;
+            viewModel.TierApplicationBadgeClass = latestApplication.Status.GetBadgeClass();
+        }
 
         return View(viewModel);
     }

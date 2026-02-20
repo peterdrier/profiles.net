@@ -178,6 +178,8 @@
   <data name="Profile_ReviewNow" xml:space="preserve"><value>Consulter maintenant</value></data>
   <data name="Profile_PendingApproval" xml:space="preserve"><value>En attente d'approbation :</value></data>
   <data name="Profile_PendingApprovalDescription" xml:space="preserve"><value>Votre compte est en attente d'approbation par le Conseil d'administration. Une fois approuv&#xE9;, vous serez inscrit dans l'&#xE9;quipe des B&#xE9;n&#xE9;voles et recevrez l'acc&#xE8;s aux ressources de l'organisation.</value></data>
+  <data name="Profile_TierApplicationStatus" xml:space="preserve"><value>Votre candidature {0} :</value><comment>{0} = tier name (Colaborador/Asociado)</comment></data>
+  <data name="Profile_TierApplicationDetails" xml:space="preserve"><value>Voir les d&#xE9;tails</value></data>
   <data name="Profile_Information" xml:space="preserve"><value>Informations du profil</value></data>
   <data name="Profile_LegalName" xml:space="preserve"><value>Nom l&#xE9;gal</value></data>
   <data name="Profile_OnlyVisibleToYouAndBoard" xml:space="preserve"><value>visible uniquement par vous et le conseil</value></data>

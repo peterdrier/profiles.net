@@ -178,6 +178,8 @@
   <data name="Profile_ReviewNow" xml:space="preserve"><value>Esamina ora</value></data>
   <data name="Profile_PendingApproval" xml:space="preserve"><value>In attesa di approvazione:</value></data>
   <data name="Profile_PendingApprovalDescription" xml:space="preserve"><value>Il Suo account è in attesa di approvazione da parte del Consiglio. Una volta approvato, verrà inserito nel team Volunteers e riceverà l'accesso alle risorse dell'organizzazione.</value></data>
+  <data name="Profile_TierApplicationStatus" xml:space="preserve"><value>La Sua candidatura {0}:</value><comment>{0} = tier name (Colaborador/Asociado)</comment></data>
+  <data name="Profile_TierApplicationDetails" xml:space="preserve"><value>Vedi dettagli</value></data>
   <data name="Profile_Information" xml:space="preserve"><value>Informazioni del profilo</value></data>
   <data name="Profile_LegalName" xml:space="preserve"><value>Nome legale</value></data>
   <data name="Profile_OnlyVisibleToYouAndBoard" xml:space="preserve"><value>visibile solo a Lei e al Consiglio</value></data>

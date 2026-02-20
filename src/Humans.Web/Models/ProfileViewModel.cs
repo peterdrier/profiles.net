@@ -160,6 +160,21 @@ public class ProfileViewModel
     public int PendingConsentCount { get; set; }
 
     /// <summary>
+    /// Status of the user's latest tier application (Submitted, Approved, Rejected), or null if none.
+    /// </summary>
+    public string? TierApplicationStatus { get; set; }
+
+    /// <summary>
+    /// The tier the user applied for (Colaborador or Asociado), or null if no application.
+    /// </summary>
+    public MembershipTier? TierApplicationTier { get; set; }
+
+    /// <summary>
+    /// Bootstrap badge CSS class for the tier application status.
+    /// </summary>
+    public string? TierApplicationBadgeClass { get; set; }
+
+    /// <summary>
     /// Whether this is the user's initial profile setup (no profile yet or not approved).
     /// Controls visibility of tier selection and inline application sections.
     /// </summary>
