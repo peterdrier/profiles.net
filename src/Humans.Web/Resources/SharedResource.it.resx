@@ -341,6 +341,12 @@
   <data name="Governance_BoardReviews" xml:space="preserve"><value>Il Consiglio esamina le domande in base al coinvolgimento nella comunità e all'allineamento con la missione del collettivo.</value></data>
   <data name="Governance_NoteNotRequired" xml:space="preserve"><value>Nota: non è necessario essere asociado per accedere alle risorse o partecipare agli eventi.</value></data>
   <data name="Governance_Statutes" xml:space="preserve"><value>Statuto</value></data>
+  <data name="Governance_ApplicationStats" xml:space="preserve"><value>Statistiche delle candidature</value></data>
+  <data name="Governance_StatsTotal" xml:space="preserve"><value>Totale</value></data>
+  <data name="Governance_StatsApproved" xml:space="preserve"><value>Approvate</value></data>
+  <data name="Governance_StatsRejected" xml:space="preserve"><value>Respinte</value></data>
+  <data name="Governance_StatsPending" xml:space="preserve"><value>In attesa</value></data>
+  <data name="Governance_StatsApprovalRate" xml:space="preserve"><value>Tasso di approvazione</value></data>
 
   <!-- Governance Create View -->
   <data name="GovernanceCreate_NewApplication" xml:space="preserve"><value>Nuova domanda</value></data>

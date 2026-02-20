@@ -331,6 +331,12 @@
   <data name="Governance_BoardReviews" xml:space="preserve"><value>The board reviews applications based on community involvement and alignment with the collective's mission.</value></data>
   <data name="Governance_NoteNotRequired" xml:space="preserve"><value>Note: You don't need to be an asociado to access resources or participate in events.</value></data>
   <data name="Governance_Statutes" xml:space="preserve"><value>Statutes</value></data>
+  <data name="Governance_ApplicationStats" xml:space="preserve"><value>Application Statistics</value></data>
+  <data name="Governance_StatsTotal" xml:space="preserve"><value>Total</value></data>
+  <data name="Governance_StatsApproved" xml:space="preserve"><value>Approved</value></data>
+  <data name="Governance_StatsRejected" xml:space="preserve"><value>Rejected</value></data>
+  <data name="Governance_StatsPending" xml:space="preserve"><value>Pending</value></data>
+  <data name="Governance_StatsApprovalRate" xml:space="preserve"><value>Approval rate</value></data>
 
   <!-- Governance Create View -->
   <data name="GovernanceCreate_NewApplication" xml:space="preserve"><value>New Application</value></data>

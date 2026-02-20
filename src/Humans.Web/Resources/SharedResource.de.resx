@@ -341,6 +341,12 @@
   <data name="Governance_BoardReviews" xml:space="preserve"><value>Der Vorstand prüft Anträge auf Grundlage des Community-Engagements und der Übereinstimmung mit der Mission des Kollektivs.</value></data>
   <data name="Governance_NoteNotRequired" xml:space="preserve"><value>Hinweis: Sie müssen kein Asociado sein, um auf Ressourcen zuzugreifen oder an Veranstaltungen teilzunehmen.</value></data>
   <data name="Governance_Statutes" xml:space="preserve"><value>Satzung</value></data>
+  <data name="Governance_ApplicationStats" xml:space="preserve"><value>Antragsstatistiken</value></data>
+  <data name="Governance_StatsTotal" xml:space="preserve"><value>Gesamt</value></data>
+  <data name="Governance_StatsApproved" xml:space="preserve"><value>Genehmigt</value></data>
+  <data name="Governance_StatsRejected" xml:space="preserve"><value>Abgelehnt</value></data>
+  <data name="Governance_StatsPending" xml:space="preserve"><value>Ausstehend</value></data>
+  <data name="Governance_StatsApprovalRate" xml:space="preserve"><value>Genehmigungsrate</value></data>
 
   <!-- Governance Create View -->
   <data name="GovernanceCreate_NewApplication" xml:space="preserve"><value>Neuer Antrag</value></data>

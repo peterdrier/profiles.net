@@ -341,6 +341,12 @@
   <data name="Governance_BoardReviews" xml:space="preserve"><value>Le conseil d'administration examine les candidatures en fonction de l'implication communautaire et de l'ad&#xE9;quation avec la mission du collectif.</value></data>
   <data name="Governance_NoteNotRequired" xml:space="preserve"><value>Remarque : Il n'est pas n&#xE9;cessaire d'&#xEA;tre asociado pour acc&#xE9;der aux ressources ou participer aux &#xE9;v&#xE9;nements.</value></data>
   <data name="Governance_Statutes" xml:space="preserve"><value>Statuts</value></data>
+  <data name="Governance_ApplicationStats" xml:space="preserve"><value>Statistiques des candidatures</value></data>
+  <data name="Governance_StatsTotal" xml:space="preserve"><value>Total</value></data>
+  <data name="Governance_StatsApproved" xml:space="preserve"><value>Approuv&#xE9;es</value></data>
+  <data name="Governance_StatsRejected" xml:space="preserve"><value>Rejet&#xE9;es</value></data>
+  <data name="Governance_StatsPending" xml:space="preserve"><value>En attente</value></data>
+  <data name="Governance_StatsApprovalRate" xml:space="preserve"><value>Taux d'approbation</value></data>
 
   <!-- Governance Create View -->
   <data name="GovernanceCreate_NewApplication" xml:space="preserve"><value>Nouvelle candidature</value></data>

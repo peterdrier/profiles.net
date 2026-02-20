@@ -13,4 +13,12 @@ public class GovernanceIndexViewModel
     public DateTime? ApplicationResolvedAt { get; set; }
     public string? ApplicationStatusBadgeClass { get; set; }
     public bool CanApply { get; set; }
+
+    // Aggregate application statistics (Section 8 transparency)
+    public int TotalApplications { get; set; }
+    public int ApprovedCount { get; set; }
+    public int RejectedCount { get; set; }
+    public int PendingCount { get; set; }
+    public int ColaboradorApplied { get; set; }
+    public int AsociadoApplied { get; set; }
 }

@@ -61,6 +61,13 @@ public class GovernanceController : Controller
 
         var statutesContent = await GetStatutesContentAsync();
 
+        // Aggregate application statistics for transparency (Section 8)
+        var allApplications = await _dbContext.Applications
+            .AsNoTracking()
+            .Where(a => a.Status != ApplicationStatus.Withdrawn)
+            .Select(a => new { a.Status, a.MembershipTier })
+            .ToListAsync();
+
         var viewModel = new GovernanceIndexViewModel
         {
             StatutesContent = statutesContent,
@@ -70,7 +77,13 @@ public class GovernanceController : Controller
             ApplicationResolvedAt = latestApplication?.ResolvedAt?.ToDateTimeUtc(),
             ApplicationStatusBadgeClass = latestApplication?.Status.GetBadgeClass(),
             CanApply = latestApplication == null ||
-                latestApplication.Status != ApplicationStatus.Submitted
+                latestApplication.Status != ApplicationStatus.Submitted,
+            TotalApplications = allApplications.Count,
+            ApprovedCount = allApplications.Count(a => a.Status == ApplicationStatus.Approved),
+            RejectedCount = allApplications.Count(a => a.Status == ApplicationStatus.Rejected),
+            PendingCount = allApplications.Count(a => a.Status == ApplicationStatus.Submitted),
+            ColaboradorApplied = allApplications.Count(a => a.MembershipTier == MembershipTier.Colaborador),
+            AsociadoApplied = allApplications.Count(a => a.MembershipTier == MembershipTier.Asociado)
         };
 
         return View(viewModel);
