@@ -7,6 +7,7 @@ namespace Humans.Web.Models;
 public class ProfileViewModel
 {
     public Guid Id { get; set; }
+    public Guid UserId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string? ProfilePictureUrl { get; set; }
@@ -33,7 +34,7 @@ public class ProfileViewModel
 
     [Required]
     [StringLength(100)]
-    [Display(Name = "Legal Last Name")]
+    [Display(Name = "Legal Last Name(s)")]
     public string LastName { get; set; } = string.Empty;
 
     /// <summary>
@@ -157,6 +158,81 @@ public class ProfileViewModel
     public bool IsApproved { get; set; }
     public bool HasPendingConsents { get; set; }
     public int PendingConsentCount { get; set; }
+
+    /// <summary>
+    /// Status of the user's latest tier application (Submitted, Approved, Rejected), or null if none.
+    /// </summary>
+    public string? TierApplicationStatus { get; set; }
+
+    /// <summary>
+    /// The tier the user applied for (Colaborador or Asociado), or null if no application.
+    /// </summary>
+    public MembershipTier? TierApplicationTier { get; set; }
+
+    /// <summary>
+    /// Bootstrap badge CSS class for the tier application status.
+    /// </summary>
+    public string? TierApplicationBadgeClass { get; set; }
+
+    /// <summary>
+    /// Whether this is the user's initial profile setup (no profile yet or not approved).
+    /// Controls visibility of tier selection and inline application sections.
+    /// </summary>
+    public bool IsInitialSetup { get; set; }
+
+    /// <summary>
+    /// Whether the Private Information section should be shown first.
+    /// True when FirstName, LastName, and EmergencyContactName are all empty (new user).
+    /// </summary>
+    public bool ShowPrivateFirst { get; set; }
+
+    /// <summary>
+    /// Whether the member has declared no prior burn experience.
+    /// When true, Burner CV entries are not required.
+    /// </summary>
+    public bool NoPriorBurnExperience { get; set; }
+
+    /// <summary>
+    /// Selected membership tier. During initial setup, the user can choose Colaborador/Asociado.
+    /// Defaults to Volunteer if not specified.
+    /// </summary>
+    public MembershipTier SelectedTier { get; set; } = MembershipTier.Volunteer;
+
+    /// <summary>
+    /// Whether the tier has been locked (approved or has active application).
+    /// </summary>
+    public bool IsTierLocked { get; set; }
+
+    // Inline application fields (only used during initial setup for Colaborador/Asociado)
+
+    /// <summary>
+    /// Motivation statement for Colaborador/Asociado application.
+    /// Required when SelectedTier is not Volunteer during initial setup.
+    /// </summary>
+    [StringLength(2000)]
+    [DataType(DataType.MultilineText)]
+    public string? ApplicationMotivation { get; set; }
+
+    /// <summary>
+    /// Additional information for the application.
+    /// </summary>
+    [StringLength(1000)]
+    [DataType(DataType.MultilineText)]
+    public string? ApplicationAdditionalInfo { get; set; }
+
+    /// <summary>
+    /// Asociado-only: significant contribution to Nowhere or another Burn.
+    /// </summary>
+    [StringLength(2000)]
+    [DataType(DataType.MultilineText)]
+    public string? ApplicationSignificantContribution { get; set; }
+
+    /// <summary>
+    /// Asociado-only: understanding of the asociado role and why they want it.
+    /// </summary>
+    [StringLength(2000)]
+    [DataType(DataType.MultilineText)]
+    public string? ApplicationRoleUnderstanding { get; set; }
 
     /// <summary>
     /// The effective profile picture URL (custom upload takes priority over Google avatar).

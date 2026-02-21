@@ -5,11 +5,11 @@
 
     var languages = new[]
     {
-        ("en", "English"),
-        ("es", "Espanol"),
         ("de", "Deutsch"),
-        ("it", "Italiano"),
-        ("fr", "Francais")
+        ("en", "English"),
+        ("es", "Español"),
+        ("fr", "Français"),
+        ("it", "Italiano")
     };
 
     var currentLanguageName = languages.FirstOrDefault(l => string.Equals(l.Item1, currentCulture, StringComparison.Ordinal)).Item2 ?? "English";

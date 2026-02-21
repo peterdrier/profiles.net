@@ -1,8 +1,8 @@
 using System.Globalization;
+using Humans.Domain.Enums;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -13,26 +13,27 @@ namespace Humans.Infrastructure.Services;
 
 /// <summary>
 /// Email service implementation using SMTP via MailKit.
+/// Delegates rendering to IEmailRenderer; handles transport only.
 /// </summary>
 public class SmtpEmailService : IEmailService
 {
     private readonly EmailSettings _settings;
     private readonly HumansMetricsService _metrics;
     private readonly ILogger<SmtpEmailService> _logger;
-    private readonly IStringLocalizer _localizer;
+    private readonly IEmailRenderer _renderer;
     private readonly string _environmentName;
 
     public SmtpEmailService(
         IOptions<EmailSettings> settings,
         HumansMetricsService metrics,
         ILogger<SmtpEmailService> logger,
-        IStringLocalizerFactory localizerFactory,
+        IEmailRenderer renderer,
         IHostEnvironment hostEnvironment)
     {
         _settings = settings.Value;
         _metrics = metrics;
         _logger = logger;
-        _localizer = localizerFactory.Create("SharedResource", "Humans.Web");
+        _renderer = renderer;
         _environmentName = hostEnvironment.EnvironmentName;
     }
 
@@ -42,18 +43,8 @@ public class SmtpEmailService : IEmailService
         string applicantName,
         CancellationToken cancellationToken = default)
     {
-        var subject = string.Format(_localizer["Email_ApplicationSubmitted_Subject"].Value, applicantName);
-        var body = $"""
-            <h2>New Membership Application</h2>
-            <p>A new membership application has been submitted.</p>
-            <ul>
-                <li><strong>Applicant:</strong> {HtmlEncode(applicantName)}</li>
-                <li><strong>Application ID:</strong> {applicationId}</li>
-            </ul>
-            <p><a href="{_settings.BaseUrl}/Admin/Applications">Review Application</a></p>
-            """;
-
-        await SendEmailAsync(_settings.AdminAddress, subject, body, cancellationToken);
+        var content = _renderer.RenderApplicationSubmitted(applicationId, applicantName);
+        await SendEmailAsync(_settings.AdminAddress, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("application_submitted");
     }
 
@@ -61,25 +52,12 @@ public class SmtpEmailService : IEmailService
     public async Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_ApplicationApproved_Subject"].Value;
-        var body = $"""
-            <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>We're delighted to inform you that your membership application has been approved.
-            Welcome to Humans!</p>
-            <p>You can now access your member profile and explore teams:</p>
-            <ul>
-                <li><a href="{_settings.BaseUrl}/Profile">View Your Profile</a></li>
-                <li><a href="{_settings.BaseUrl}/Teams">Browse Teams</a></li>
-                <li><a href="{_settings.BaseUrl}/Consent">Review Legal Documents</a></li>
-            </ul>
-            <p>If you have any questions, don't hesitate to reach out.</p>
-            <p>Welcome aboard!<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderApplicationApproved(userName, tier, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("application_approved");
     }
 
@@ -87,22 +65,13 @@ public class SmtpEmailService : IEmailService
     public async Task SendApplicationRejectedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_ApplicationRejected_Subject"].Value;
-        var body = $"""
-            <h2>Application Update</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>Thank you for your interest in joining us. After careful review,
-            we regret to inform you that we are unable to approve your membership application at this time.</p>
-            {(string.IsNullOrEmpty(reason) ? "" : $"<p><strong>Reason:</strong> {HtmlEncode(reason)}</p>")}
-            <p>If you have any questions or would like to discuss this decision,
-            please contact us at <a href="mailto:{_settings.AdminAddress}">{_settings.AdminAddress}</a>.</p>
-            <p>Best regards,<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderApplicationRejected(userName, tier, reason, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("application_rejected");
     }
 
@@ -111,9 +80,10 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string documentName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        await SendReConsentsRequiredAsync(userEmail, userName, new[] { documentName }, cancellationToken);
+        await SendReConsentsRequiredAsync(userEmail, userName, new[] { documentName }, culture, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -121,27 +91,12 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         IEnumerable<string> documentNames,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         var docs = documentNames.ToList();
-        var subject = docs.Count == 1
-            ? string.Format(_localizer["Email_ReConsentRequired_Subject_Single"].Value, docs[0])
-            : _localizer["Email_ReConsentRequired_Subject_Multiple"].Value;
-
-        var body = $"""
-            <h2>Legal Document Update</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>We have updated the following required documents:</p>
-            <ul>
-                {string.Join("\n", docs.Select(d => $"<li><strong>{HtmlEncode(d)}</strong></li>"))}
-            </ul>
-            <p>As a member, you need to review and accept these updated documents to maintain your active membership status.</p>
-            <p><a href="{_settings.BaseUrl}/Consent">Review and Accept</a></p>
-            <p>If you have any questions about the changes, please contact us.</p>
-            <p>Thank you,<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderReConsentsRequired(userName, docs, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("reconsents_required");
     }
 
@@ -151,24 +106,12 @@ public class SmtpEmailService : IEmailService
         string userName,
         IEnumerable<string> documentNames,
         int daysRemaining,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var docs = string.Join(", ", documentNames);
-        var subject = string.Format(CultureInfo.CurrentCulture, _localizer["Email_ReConsentReminder_Subject"].Value, daysRemaining);
-        var body = $"""
-            <h2>Consent Reminder</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>This is a reminder that you have <strong>{daysRemaining} days</strong> remaining to review and accept
-            the following updated documents:</p>
-            <ul>
-                {string.Join("\n", documentNames.Select(d => $"<li>{HtmlEncode(d)}</li>"))}
-            </ul>
-            <p>If you do not accept these documents before the deadline, your membership access may be temporarily suspended.</p>
-            <p><a href="{_settings.BaseUrl}/Consent">Review Documents Now</a></p>
-            <p>Thank you,<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var docs = documentNames.ToList();
+        var content = _renderer.RenderReConsentReminder(userName, docs, daysRemaining, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("reconsent_reminder");
     }
 
@@ -176,24 +119,11 @@ public class SmtpEmailService : IEmailService
     public async Task SendWelcomeEmailAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_Welcome_Subject"].Value;
-        var body = $"""
-            <h2>{_localizer["Email_Welcome_Heading"].Value}</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>Welcome to the Humans member portal!</p>
-            <p>Here's what you can do:</p>
-            <ul>
-                <li><a href="{_settings.BaseUrl}/Profile">Complete your profile</a></li>
-                <li><a href="{_settings.BaseUrl}/Teams">Join teams and working groups</a></li>
-                <li><a href="{_settings.BaseUrl}/Consent">Review legal documents</a></li>
-            </ul>
-            <p>If you have any questions, feel free to reach out to us.</p>
-            <p>Best regards,<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderWelcome(userName, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("welcome");
     }
 
@@ -202,24 +132,11 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_AccessSuspended_Subject"].Value;
-        var body = $"""
-            <h2>Access Suspended</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>Your membership access has been temporarily suspended.</p>
-            <p><strong>Reason:</strong> {HtmlEncode(reason)}</p>
-            <p>To restore your access, please take the required action:</p>
-            <ul>
-                <li><a href="{_settings.BaseUrl}/Consent">Review pending consent requirements</a></li>
-            </ul>
-            <p>If you believe this is an error or have questions, please contact us at
-            <a href="mailto:{_settings.AdminAddress}">{_settings.AdminAddress}</a>.</p>
-            <p>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderAccessSuspended(userName, reason, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("access_suspended");
     }
 
@@ -228,21 +145,11 @@ public class SmtpEmailService : IEmailService
         string toEmail,
         string userName,
         string verificationUrl,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_VerifyEmail_Subject"].Value;
-        var body = $"""
-            <h2>Email Verification</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>You requested to set <strong>{HtmlEncode(toEmail)}</strong> as your preferred email address.</p>
-            <p>Please click the link below to verify this email address:</p>
-            <p><a href="{verificationUrl}">Verify Email Address</a></p>
-            <p>This link will expire in 24 hours.</p>
-            <p>If you did not request this change, you can safely ignore this email.</p>
-            <p>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(toEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderEmailVerification(userName, toEmail, verificationUrl, culture);
+        await SendEmailAsync(toEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("email_verification");
     }
 
@@ -251,22 +158,12 @@ public class SmtpEmailService : IEmailService
         string userEmail,
         string userName,
         DateTime deletionDate,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
         var formattedDate = deletionDate.ToString("MMMM d, yyyy", CultureInfo.InvariantCulture);
-        var subject = _localizer["Email_DeletionRequested_Subject"].Value;
-        var body = $"""
-            <h2>Account Deletion Request Received</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>We have received your request to delete your account. Your account and all associated data
-            will be permanently deleted on <strong>{formattedDate}</strong>.</p>
-            <p>If you change your mind, you can cancel this request before the deletion date by visiting:</p>
-            <p><a href="{_settings.BaseUrl}/Profile/Privacy">Cancel Deletion Request</a></p>
-            <p>After deletion, this action cannot be undone and all your data will be permanently removed.</p>
-            <p>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderAccountDeletionRequested(userName, formattedDate, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("deletion_requested");
     }
 
@@ -274,20 +171,11 @@ public class SmtpEmailService : IEmailService
     public async Task SendAccountDeletedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = _localizer["Email_AccountDeleted_Subject"].Value;
-        var body = $"""
-            <h2>Account Deleted</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>As requested, your Humans account has been permanently deleted.
-            All your personal data has been removed from our systems.</p>
-            <p>Thank you for being part of our community. If you ever wish to rejoin,
-            you're welcome to submit a new membership application.</p>
-            <p>Best wishes,<br/>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderAccountDeleted(userName, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("account_deleted");
     }
 
@@ -298,31 +186,40 @@ public class SmtpEmailService : IEmailService
         string teamName,
         string teamSlug,
         IEnumerable<(string Name, string? Url)> resources,
+        string? culture = null,
         CancellationToken cancellationToken = default)
     {
-        var subject = string.Format(CultureInfo.CurrentCulture, _localizer["Email_AddedToTeam_Subject"].Value, teamName);
-        var teamUrl = $"{_settings.BaseUrl}/Teams/{teamSlug}";
         var resourceList = resources.ToList();
-        var resourcesHtml = resourceList.Count > 0
-            ? "<p>Your team has the following resources:</p><ul>" +
-              string.Join("\n", resourceList.Select(r =>
-                  !string.IsNullOrEmpty(r.Url)
-                      ? $"<li><a href=\"{r.Url}\">{HtmlEncode(r.Name)}</a></li>"
-                      : $"<li>{HtmlEncode(r.Name)}</li>")) +
-              "</ul>"
-            : "";
-
-        var body = $"""
-            <h2>Welcome to {HtmlEncode(teamName)}!</h2>
-            <p>Dear {HtmlEncode(userName)},</p>
-            <p>You have been added to the <strong>{HtmlEncode(teamName)}</strong> team.</p>
-            {resourcesHtml}
-            <p><a href="{teamUrl}">View Team Page</a></p>
-            <p>The Humans Team</p>
-            """;
-
-        await SendEmailAsync(userEmail, subject, body, cancellationToken);
+        var content = _renderer.RenderAddedToTeam(userName, teamName, teamSlug, resourceList, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
         _metrics.RecordEmailSent("added_to_team");
+    }
+
+    /// <inheritdoc />
+    public async Task SendSignupRejectedAsync(
+        string userEmail,
+        string userName,
+        string? reason,
+        string? culture = null,
+        CancellationToken cancellationToken = default)
+    {
+        var content = _renderer.RenderSignupRejected(userName, reason, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
+        _metrics.RecordEmailSent("signup_rejected");
+    }
+
+    /// <inheritdoc />
+    public async Task SendTermRenewalReminderAsync(
+        string userEmail,
+        string userName,
+        string tierName,
+        string expiresAt,
+        string? culture = null,
+        CancellationToken cancellationToken = default)
+    {
+        var content = _renderer.RenderTermRenewalReminder(userName, tierName, expiresAt, culture);
+        await SendEmailAsync(userEmail, content.Subject, content.HtmlBody, cancellationToken);
+        _metrics.RecordEmailSent("term_renewal_reminder");
     }
 
     private async Task SendEmailAsync(
@@ -380,7 +277,7 @@ public class SmtpEmailService : IEmailService
             ? ""
             : $"""
                 <div style="background:#a0522d;color:#fff;text-align:center;font-size:11px;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;padding:4px 0;">
-                    {HtmlEncode(envLabel)} &bull; {HtmlEncode(envLabel)} &bull; {HtmlEncode(envLabel)}
+                    {System.Net.WebUtility.HtmlEncode(envLabel)} &bull; {System.Net.WebUtility.HtmlEncode(envLabel)} &bull; {System.Net.WebUtility.HtmlEncode(envLabel)}
                 </div>
                 """;
 
@@ -411,7 +308,6 @@ public class SmtpEmailService : IEmailService
 
     private static string HtmlToPlainText(string html)
     {
-        // Simple HTML to plain text conversion
         var text = html;
         text = System.Text.RegularExpressions.Regex.Replace(text, "<br\\s*/?>", "\n", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
         text = System.Text.RegularExpressions.Regex.Replace(text, "</p>", "\n\n", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
@@ -419,10 +315,5 @@ public class SmtpEmailService : IEmailService
         text = System.Text.RegularExpressions.Regex.Replace(text, "<[^>]+>", "", System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1));
         text = System.Net.WebUtility.HtmlDecode(text);
         return text.Trim();
-    }
-
-    private static string HtmlEncode(string text)
-    {
-        return System.Net.WebUtility.HtmlEncode(text);
     }
 }

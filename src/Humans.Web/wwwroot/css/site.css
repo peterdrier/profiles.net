@@ -9,6 +9,9 @@
    Loaded via <link> in _Layout.cshtml
    ------------- */
 
+/* Prevent layout shift when scrollbar appears/disappears */
+html { scrollbar-gutter: stable; }
+
 /* --- CSS Custom Properties (Design Tokens) --- */
 :root {
     /* Brand palette — Renaissance parchment & ink */
@@ -684,4 +687,9 @@ hr {
     *::after {
         transition-duration: 0.01ms !important;
     }
+}
+
+/* --- Clickable table rows --- */
+tr[data-href] {
+    cursor: pointer;
 }

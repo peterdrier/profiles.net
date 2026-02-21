@@ -6,26 +6,34 @@
 <div class="row mb-4">
     <div class="col">
         <div class="d-flex align-items-center">
-            @if (!string.IsNullOrEmpty(Model.ProfilePictureUrl))
-            {
-                <img src="@Model.ProfilePictureUrl" alt="" class="rounded-circle me-3" style="width: 64px; height: 64px;">
-            }
-            else
-            {
-                <div class="bg-secondary rounded-circle me-3 d-flex align-items-center justify-content-center text-white" style="width: 64px; height: 64px; font-size: 1.5rem;">
-                    @(string.IsNullOrEmpty(Model.DisplayName) ? "?" : Model.DisplayName[0])
-                </div>
-            }
+            <vc:user-avatar profile-picture-url="@Model.ProfilePictureUrl"
+                            display-name="@Model.DisplayName"
+                            size="64"
+                            css-class="me-3" />
             <div>
-                <h1 class="mb-0">@Html.Raw(string.Format(Localizer["Dashboard_Welcome"].Value, Model.DisplayName))</h1>
-                <span class="badge @StatusBadgeExtensions.GetMembershipStatusBadgeClass(Model.MembershipStatus) fs-6">@Model.MembershipStatus</span>
+                <h1 class="mb-0">@Html.Raw(string.Format(Localizer["Dashboard_Welcome"].Value, Html.Encode(Model.DisplayName)))</h1>
             </div>
         </div>
     </div>
 </div>
 
+@if (Model.IsRejected)
+{
+    <div class="alert alert-danger" role="alert">
+        <h5 class="alert-heading">@Localizer["Dashboard_RejectedTitle"]</h5>
+        <p class="mb-0">@Localizer["Dashboard_RejectedMessage"]</p>
+        @if (!string.IsNullOrEmpty(Model.RejectionReason))
+        {
+            <hr />
+            <p class="mb-0"><strong>@Localizer["Dashboard_RejectionReason"]:</strong> @Model.RejectionReason</p>
+        }
+    </div>
+}
+
 @if (!Model.IsVolunteerMember)
 {
+    var consentsComplete = Model.PendingConsents == 0 && Model.TotalRequiredConsents > 0;
+    var consentCheckCleared = Model.ConsentCheckStatus == Humans.Domain.Enums.ConsentCheckStatus.Cleared;
     <div class="alert alert-info" role="alert">
         <h5 class="alert-heading">@Localizer["Dashboard_OnboardingTitle"]</h5>
         <p class="mb-2">@Localizer["Dashboard_OnboardingDescription"]</p>
@@ -33,10 +41,12 @@
             <li class="@(Model.ProfileComplete ? "text-decoration-line-through text-muted" : "fw-bold")">
                 @Localizer["Dashboard_Step_Profile"]
             </li>
-            <li class="@(Model.PendingConsents == 0 && Model.TotalRequiredConsents > 0 ? "text-decoration-line-through text-muted" : Model.ProfileComplete ? "fw-bold" : "")">
+            <li class="@(consentsComplete ? "text-decoration-line-through text-muted" : Model.ProfileComplete ? "fw-bold" : "")">
                 @Localizer["Dashboard_Step_Consents"]
             </li>
-            <li>@Localizer["Dashboard_Step_Approval"]</li>
+            <li class="@(consentCheckCleared ? "text-decoration-line-through text-muted" : consentsComplete ? "fw-bold" : "")">
+                @Localizer["Dashboard_Step_ConsentCheck"]
+            </li>
         </ol>
     </div>
 }
@@ -101,6 +111,44 @@ else if (Model.PendingConsents > 0)
 
         @if (Model.IsVolunteerMember)
         {
+            @if (Model.MembershipTier != Humans.Domain.Enums.MembershipTier.Volunteer)
+            {
+                <div class="card mb-4">
+                    <div class="card-header">
+                        @Localizer["Dashboard_MembershipTier"]
+                        <span class="badge bg-primary ms-2">@Model.MembershipTier</span>
+                    </div>
+                    <div class="card-body">
+                        @if (Model.TermExpired)
+                        {
+                            <div class="alert alert-danger mb-2">
+                                <strong>@Localizer["Dashboard_TermExpired"]</strong>
+                            </div>
+                            <a asp-controller="Application" asp-action="Create" class="btn btn-sm btn-primary">@Localizer["Dashboard_RenewNow"]</a>
+                        }
+                        else if (Model.TermExpiresSoon)
+                        {
+                            <div class="alert alert-warning mb-2">
+                                @Html.Raw(string.Format(Localizer["Dashboard_TermExpiresSoon"].Value, Model.TermExpiresAt?.ToString("d MMM yyyy")))
+                            </div>
+                            <a asp-controller="Application" asp-action="Create" class="btn btn-sm btn-warning">@Localizer["Dashboard_RenewNow"]</a>
+                        }
+                        else if (Model.HasPendingApplication)
+                        {
+                            <p class="text-warning mb-2">@Localizer["Dashboard_TierApplicationPending"]</p>
+                        }
+                        else
+                        {
+                            <p class="text-success mb-2">@Localizer["Dashboard_TierActive"]</p>
+                        }
+                        @if (Model.TermExpiresAt.HasValue && !Model.TermExpired)
+                        {
+                            <p class="text-muted mb-0"><small>@Html.Raw(string.Format(Localizer["Dashboard_TermExpires"].Value, Model.TermExpiresAt.Value.ToString("d MMM yyyy")))</small></p>
+                        }
+                    </div>
+                </div>
+            }
+
             <div class="card mb-4">
                 <div class="card-header">@Localizer["Nav_Governance"]</div>
                 <div class="card-body">
@@ -109,7 +157,11 @@ else if (Model.PendingConsents > 0)
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <strong>@Localizer["Dashboard_LatestApplication"]</strong>
-                                <span class="badge @StatusBadgeExtensions.GetApplicationStatusBadgeClass(Model.LatestApplicationStatus)">@Model.LatestApplicationStatus</span>
+                                @if (Model.LatestApplicationTier.HasValue)
+                                {
+                                    <span class="badge bg-info me-1">@Model.LatestApplicationTier.Value</span>
+                                }
+                                <span class="badge @StatusBadgeExtensions.GetApplicationStatusBadgeClass(Model.LatestApplicationStatus)">@Localizer["ApplicationStatus_" + Model.LatestApplicationStatus]</span>
                             </div>
                             <small class="text-muted">@Model.LatestApplicationDate?.ToString("d MMM yyyy")</small>
                         </div>
@@ -133,10 +185,6 @@ else if (Model.PendingConsents > 0)
             <div class="card-header">@Localizer["Dashboard_YourMembership"]</div>
             <div class="card-body">
                 <dl class="row mb-0">
-                    <dt class="col-6">@Localizer["Common_Status"]</dt>
-                    <dd class="col-6">
-                        <span class="badge @StatusBadgeExtensions.GetMembershipStatusBadgeClass(Model.MembershipStatus)">@Model.MembershipStatus</span>
-                    </dd>
                     <dt class="col-6">@Localizer["Dashboard_MemberSince"]</dt>
                     <dd class="col-6">@Model.MemberSince.ToString("MMM yyyy")</dd>
                     @if (Model.LastLogin.HasValue)

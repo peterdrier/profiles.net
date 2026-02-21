@@ -7,12 +7,23 @@
     <div class="col-12" style="max-width: 900px;">
         <h1>@Localizer["ProfileEdit_Title"]</h1>
 
-        <div class="card">
-            <div class="card-body">
-                <form asp-action="Edit" method="post" enctype="multipart/form-data">
-                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+        <form asp-action="Edit" method="post" enctype="multipart/form-data">
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
-                    <h5>@Localizer["Profile_ProfilePicture"]</h5>
+            @* === Section ordering: Private first when fields are empty (new user) === *@
+            @if (Model.ShowPrivateFirst)
+            {
+                <partial name="_EditSectionPrivate" model="Model" />
+            }
+
+            @* ====================== *@
+            @* Section 1: General     *@
+            @* ====================== *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3>@Localizer["ProfileEdit_SectionGeneral"]</h3>
+
+                    <h6>@Localizer["Profile_ProfilePicture"]</h6>
                     <div class="mb-3">
                         <div class="d-flex align-items-center gap-3 mb-2">
                             @if (Model.HasCustomProfilePicture && !string.IsNullOrEmpty(Model.CustomProfilePictureUrl))
@@ -59,7 +70,7 @@
                     </div>
 
                     <hr />
-                    <h5>@Localizer["Profile_Location"]</h5>
+                    <h6>@Localizer["Profile_Location"]</h6>
 
                     <div class="mb-3">
                         <label for="locationSearch" class="form-label">@Localizer["ProfileEdit_City"]</label>
@@ -90,7 +101,7 @@
                     }
 
                     <hr />
-                    <h5>@Localizer["Profile_DateOfBirth"]</h5>
+                    <h6>@Localizer["Profile_DateOfBirth"]</h6>
                     <div class="row mb-3">
                         <div class="col-md-3">
                             <label asp-for="BirthdayMonth" class="form-label">@Localizer["Profile_Month"]</label>
@@ -115,11 +126,19 @@
                     </div>
 
                     <hr />
-                    <h5>@Localizer["Profile_ContactInformation"]</h5>
+                    <h6>@Localizer["Profile_ContactInformation"]</h6>
                     <p class="text-muted small mb-3">
                         @Localizer["ProfileEdit_ContactInfoHelp"]
                     </p>
 
+                    @if (Model.EditableContactFields.Count > 0)
+                    {
+                        <div class="row g-2 mb-1 text-muted small d-none d-md-flex">
+                            <div class="col-md-2">Type</div>
+                            <div class="col-md-3">Value</div>
+                            <div class="col-md-3">Visibility</div>
+                        </div>
+                    }
                     <div id="contactFieldsContainer">
                         @for (var i = 0; i < Model.EditableContactFields.Count; i++)
                         {
@@ -130,7 +149,6 @@
                                         <input type="hidden" name="EditableContactFields[@i].DisplayOrder" value="@i" class="display-order" />
 
                                         <div class="col-md-2">
-                                            <label class="form-label small">Type</label>
                                             @{
                                                 var fieldType = Model.EditableContactFields[i].FieldType;
                                             }
@@ -145,18 +163,15 @@
                                         </div>
 
                                         <div class="col-md-2 custom-label-col" style="display: @(Model.EditableContactFields[i].FieldType == ContactFieldType.Other ? "block" : "none");">
-                                            <label class="form-label small">Label</label>
                                             <input type="text" name="EditableContactFields[@i].CustomLabel" value="@Model.EditableContactFields[i].CustomLabel" class="form-control form-control-sm custom-label-input" placeholder="e.g., Discord" />
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label small">Value</label>
                                             <input type="text" name="EditableContactFields[@i].Value" value="@Model.EditableContactFields[i].Value" class="form-control form-control-sm contact-value-input" required placeholder="Enter contact info" />
                                             <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[@i].Value"></span>
                                         </div>
 
                                         <div class="col-md-3">
-                                            <label class="form-label small">Visibility</label>
                                             @{
                                                 var visibility = Model.EditableContactFields[i].Visibility;
                                             }
@@ -184,11 +199,21 @@
                     </button>
 
                     <div class="mb-3">
-                        <a asp-action="Emails" class="btn btn-outline-secondary">
-                            <i class="fa-solid fa-envelope me-1"></i>
-                            @Localizer["Emails_ManageEmails"]
-                        </a>
-                        <div class="form-text">@Localizer["Emails_ManageEmailsHelp"]</div>
+                        @if (Model.IsInitialSetup)
+                        {
+                            <p class="text-muted small mb-0">
+                                <i class="fa-solid fa-envelope me-1"></i>
+                                @Localizer["Emails_ManageLater"]
+                            </p>
+                        }
+                        else
+                        {
+                            <a asp-action="Emails" class="btn btn-outline-secondary">
+                                <i class="fa-solid fa-envelope me-1"></i>
+                                @Localizer["Emails_ManageEmails"]
+                            </a>
+                            <div class="form-text">@Localizer["Emails_ManageEmailsHelp"]</div>
+                        }
                     </div>
 
                     <hr />
@@ -199,16 +224,17 @@
                         <span asp-validation-for="Bio" class="text-danger"></span>
                         <div class="form-text">@Localizer["ProfileEdit_BioHelp"]</div>
                     </div>
+                </div>
+            </div>
 
-                    <div class="mb-3">
-                        <label asp-for="ContributionInterests" class="form-label">@Localizer["Profile_ContributionInterests"]</label>
-                        <textarea asp-for="ContributionInterests" class="form-control" rows="3"></textarea>
-                        <span asp-validation-for="ContributionInterests" class="text-danger"></span>
-                        <div class="form-text">@Localizer["ProfileEdit_ContributionInterestsHelp"]</div>
-                    </div>
+            @* ========================== *@
+            @* Section 2: Contributor     *@
+            @* ========================== *@
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3>@Localizer["ProfileEdit_SectionContributor"]</h3>
 
-                    <hr />
-                    <h5>@Localizer["Profile_BurnerCV"]</h5>
+                    <h6>@Localizer["Profile_BurnerCV"]</h6>
                     <p class="text-muted small mb-3">
                         @Localizer["ProfileEdit_BurnerCVHelp"]
                     </p>
@@ -251,71 +277,140 @@
                         <i class="fa-solid fa-plus me-1"></i> @Localizer["ProfileEdit_AddEntry"]
                     </button>
 
-                    <hr />
-                    <h5 class="text-muted"><i class="fa-solid fa-lock me-1"></i> @Localizer["Profile_BoardInformation"]</h5>
-                    <p class="text-muted small mb-3">@Localizer["Profile_OnlyVisibleToYouAndBoard"]</p>
-
-                    <h5>@Localizer["Profile_LegalName"]</h5>
-                    <p class="text-muted small mb-3">
-                        @Localizer["ProfileEdit_LegalNameHelp"]
-                    </p>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label asp-for="FirstName" class="form-label"></label>
-                            <input asp-for="FirstName" class="form-control" />
-                            <span asp-validation-for="FirstName" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-6">
-                            <label asp-for="LastName" class="form-label"></label>
-                            <input asp-for="LastName" class="form-control" />
-                            <span asp-validation-for="LastName" class="text-danger"></span>
-                        </div>
+                    <div class="form-check mb-3" id="noPriorBurnContainer">
+                        <input type="checkbox" asp-for="NoPriorBurnExperience" class="form-check-input" id="noPriorBurnCheckbox" />
+                        <label asp-for="NoPriorBurnExperience" class="form-check-label">@Localizer["Profile_NoPriorBurnExperience"]</label>
+                        <span asp-validation-for="NoPriorBurnExperience" class="text-danger d-block"></span>
                     </div>
 
                     <hr />
-                    <h5>@Localizer["Profile_EmergencyContact"]</h5>
-                    <p class="text-muted small mb-3">
-                        @Localizer["ProfileEdit_EmergencyContactHelp"]
-                    </p>
 
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <label asp-for="EmergencyContactName" class="form-label">@Localizer["Profile_EmergencyContactName"]</label>
-                            <input asp-for="EmergencyContactName" class="form-control" />
-                            <span asp-validation-for="EmergencyContactName" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="EmergencyContactPhone" class="form-label">@Localizer["Profile_EmergencyContactPhone"]</label>
-                            <input asp-for="EmergencyContactPhone" class="form-control" type="tel" />
-                            <span asp-validation-for="EmergencyContactPhone" class="text-danger"></span>
-                        </div>
-                        <div class="col-md-4">
-                            <label asp-for="EmergencyContactRelationship" class="form-label">@Localizer["Profile_EmergencyContactRelationship"]</label>
-                            <input asp-for="EmergencyContactRelationship" class="form-control" placeholder="e.g., Partner, Parent" />
-                            <span asp-validation-for="EmergencyContactRelationship" class="text-danger"></span>
-                        </div>
-                    </div>
-
-                    <hr />
-                    <h5>@Localizer["Profile_BoardNotes"]</h5>
-                    <p class="text-muted small mb-3">
-                        @Localizer["ProfileEdit_BoardNotesHelp"]
-                    </p>
                     <div class="mb-3">
-                        <textarea asp-for="BoardNotes" class="form-control" rows="3"></textarea>
-                        <span asp-validation-for="BoardNotes" class="text-danger"></span>
+                        <label asp-for="ContributionInterests" class="form-label">@Localizer["Profile_ContributionInterests"]</label>
+                        <textarea asp-for="ContributionInterests" class="form-control" rows="3"></textarea>
+                        <span asp-validation-for="ContributionInterests" class="text-danger"></span>
+                        <div class="form-text">@Localizer["ProfileEdit_ContributionInterestsHelp"]</div>
                     </div>
-
-                    <hr />
-
-                    <div class="d-flex justify-content-between">
-                        <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
-                        <button type="submit" class="btn btn-primary">@Localizer["Common_Save"]</button>
-                    </div>
-                </form>
+                </div>
             </div>
-        </div>
+
+            @* ========================== *@
+            @* Section 3: Application     *@
+            @* ========================== *@
+            @if (Model.IsInitialSetup)
+            {
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h3>@Localizer["Profile_MembershipTier"]</h3>
+                        <p class="text-muted small mb-3">@Localizer["ProfileEdit_TierDescription"]</p>
+
+                        @{
+                            var isVolunteer = Model.SelectedTier == Humans.Domain.Enums.MembershipTier.Volunteer;
+                            var isColaborador = Model.SelectedTier == Humans.Domain.Enums.MembershipTier.Colaborador;
+                            var isAsociado = Model.SelectedTier == Humans.Domain.Enums.MembershipTier.Asociado;
+                        }
+                        <div class="mb-3">
+                            <div class="form-check mb-3">
+                                @if (Model.IsTierLocked)
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Volunteer" id="tierVolunteer" checked="@isVolunteer" disabled />
+                                }
+                                else
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Volunteer" id="tierVolunteer" checked="@isVolunteer" />
+                                }
+                                <label class="form-check-label" for="tierVolunteer">
+                                    <strong>Volunteer</strong> — <span class="text-muted">@Localizer["ProfileEdit_TierVolunteerDesc"]</span>
+                                </label>
+                            </div>
+                            <div class="form-check mb-3">
+                                @if (Model.IsTierLocked)
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Colaborador" id="tierColaborador" checked="@isColaborador" disabled />
+                                }
+                                else
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Colaborador" id="tierColaborador" checked="@isColaborador" />
+                                }
+                                <label class="form-check-label" for="tierColaborador">
+                                    <strong>Colaborador</strong> — <span class="text-muted">@Localizer["ProfileEdit_TierColaboradorDesc"]</span>
+                                </label>
+                            </div>
+                            <div class="form-check mb-3">
+                                @if (Model.IsTierLocked)
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Asociado" id="tierAsociado" checked="@isAsociado" disabled />
+                                }
+                                else
+                                {
+                                    <input class="form-check-input" type="radio" name="SelectedTier" value="Asociado" id="tierAsociado" checked="@isAsociado" />
+                                }
+                                <label class="form-check-label" for="tierAsociado">
+                                    <strong>Asociado</strong> <span class="text-muted">(@Localizer["ProfileEdit_TierAsociadoSubtitle"])</span> — <span class="text-muted">@Localizer["ProfileEdit_TierAsociadoDesc"]</span>
+                                </label>
+                            </div>
+                            <p class="text-muted small mb-0"><em>@Localizer["ProfileEdit_TierChangeNote"]</em></p>
+                            @if (Model.IsTierLocked)
+                            {
+                                <div class="form-text text-warning mt-2">@Localizer["ProfileEdit_TierLocked"]</div>
+                            }
+                        </div>
+
+                        <div id="applicationSection" style="display: @(Model.SelectedTier != Humans.Domain.Enums.MembershipTier.Volunteer ? "block" : "none");">
+                            <div class="card bg-light mb-3">
+                                <div class="card-body">
+                                    <h6>@Localizer["ProfileEdit_ApplicationSection"]</h6>
+                                    <p class="text-muted small mb-3">@Localizer["ProfileEdit_ApplicationDescription"]</p>
+
+                                    <div class="mb-3">
+                                        <label asp-for="ApplicationMotivation" class="form-label">@Localizer["Profile_Motivation"]</label>
+                                        <textarea asp-for="ApplicationMotivation" class="form-control" rows="4" placeholder="@Localizer["ProfileEdit_MotivationPlaceholder"].Value"></textarea>
+                                        <span asp-validation-for="ApplicationMotivation" class="text-danger"></span>
+                                        <div class="form-text">@Localizer["ProfileEdit_MotivationHelp"]</div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label asp-for="ApplicationAdditionalInfo" class="form-label">@Localizer["Profile_AdditionalInfo"]</label>
+                                        <textarea asp-for="ApplicationAdditionalInfo" class="form-control" rows="3"></textarea>
+                                        <span asp-validation-for="ApplicationAdditionalInfo" class="text-danger"></span>
+                                    </div>
+
+                                    <div id="asociadoQuestionsInline" style="display: @(Model.SelectedTier == Humans.Domain.Enums.MembershipTier.Asociado ? "block" : "none");">
+                                        <hr />
+                                        <h6>@Localizer["Application_AsociadoQuestionsHeader"]</h6>
+
+                                        <div class="mb-3">
+                                            <label asp-for="ApplicationSignificantContribution" class="form-label">@Localizer["Application_SignificantContribution"]</label>
+                                            <textarea asp-for="ApplicationSignificantContribution" class="form-control" rows="4" placeholder="@Localizer["Application_SignificantContributionPlaceholder"].Value"></textarea>
+                                            <span asp-validation-for="ApplicationSignificantContribution" class="text-danger"></span>
+                                        </div>
+
+                                        <div class="mb-3">
+                                            <label asp-for="ApplicationRoleUnderstanding" class="form-label">@Localizer["Application_RoleUnderstanding"]</label>
+                                            <textarea asp-for="ApplicationRoleUnderstanding" class="form-control" rows="4" placeholder="@Localizer["Application_RoleUnderstandingPlaceholder"].Value"></textarea>
+                                            <span asp-validation-for="ApplicationRoleUnderstanding" class="text-danger"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @* ========================== *@
+            @* Section 4: Private         *@
+            @* ========================== *@
+            @if (!Model.ShowPrivateFirst)
+            {
+                <partial name="_EditSectionPrivate" model="Model" />
+            }
+
+            <div class="d-flex justify-content-between">
+                <a asp-action="Index" class="btn btn-outline-secondary">@Localizer["Common_Cancel"]</a>
+                <button type="submit" class="btn btn-primary">@Localizer["Common_Save"]</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -451,7 +546,6 @@
                                 <input type="hidden" name="EditableContactFields[${index}].DisplayOrder" value="${index}" class="display-order" />
 
                                 <div class="col-md-2">
-                                    <label class="form-label small">Type</label>
                                     <select name="EditableContactFields[${index}].FieldType" class="form-select form-select-sm field-type-select">
                                         <option value="Phone">Phone</option>
                                         <option value="Signal">Signal</option>
@@ -463,18 +557,15 @@
                                 </div>
 
                                 <div class="col-md-2 custom-label-col" style="display: none;">
-                                    <label class="form-label small">Label</label>
                                     <input type="text" name="EditableContactFields[${index}].CustomLabel" class="form-control form-control-sm custom-label-input" placeholder="e.g., Discord" />
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small">Value</label>
                                     <input type="text" name="EditableContactFields[${index}].Value" class="form-control form-control-sm contact-value-input" placeholder="Enter contact info" />
                                     <span class="text-danger small field-validation-error" data-valmsg-for="EditableContactFields[${index}].Value"></span>
                                 </div>
 
                                 <div class="col-md-3">
-                                    <label class="form-label small">Visibility</label>
                                     <select name="EditableContactFields[${index}].Visibility" class="form-select form-select-sm">
                                         <option value="AllActiveProfiles" selected>All active members</option>
                                         <option value="MyTeams">My teams (+ leads & board)</option>
@@ -615,6 +706,47 @@
                 container.appendChild(row);
                 setupHistoryRow(row);
                 row.querySelector('input[type="date"]').focus();
+            });
+        })();
+    </script>
+    <script>
+        // Tier selection show/hide for application section and Asociado questions
+        (function() {
+            const tierRadios = document.querySelectorAll('input[name="SelectedTier"]');
+            const appSection = document.getElementById('applicationSection');
+            const asociadoQuestions = document.getElementById('asociadoQuestionsInline');
+            if (!appSection || tierRadios.length === 0) return;
+
+            tierRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    appSection.style.display = this.value === 'Volunteer' ? 'none' : 'block';
+                    if (asociadoQuestions) {
+                        asociadoQuestions.style.display = this.value === 'Asociado' ? 'block' : 'none';
+                        // Clear hidden fields so stale values aren't submitted
+                        if (this.value !== 'Asociado') {
+                            asociadoQuestions.querySelectorAll('textarea').forEach(t => t.value = '');
+                        }
+                    }
+                });
+            });
+        })();
+    </script>
+    <script>
+        // Client-side CV validation: block submit if no CV rows and checkbox unchecked
+        (function() {
+            const form = document.querySelector('form[action*="Edit"]');
+            const checkbox = document.getElementById('noPriorBurnCheckbox');
+            const historyContainer = document.getElementById('volunteerHistoryContainer');
+            if (!form || !checkbox || !historyContainer) return;
+
+            form.addEventListener('submit', function(e) {
+                const hasRows = historyContainer.querySelectorAll('.volunteer-history-row').length > 0;
+                if (!checkbox.checked && !hasRows) {
+                    e.preventDefault();
+                    // Focus the checkbox area
+                    checkbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    checkbox.focus();
+                }
             });
         })();
     </script>

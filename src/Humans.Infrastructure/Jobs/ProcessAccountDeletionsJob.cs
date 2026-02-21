@@ -90,6 +90,7 @@ public class ProcessAccountDeletionsJob
                         await _emailService.SendAccountDeletedAsync(
                             originalEmail,
                             originalName,
+                            user.PreferredLanguage,
                             cancellationToken);
                     }
 

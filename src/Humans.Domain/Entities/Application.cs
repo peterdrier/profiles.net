@@ -5,7 +5,10 @@ using Stateless;
 namespace Humans.Domain.Entities;
 
 /// <summary>
-/// Membership application entity with state machine workflow.
+/// Tier application entity with state machine workflow.
+/// Used for Colaborador and Asociado applications (never Volunteer).
+/// During initial signup, created inline alongside the profile.
+/// After onboarding, created via the dedicated Application route.
 /// </summary>
 public class Application
 {
@@ -27,6 +30,11 @@ public class Application
     public User User { get; set; } = null!;
 
     /// <summary>
+    /// The membership tier being applied for (Colaborador or Asociado — never Volunteer).
+    /// </summary>
+    public MembershipTier MembershipTier { get; set; }
+
+    /// <summary>
     /// Current status of the application.
     /// </summary>
     public ApplicationStatus Status { get; private set; } = ApplicationStatus.Submitted;
@@ -40,6 +48,16 @@ public class Application
     /// Additional information provided by the applicant.
     /// </summary>
     public string? AdditionalInfo { get; set; }
+
+    /// <summary>
+    /// Asociado-only: the applicant's most significant contribution to Nowhere (or another Burn).
+    /// </summary>
+    public string? SignificantContribution { get; set; }
+
+    /// <summary>
+    /// Asociado-only: the applicant's understanding of the asociado role and why they want it.
+    /// </summary>
+    public string? RoleUnderstanding { get; set; }
 
     /// <summary>
     /// The UI language the applicant was using when they submitted the application (ISO 639-1 code, e.g. "es", "en").
@@ -82,9 +100,38 @@ public class Application
     public string? ReviewNotes { get; private set; }
 
     /// <summary>
+    /// When the membership term expires. Set on approval: Dec 31 of the appropriate odd year.
+    /// Null until approved. Only applies to Colaborador/Asociado.
+    /// </summary>
+    public LocalDate? TermExpiresAt { get; set; }
+
+    /// <summary>
+    /// Date of the Board meeting where the decision was made.
+    /// Required when finalizing a Board vote.
+    /// </summary>
+    public LocalDate? BoardMeetingDate { get; set; }
+
+    /// <summary>
+    /// Board's collective decision note. Required for rejection, optional for approval.
+    /// This is the only record of the Board's reasoning — individual votes are deleted (GDPR).
+    /// </summary>
+    public string? DecisionNote { get; set; }
+
+    /// <summary>
+    /// When the renewal reminder email was last sent for this application's term.
+    /// Used to prevent sending duplicate reminders.
+    /// </summary>
+    public Instant? RenewalReminderSentAt { get; set; }
+
+    /// <summary>
     /// Navigation property to state history.
     /// </summary>
     public ICollection<ApplicationStateHistory> StateHistory { get; } = new List<ApplicationStateHistory>();
+
+    /// <summary>
+    /// Navigation property to Board votes (transient — deleted on finalization).
+    /// </summary>
+    public ICollection<BoardVote> BoardVotes { get; } = new List<BoardVote>();
 
     /// <summary>
     /// Gets the state machine for this application.
@@ -99,13 +146,9 @@ public class Application
             s => Status = s);
 
         machine.Configure(ApplicationStatus.Submitted)
-            .Permit(ApplicationTrigger.StartReview, ApplicationStatus.UnderReview)
-            .Permit(ApplicationTrigger.Withdraw, ApplicationStatus.Withdrawn);
-
-        machine.Configure(ApplicationStatus.UnderReview)
             .Permit(ApplicationTrigger.Approve, ApplicationStatus.Approved)
             .Permit(ApplicationTrigger.Reject, ApplicationStatus.Rejected)
-            .Permit(ApplicationTrigger.RequestMoreInfo, ApplicationStatus.Submitted)
+            .PermitReentry(ApplicationTrigger.RequestMoreInfo)
             .Permit(ApplicationTrigger.Withdraw, ApplicationStatus.Withdrawn);
 
         machine.Configure(ApplicationStatus.Approved)
@@ -118,20 +161,6 @@ public class Application
             .OnEntry(() => ResolvedAt = SystemClock.Instance.GetCurrentInstant());
 
         return machine;
-    }
-
-    /// <summary>
-    /// Starts the review process for this application.
-    /// </summary>
-    /// <param name="reviewerUserId">The ID of the reviewer.</param>
-    /// <param name="clock">The clock to use for timestamps.</param>
-    public void StartReview(Guid reviewerUserId, IClock clock)
-    {
-        StateMachine.Fire(ApplicationTrigger.StartReview);
-        ReviewedByUserId = reviewerUserId;
-        ReviewStartedAt = clock.GetCurrentInstant();
-        UpdatedAt = clock.GetCurrentInstant();
-        AddStateHistory(ApplicationStatus.UnderReview, reviewerUserId, clock);
     }
 
     /// <summary>
@@ -193,7 +222,6 @@ public class Application
     {
         StateHistory.Add(new ApplicationStateHistory
         {
-            Id = Guid.NewGuid(),
             ApplicationId = Id,
             Status = newStatus,
             ChangedByUserId = actorUserId,

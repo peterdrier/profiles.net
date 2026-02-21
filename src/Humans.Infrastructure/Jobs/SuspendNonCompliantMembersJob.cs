@@ -94,6 +94,7 @@ public class SuspendNonCompliantMembersJob
                         effectiveEmail,
                         user.DisplayName,
                         "Missing required document consent (grace period expired)",
+                        user.PreferredLanguage,
                         cancellationToken);
                 }
 

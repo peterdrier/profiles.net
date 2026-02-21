@@ -55,7 +55,7 @@
             <div class="card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span>@Localizer["Governance_YourApplication"]</span>
-                    <span class="badge @Model.ApplicationStatusBadgeClass">@Model.ApplicationStatus</span>
+                    <span class="badge @Model.ApplicationStatusBadgeClass">@Localizer["ApplicationStatus_" + Model.ApplicationStatus]</span>
                 </div>
                 <div class="card-body">
                     <dl class="row mb-0">
@@ -69,7 +69,7 @@
                         }
                     </dl>
 
-                    @if (Model.ApplicationStatus == "Submitted" || Model.ApplicationStatus == "UnderReview")
+                    @if (Model.ApplicationStatus == "Submitted")
                     {
                         <hr />
                         <p class="text-muted mb-0">@Localizer["Governance_UnderReviewMessage"]</p>
@@ -158,6 +158,17 @@
                 </ul>
                 <p class="mb-2 text-muted"><small>@Localizer["Governance_BoardReviews"]</small></p>
                 <p class="mb-0 text-muted"><small>@Localizer["Governance_NoteNotRequired"]</small></p>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">@Localizer["Governance_MemberCounts"]</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-8">@Localizer["Governance_Colaboradores"]</dt>
+                    <dd class="col-4 text-end mb-2">@Model.ColaboradorCount</dd>
+                    <dt class="col-8">@Localizer["Governance_Asociados"]</dt>
+                    <dd class="col-4 text-end mb-0">@Model.AsociadoCount</dd>
+                </dl>
             </div>
         </div>
     </div>

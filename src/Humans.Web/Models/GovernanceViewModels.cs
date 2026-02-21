@@ -13,4 +13,8 @@ public class GovernanceIndexViewModel
     public DateTime? ApplicationResolvedAt { get; set; }
     public string? ApplicationStatusBadgeClass { get; set; }
     public bool CanApply { get; set; }
+
+    // Tier member counts for the sidebar
+    public int ColaboradorCount { get; set; }
+    public int AsociadoCount { get; set; }
 }

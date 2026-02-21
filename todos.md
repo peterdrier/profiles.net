@@ -1,7 +1,7 @@
 # Release TODOs
 
 Audit date: 2026-02-05
-Last synced: 2026-02-17T22:30
+Last synced: 2026-02-21T14:30
 
 ---
 
@@ -9,28 +9,62 @@ Last synced: 2026-02-17T22:30
 
 ### Priority 1: GDPR & Security (Pre-Launch Blockers)
 
+#### #56: Add site policies page for app-specific legal disclosures
+Dedicated page for app-specific operational disclosures (delegated coordinator roles + enhanced access, contact point, visibility model, automated provisioning) with multi-language privacy policy viewer below (same tabbed UX as Governance statutes). Replaces current hardcoded English-only Privacy page.
+
 ---
 
-### Priority 2: User-Facing Features & Improvements
+### Priority 2: Quick Fixes (do now, standalone)
 
-#### #26: Add custom Prometheus metrics to /metrics endpoint
-`Humans.Metrics` meter is registered but emits nothing. Add `ObservableGauge` callbacks for membership status, compliance risk, role distribution, team/resource health. Add counters for emails sent, admin actions, job runs. Use `IMemoryCache` for gauge queries.
+#### QA-01: "Approved" badge not localized in non-English locales
+On the Spanish dashboard (and likely other locales), the "Approved" badge in the Governance section stays in English. Should be "Aprobado" / "Genehmigt" / etc.
+**Where:** Dashboard view, Governance card — badge rendering
+
+#### QA-02: `/Application` page title says "Governance"
+Navigating to `/Application` renders a page titled "Governance" showing only the application status card (missing statutes and community stats). Should use a distinct title like "My Applications" to differentiate from `/Governance`.
+**Where:** `Application/Index.cshtml` or routing
+
+#### QA-03: Language names missing diacritics in language switcher
+"Espanol" should be "Español" and "Francais" should be "Français" in the language dropdown.
+**Where:** `_Layout.cshtml` or language configuration
+
+#### QA-04: Enable custom error pages in Development mode
+`UseStatusCodePagesWithReExecute` is inside the `!IsDevelopment()` block (`Program.cs:299-304`), so 404s return bare empty responses in dev/QA. Move it outside the conditional so the friendly 404 page shows in all environments.
+**Where:** `Program.cs:299-304`
+
+---
+
+---
+
+### Priority 4: Onboarding Redesign Epic (#52) — IMPLEMENTED, STABILIZING
+
+Core implementation landed in `8a9ee4e` with 5 follow-up fix commits (`67eb438`, `6c40f27`, `46a9046`, `f638a46`, `a49e27e`). Needs QA validation.
+
+#### #52: Redesign onboarding with three membership tiers (EPIC) — IMPLEMENTED
+Three tiers implemented: Volunteer (auto-accepted after consent check), Colaborador (board vote), Asociado (board vote + specific questions). Tier selection at signup, MembershipCalculator computes status. Remaining: QA testing, edge cases.
+
+#### #54: Add Consent and Volunteer Coordinator roles with onboarding gate — IMPLEMENTED
+Consent Coordinator role implemented with onboarding gate. Consent check must be cleared before volunteer is auto-approved. Remaining: QA testing.
+
+#### #53: Add board voting system for application reviews — IMPLEMENTED
+Board voting dashboard implemented with Yay/Maybe/No/Abstain votes, per-board-member columns, approve/reject actions. Remaining: QA testing.
+
+#### #46 Part 2: Add reject signup action — IMPLEMENTED
+`RejectSignup` endpoint implemented in `OnboardingReviewController`. Reject button, optional reason, email notification, audit log all in place. Committed as part of onboarding epic.
+
+---
+
+### Priority 5: UI/Navigation Improvements
 
 #### #14: Drive Activity Monitor: resolve people/ IDs to email addresses
 Drive Activity API returns `people/` IDs instead of email addresses. Need to resolve these via the People API for meaningful audit display.
 
-#### #28: Finish asociado application workflow for launch
-Localization gaps (English remains in some views), verify `Application.Language` tracking, test all state machine transitions, add feature gate to open/close applications.
-
 #### #33: Add Discord integration to sync team/role-based server roles via API
 Discord bot integration to automatically assign/remove Discord server roles based on Humans team memberships and role assignments. Configurable team→Discord role mappings, drift detection, audit logging, and manual sync UI at `/Admin/DiscordSync`.
 
-#### #27: Revoke team memberships immediately on deletion request
-Currently users keep full access during the 30-day deletion grace period. Should immediately remove from all teams and end role assignments on request. Returning users must re-consent and rejoin. Google deprovisioning via normal sync job.
-
 ---
 
-### Priority 3: Data Integrity & Security
+### Priority 6: Data Integrity & Security
 
 #### P1-09: Enforce uniqueness for active role assignments (DB-level)
 App-layer overlap guard added (`RoleAssignmentService.HasOverlappingAssignmentAsync`), but DB-level exclusion constraint on `tsrange(valid_from, valid_to)` is still deferred. Low urgency since admin UI validates before insert.
@@ -41,10 +75,6 @@ App-layer overlap guard added (`RoleAssignmentService.HasOverlappingAssignmentAs
 **Where:** `ProcessGoogleSyncOutboxJob.cs:41-52`
 **Source:** Multi-model production readiness assessment (2026-02-16), Codex unique finding
 
-#### P1-23: Tighten CSP — remove `unsafe-inline`
-`Content-Security-Policy` includes `script-src 'self' 'unsafe-inline'` which weakens XSS protection. Move to nonce-based CSP for inline scripts.
-**Where:** `Program.cs:328-330`
-**Source:** Multi-model production readiness assessment (2026-02-16), consensus Claude + Codex
 
 #### P1-13: Apply configured Google group settings during provisioning
 `GoogleWorkspaceSettings.GroupSettings` properties (WhoCanViewMembership, AllowExternalMembers, etc.) are defined but never applied. Groups get Google defaults. Per R-04, external members must be allowed.
@@ -52,47 +82,25 @@ App-layer overlap guard added (`RoleAssignmentService.HasOverlappingAssignmentAs
 
 ---
 
-### Priority 4: Quality & Compliance
+### Priority 7: Quality & Compliance
 
-#### P2-09: PII logging policy and redaction
-Structured logs include emails and user IDs in plaintext. No redaction or classification policy. GDPR data minimization gap.
-
-#### P2-03: Re-enable vulnerable package warning visibility
-`NU1902`/`NU1903` warnings suppressed globally in `Directory.Packages.props`. Vulnerable dependencies won't surface in builds.
-
-#### P2-07: Add integration tests for critical paths
-Integration test project exists with TestContainers but has 0 tests. Critical compliance paths (consent, auth, deletion) untested end-to-end.
 
 ---
 
-### Priority 5: Technical Debt (Low Priority)
+### Priority 8: Technical Debt (Low Priority)
 
 #### G-03: N+1 queries in GoogleWorkspaceSyncService
 Helper methods re-query resources already loaded by parent methods. Redundant DB round-trips.
 
-#### #37: Add ProfileCard ViewComponent to consolidate profile rendering
-Profile info is rendered independently in `/Profile`, `/Human/{id}`, and `/Admin/Humans/{id}` with duplicated controller logic and drifting ViewModels. Create a `ProfileCardViewComponent` that owns data fetching, permission checks, and rendering for the shared profile card. Admin-only sections (roles, audit, actions) stay outside the component.
-
-#### #38: Add TempDataAlerts ViewComponent to replace 20 duplicated alert blocks
-Same success/error/info dismissible alert banner copy-pasted across 20 views. Replace with `<vc:temp-data-alerts />` that reads TempData directly.
-
-#### #39: Add UserAvatar ViewComponent to consolidate avatar rendering
-Photo-or-initials-fallback avatar pattern duplicated in 8 views at varying sizes (32px–160px). Parameterize by size and optional bg-class.
-
-#### #40: Add RoleBadge partial to consolidate Lead/Member pills
-Lead/Member badge logic duplicated in 5 views with a color inconsistency (bg-warning vs bg-primary for Lead). Extract shared partial.
-
-#### #41: Add ApplicationHistory partial to deduplicate timeline rendering
-Application status history timeline near-identical in `Application/Details` and `Admin/ApplicationDetail`. Extract shared partial, fix localization inconsistency.
-
-#### G-06b: Wire remaining views to use StatusBadgeExtensions
-`StatusBadgeExtensions.GetMembershipStatusBadgeClass()` exists but `Profile/Index.cshtml` and `Admin/Humans.cshtml` use inline switch statements instead. Wire them to the existing extension method for consistency.
 
 #### G-07: AdminController over-fetches data
 `HumanDetail` loads ALL applications and consent records via `Include` when it only needs a few. `Humans` list relies on implicit Include behavior.
 
-#### G-08: Centralize admin business logic into services
-Legal docs slice extracted to `AdminLegalDocumentsController` + `IAdminLegalDocumentService`. Remaining: role management, member management, application review slices still in `AdminController`.
+#### #59 / G-08: Extract duplicated controller business logic into shared services
+Legal docs slice extracted to `AdminLegalDocumentsController` + `IAdminLegalDocumentService`. Application approve/reject extracted to `IApplicationDecisionService`. Remaining: signup rejection (duplicated in Admin + OnboardingReview), volunteer approval (duplicated in Admin + OnboardingReview), and extending `IRoleAssignmentService` with assign/end/reassign orchestration. Consolidate into fewest services needed — extend existing interfaces where possible.
+
+#### #60: Replace magic string ViewModel properties with domain enums
+~50+ sites across 20+ ViewModels, 10+ controllers, and 3 views use `.ToString()` on domain enums instead of passing typed enums through. Affects `ApplicationStatus`, `MembershipStatus`, `TeamMemberRole`, `SystemTeamType`, `GoogleResourceType`, `TeamJoinRequestStatus`, `AuditAction`, `GoogleSyncSource`, `MembershipTier`. Also fix `StatusBadgeExtensions` to accept enums and add coding rules to prevent recurrence.
 
 #### G-09: Team membership caching
 Every page load queries team memberships. At ~500 users, in-memory cache with short TTL would eliminate most DB hits.
@@ -135,6 +143,12 @@ Admin email previews (`/Admin/EmailPreview`) use duplicated static HTML in `Admi
 ---
 
 ## Completed
+
+### #26: Wire up custom Prometheus metrics DONE
+Eagerly resolve HumansMetricsService at startup, add RecordJobRun to 3 uninstrumented jobs, add google_sync_outbox_pending gauge. Committed `5a99d19`.
+
+### #27: Revoke team memberships immediately on deletion request DONE
+Immediately revokes all team memberships and ends role assignments on deletion request. Returning users must re-consent and rejoin. Google deprovisioning via normal sync job. Committed `966e2a6`.
 
 ### #32: Fix Lead role — remove standalone RoleAssignment DONE
 Removed `RoleNames.Lead` from assignable roles, data migration to soft-end orphaned assignments, fixed Leads team sync on role change, consolidated consent eligibility into `GetRequiredTeamIdsForUserAsync`, fixed HumanController missing ViewModel properties, added 8 unit tests. Committed `5acfa4f`.
@@ -247,3 +261,33 @@ All three call sites (`SyncTeamGroupMembersAsync`, `PreviewGroupSyncAsync`, `Lis
 - G-02: N+1 query in SendReConsentReminderJob (`3966e79`)
 - G-04: Google Drive provisioning idempotency (`4243ca7`)
 - G-06: SystemTeamSyncJob sequential execution (resolved by design)
+
+### Batch: UI consolidation, security hardening, integration tests DONE
+Committed 2026-02-18 in 3 commits:
+
+**UI consolidation** (`3a2e444`): TempDataAlertsViewComponent replaces 19 duplicated alert blocks (#38). UserAvatarViewComponent replaces 9 avatar patterns (#39). ProfileCardViewComponent with dedicated ViewModel replaces 3 duplicated profile renderings (#37). _RoleBadge partial fixes Lead color inconsistency across 5 views (#40). _ApplicationHistory partial deduplicates timeline in 2 views (#41). StatusBadgeExtensions wired in Profile/Index + Admin/Humans, added "Pending Approval" case (G-06b). Net -150 lines across 37 files.
+
+**Security hardening** (`dbdcf58`): CSP nonce middleware + NonceTagHelper replace `unsafe-inline` in script-src (P1-23). Inline onclick/onchange handlers converted to addEventListener in LegalDocuments, Resources, Emails. PII redaction Serilog enricher masks emails and PII in structured logs (P2-09). P2-03 was already resolved (NU1902/NU1903 not suppressed).
+
+**Integration tests** (`b6c43c1`): WebApplicationFactory with TestContainers PostgreSQL, 16 tests across health endpoints, anonymous access controls, and security headers (P2-07).
+
+### #44 + #46 Part 1: Consent tab language + admin terminology DONE
+Committed `a53696d`. #44: Consent review checkbox text now follows the active document tab via JS tab-switch handler with per-language translations from ResourceManager. Non-Spanish tabs show bilingual legal note (tab language + Spanish italic). #46 Part 1: Replaced "Volunteer"/"Member" with "Human" in 7 admin button/message keys across all 5 locales (EN/ES/DE/FR/IT) + 3 log messages in AdminController.
+
+### #49: Reorganize profile edit into four named sections DONE
+Committed `2e98cbd`. Restructured Profile Edit from a single flat card into 4 distinct cards within one form: General Information, Contributor Information, Application (initial setup only), Private Information. Folds in #45 (Private section shown first when private fields are empty) and #47 (require Burner CV or "no prior burn experience" checkbox). Renamed "Legal First Name" → "Legal First Name(s)" in all 5 locales. Added `NoPriorBurnExperience` domain property with EF migration, client-side + server-side CV validation, `ShowPrivateFirst` conditional ordering, and `_EditSectionPrivate.cshtml` partial.
+
+### #58: Add dev/QA user purge function DONE
+Committed `32468ea`. Admin-only PurgeHuman endpoint (non-production gated). Severs OAuth login, clears UserEmails, changes email to `purged-{guid}@deleted.local`, locks out account — so the same Gmail can log back in fresh. Danger-styled button on HumanDetail inside `<environment exclude="Production">`.
+
+### Onboarding QA stabilization (part of #52/#53/#54) DONE
+Committed `32468ea`. Removed unnecessary StartReview/UnderReview application states — Submitted now transitions directly to Approved/Rejected/Withdrawn. Fixed board vote concurrency error (vote no longer touches Application entity). Fixed invisible membership tier badge (bg-purple → bg-primary). Simplified OnboardingReview Detail and BoardVotingDetail first cards (removed duplicated profile info, inlined motivation). Added vote date column. Clickable board voting rows. Application/Create tier selector switched to radio buttons with always-visible descriptions.
+
+### #55: Show tier application status on profile banner DONE
+Committed `d503e2b`. Profile page now shows a banner with the user's latest tier application status (Submitted/Approved/Rejected) and a link to the Governance page. Skips Withdrawn applications. Localized in all 5 languages.
+
+### #57: Add application transparency statistics to Governance page DONE
+Committed `ebc54b0`. Governance page shows aggregate application statistics: total, approved, rejected, pending counts, Colaborador/Asociado breakdown, and approval rate percentage. Visible to all members per Section 8 transparency requirements.
+
+### #50: Split teams page into My Teams / Other Teams DONE
+Committed `793bceb`. Teams Index page now shows "My Teams" section at top with user's teams, "Other Teams" section below with remaining teams. Extracted `_TeamCard.cshtml` partial to eliminate card markup duplication. Pagination applies to Other Teams only. Separate `/Teams/My` page retained for Leave/Manage actions.

@@ -147,6 +147,7 @@ public class SyncLegalDocumentsJob
                 effectiveEmail,
                 user.DisplayName,
                 documentNames,
+                user.PreferredLanguage,
                 cancellationToken);
 
             notificationCount++;

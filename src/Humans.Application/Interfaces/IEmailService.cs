@@ -1,3 +1,5 @@
+using Humans.Domain.Enums;
+
 namespace Humans.Application.Interfaces;
 
 /// <summary>
@@ -21,10 +23,13 @@ public interface IEmailService
     /// </summary>
     /// <param name="userEmail">The applicant's email.</param>
     /// <param name="userName">The applicant's name.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -32,12 +37,16 @@ public interface IEmailService
     /// </summary>
     /// <param name="userEmail">The applicant's email.</param>
     /// <param name="userName">The applicant's name.</param>
+    /// <param name="tier">The membership tier applied for.</param>
     /// <param name="reason">The reason for rejection.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendApplicationRejectedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -46,11 +55,13 @@ public interface IEmailService
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
     /// <param name="documentName">The document name.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendReConsentRequiredAsync(
         string userEmail,
         string userName,
         string documentName,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -59,11 +70,13 @@ public interface IEmailService
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
     /// <param name="documentNames">The names of updated documents.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendReConsentsRequiredAsync(
         string userEmail,
         string userName,
         IEnumerable<string> documentNames,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -73,12 +86,14 @@ public interface IEmailService
     /// <param name="userName">The user's name.</param>
     /// <param name="documentNames">Names of documents requiring consent.</param>
     /// <param name="daysRemaining">Days remaining before suspension.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendReConsentReminderAsync(
         string userEmail,
         string userName,
         IEnumerable<string> documentNames,
         int daysRemaining,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -86,10 +101,12 @@ public interface IEmailService
     /// </summary>
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendWelcomeEmailAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -98,11 +115,13 @@ public interface IEmailService
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
     /// <param name="reason">The reason for suspension.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendAccessSuspendedAsync(
         string userEmail,
         string userName,
         string reason,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -111,11 +130,13 @@ public interface IEmailService
     /// <param name="toEmail">The email address to verify.</param>
     /// <param name="userName">The user's name.</param>
     /// <param name="verificationUrl">The URL to verify the email.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendEmailVerificationAsync(
         string toEmail,
         string userName,
         string verificationUrl,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -124,11 +145,13 @@ public interface IEmailService
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
     /// <param name="deletionDate">When the account will be deleted.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendAccountDeletionRequestedAsync(
         string userEmail,
         string userName,
         DateTime deletionDate,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -136,10 +159,12 @@ public interface IEmailService
     /// </summary>
     /// <param name="userEmail">The user's email.</param>
     /// <param name="userName">The user's name.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendAccountDeletedAsync(
         string userEmail,
         string userName,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -150,6 +175,7 @@ public interface IEmailService
     /// <param name="teamName">The team name.</param>
     /// <param name="teamSlug">The team's URL slug (used to construct the team page link).</param>
     /// <param name="resources">Google resources associated with the team (name + URL pairs).</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendAddedToTeamAsync(
         string userEmail,
@@ -157,5 +183,39 @@ public interface IEmailService
         string teamName,
         string teamSlug,
         IEnumerable<(string Name, string? Url)> resources,
+        string? culture = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a signup rejection notification to the user.
+    /// This is for rejecting a human's signup/profile (not an Asociado application).
+    /// </summary>
+    /// <param name="userEmail">The user's email.</param>
+    /// <param name="userName">The user's display name.</param>
+    /// <param name="reason">The reason for rejection.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SendSignupRejectedAsync(
+        string userEmail,
+        string userName,
+        string? reason,
+        string? culture = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Sends a term renewal reminder to a Colaborador or Asociado whose term is expiring soon.
+    /// </summary>
+    /// <param name="userEmail">The user's email.</param>
+    /// <param name="userName">The user's display name.</param>
+    /// <param name="tierName">The membership tier name (e.g. "Colaborador", "Asociado").</param>
+    /// <param name="expiresAt">The term expiry date.</param>
+    /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task SendTermRenewalReminderAsync(
+        string userEmail,
+        string userName,
+        string tierName,
+        string expiresAt,
+        string? culture = null,
         CancellationToken cancellationToken = default);
 }

@@ -9,12 +9,15 @@ using Microsoft.Extensions.Localization;
 using NodaTime;
 using Humans.Application.DTOs;
 using Humans.Application.Interfaces;
+using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Services;
 using SkiaSharp;
+using Humans.Web.Extensions;
 using Humans.Web.Models;
+using MemberApplication = Humans.Domain.Entities.Application;
 
 namespace Humans.Web.Controllers;
 
@@ -91,100 +94,42 @@ public class ProfileController : Controller
         }
 
         var profile = await _dbContext.Profiles
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == user.Id);
 
-        // Get canonical membership + consent status in one call.
+        // Get consent status for the alert banners (profile card handles its own data).
         var membershipSnapshot = await _membershipCalculator.GetMembershipSnapshotAsync(user.Id);
-        var pendingConsents = membershipSnapshot.PendingConsentCount;
 
-        // Get contact fields (user viewing their own profile sees all)
-        var contactFields = profile != null
-            ? await _contactFieldService.GetVisibleContactFieldsAsync(profile.Id, user.Id)
-            : [];
-
-        // Get visible user emails (owner sees all visible emails)
-        var visibleEmails = await _userEmailService.GetVisibleEmailsAsync(
-            user.Id, ContactFieldVisibility.BoardOnly);
-
-        // Get volunteer history entries
-        var volunteerHistory = profile != null
-            ? await _volunteerHistoryService.GetAllAsync(profile.Id)
-            : [];
-
-        // Get user's teams (excluding Volunteers system team)
-        var userTeams = await _teamService.GetUserTeamsAsync(user.Id);
-        var displayableTeams = userTeams
-            .Where(tm => tm.Team.SystemTeamType != SystemTeamType.Volunteers)
-            .OrderBy(tm => tm.Team.Name, StringComparer.Ordinal)
-            .Select(tm => new TeamMembershipViewModel
-            {
-                TeamId = tm.TeamId,
-                TeamName = tm.Team.Name,
-                TeamSlug = tm.Team.Slug,
-                IsLead = tm.Role == TeamMemberRole.Lead,
-                IsSystemTeam = tm.Team.IsSystemTeam
-            })
-            .ToList();
-
-        var hasCustomPicture = profile?.HasCustomProfilePicture == true;
+        // Get latest tier application for the profile banner
+        var latestApplication = await _dbContext.Applications
+            .Where(a => a.UserId == user.Id)
+            .OrderByDescending(a => a.SubmittedAt)
+            .FirstOrDefaultAsync();
 
         var viewModel = new ProfileViewModel
         {
             Id = profile?.Id ?? Guid.Empty,
-            Email = user.Email ?? string.Empty,
-            DisplayName = user.DisplayName,
-            ProfilePictureUrl = user.ProfilePictureUrl,
-            HasCustomProfilePicture = hasCustomPicture,
-            CustomProfilePictureUrl = hasCustomPicture ? Url.Action(nameof(Picture), new { id = profile!.Id }) : null,
-            BurnerName = profile?.BurnerName ?? string.Empty,
-            FirstName = profile?.FirstName ?? string.Empty,
-            LastName = profile?.LastName ?? string.Empty,
-            City = profile?.City,
-            CountryCode = profile?.CountryCode,
-            Bio = profile?.Bio,
-            Pronouns = profile?.Pronouns,
-            ContributionInterests = profile?.ContributionInterests,
-            BoardNotes = profile?.BoardNotes,
-            BirthdayMonth = profile?.DateOfBirth?.Month,
-            BirthdayDay = profile?.DateOfBirth?.Day,
-            EmergencyContactName = profile?.EmergencyContactName,
-            EmergencyContactPhone = profile?.EmergencyContactPhone,
-            EmergencyContactRelationship = profile?.EmergencyContactRelationship,
-            HasPendingConsents = pendingConsents > 0,
-            PendingConsentCount = pendingConsents,
+            UserId = user.Id,
+            HasPendingConsents = membershipSnapshot.PendingConsentCount > 0,
+            PendingConsentCount = membershipSnapshot.PendingConsentCount,
             IsApproved = profile?.IsApproved ?? false,
-            MembershipStatus = membershipSnapshot.Status.ToString(),
             IsOwnProfile = true,
-            CanViewLegalName = true, // User viewing their own profile
-            UserEmails = visibleEmails.Select(e => new UserEmailDisplayViewModel
-            {
-                Email = e.Email,
-                IsNotificationTarget = e.IsNotificationTarget,
-                Visibility = e.Visibility
-            }).ToList(),
-            ContactFields = contactFields.Select(cf => new ContactFieldViewModel
-            {
-                Id = cf.Id,
-                FieldType = cf.FieldType,
-                Label = cf.Label,
-                Value = cf.Value,
-                Visibility = cf.Visibility
-            }).ToList(),
-            VolunteerHistory = volunteerHistory.Select(vh => new VolunteerHistoryEntryViewModel
-            {
-                Id = vh.Id,
-                Date = vh.Date,
-                EventName = vh.EventName,
-                Description = vh.Description
-            }).ToList(),
-            Teams = displayableTeams
+            DisplayName = user.DisplayName,
         };
+
+        // Show tier application status (skip Withdrawn — not interesting)
+        if (latestApplication != null && latestApplication.Status != ApplicationStatus.Withdrawn)
+        {
+            viewModel.TierApplicationStatus = latestApplication.Status.ToString();
+            viewModel.TierApplicationTier = latestApplication.MembershipTier;
+            viewModel.TierApplicationBadgeClass = latestApplication.Status.GetBadgeClass();
+        }
 
         return View(viewModel);
     }
 
     [HttpGet]
-    public async Task<IActionResult> Edit()
+    public async Task<IActionResult> Edit([FromQuery] bool preview = false)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -206,6 +151,26 @@ public class ProfileController : Controller
             : [];
 
         var hasCustomPicture = profile?.HasCustomProfilePicture == true;
+
+        // Initial setup = no profile or not yet approved (onboarding)
+        // ?preview=true forces initial-setup mode for testing
+        var isInitialSetup = profile == null || !profile.IsApproved || preview;
+
+        // Check if tier is locked (has active/pending application)
+        var hasPendingOrApprovedApplication = profile != null && await _dbContext.Applications
+            .AnyAsync(a => a.UserId == user.Id &&
+                (a.Status == ApplicationStatus.Submitted ||
+                 a.Status == ApplicationStatus.Approved));
+
+        // Load existing pending application for inline display during initial setup
+        MemberApplication? pendingApplication = null;
+        if (isInitialSetup)
+        {
+            pendingApplication = await _dbContext.Applications
+                .Where(a => a.UserId == user.Id &&
+                    a.Status == ApplicationStatus.Submitted)
+                .FirstOrDefaultAsync();
+        }
 
         var viewModel = new ProfileViewModel
         {
@@ -233,6 +198,17 @@ public class ProfileController : Controller
             EmergencyContactPhone = profile?.EmergencyContactPhone,
             EmergencyContactRelationship = profile?.EmergencyContactRelationship,
             CanViewLegalName = true, // User editing their own profile
+            IsInitialSetup = isInitialSetup,
+            SelectedTier = profile?.MembershipTier ?? MembershipTier.Volunteer,
+            IsTierLocked = hasPendingOrApprovedApplication,
+            ApplicationMotivation = pendingApplication?.Motivation,
+            ApplicationAdditionalInfo = pendingApplication?.AdditionalInfo,
+            ApplicationSignificantContribution = pendingApplication?.SignificantContribution,
+            ApplicationRoleUnderstanding = pendingApplication?.RoleUnderstanding,
+            NoPriorBurnExperience = profile?.NoPriorBurnExperience ?? false,
+            ShowPrivateFirst = string.IsNullOrEmpty(profile?.FirstName)
+                && string.IsNullOrEmpty(profile?.LastName)
+                && string.IsNullOrEmpty(profile?.EmergencyContactName),
             EditableContactFields = contactFields.Select(cf => new ContactFieldEditViewModel
             {
                 Id = cf.Id,
@@ -305,6 +281,7 @@ public class ProfileController : Controller
         profile.EmergencyContactName = model.EmergencyContactName;
         profile.EmergencyContactPhone = model.EmergencyContactPhone;
         profile.EmergencyContactRelationship = model.EmergencyContactRelationship;
+        profile.NoPriorBurnExperience = model.NoPriorBurnExperience;
         profile.UpdatedAt = now;
 
         // Handle profile picture removal
@@ -338,6 +315,117 @@ public class ProfileController : Controller
             var (resizedData, contentType) = ResizeProfilePicture(uploadStream.ToArray());
             profile.ProfilePictureData = resizedData;
             profile.ProfilePictureContentType = contentType;
+        }
+
+        // Validate Burner CV: must have entries OR check "no prior experience"
+        var hasVolunteerHistory = model.EditableVolunteerHistory
+            .Any(vh => !string.IsNullOrWhiteSpace(vh.EventName) && vh.ParsedDate.HasValue);
+        if (!model.NoPriorBurnExperience && !hasVolunteerHistory)
+        {
+            ModelState.AddModelError(nameof(model.NoPriorBurnExperience),
+                _localizer["Profile_BurnerCVRequired"].Value);
+            model.IsInitialSetup = !profile.IsApproved;
+            model.ShowPrivateFirst = string.IsNullOrEmpty(model.FirstName)
+                && string.IsNullOrEmpty(model.LastName)
+                && string.IsNullOrEmpty(model.EmergencyContactName);
+            ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+            return View(model);
+        }
+
+        // Handle tier selection during initial setup
+        var isInitialSetup = !profile.IsApproved;
+        if (isInitialSetup)
+        {
+            // Server-side enforcement: don't allow tier changes if application exists
+            var hasPendingOrApprovedApp = await _dbContext.Applications
+                .AnyAsync(a => a.UserId == user.Id &&
+                    (a.Status == ApplicationStatus.Submitted ||
+                     a.Status == ApplicationStatus.Approved));
+            if (hasPendingOrApprovedApp)
+            {
+                model.SelectedTier = profile.MembershipTier;
+            }
+
+            // profile.MembershipTier = model.SelectedTier; // Removed: Tier is set only on Board approval
+
+            // Validate motivation is required for Colaborador/Asociado
+            if (model.SelectedTier != MembershipTier.Volunteer &&
+                string.IsNullOrWhiteSpace(model.ApplicationMotivation))
+            {
+                ModelState.AddModelError(nameof(model.ApplicationMotivation),
+                    _localizer["Profile_MotivationRequired"].Value);
+                model.IsInitialSetup = true;
+                model.ShowPrivateFirst = string.IsNullOrEmpty(model.FirstName)
+                    && string.IsNullOrEmpty(model.LastName)
+                    && string.IsNullOrEmpty(model.EmergencyContactName);
+                ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+                return View(model);
+            }
+
+            // Validate Asociado-specific fields
+            if (model.SelectedTier == MembershipTier.Asociado)
+            {
+                if (string.IsNullOrWhiteSpace(model.ApplicationSignificantContribution))
+                {
+                    ModelState.AddModelError(nameof(model.ApplicationSignificantContribution),
+                        _localizer["Application_SignificantContributionRequired"].Value);
+                }
+                if (string.IsNullOrWhiteSpace(model.ApplicationRoleUnderstanding))
+                {
+                    ModelState.AddModelError(nameof(model.ApplicationRoleUnderstanding),
+                        _localizer["Application_RoleUnderstandingRequired"].Value);
+                }
+                if (!ModelState.IsValid)
+                {
+                    model.IsInitialSetup = true;
+                    model.ShowPrivateFirst = string.IsNullOrEmpty(model.FirstName)
+                        && string.IsNullOrEmpty(model.LastName)
+                        && string.IsNullOrEmpty(model.EmergencyContactName);
+                    ViewData["GoogleMapsApiKey"] = _configuration["GoogleMaps:ApiKey"];
+                    return View(model);
+                }
+            }
+
+            // Auto-create or update inline application for Colaborador/Asociado
+            if (model.SelectedTier != MembershipTier.Volunteer)
+            {
+                var existingApp = await _dbContext.Applications
+                    .FirstOrDefaultAsync(a => a.UserId == user.Id &&
+                        a.Status == ApplicationStatus.Submitted);
+
+                if (existingApp != null)
+                {
+                    // Update existing pending application
+                    existingApp.Motivation = model.ApplicationMotivation!;
+                    existingApp.AdditionalInfo = model.ApplicationAdditionalInfo;
+                    existingApp.MembershipTier = model.SelectedTier;
+                    existingApp.SignificantContribution = model.SelectedTier == MembershipTier.Asociado
+                        ? model.ApplicationSignificantContribution : null;
+                    existingApp.RoleUnderstanding = model.SelectedTier == MembershipTier.Asociado
+                        ? model.ApplicationRoleUnderstanding : null;
+                    existingApp.UpdatedAt = now;
+                }
+                else
+                {
+                    // Create new application
+                    var application = new MemberApplication
+                    {
+                        Id = Guid.NewGuid(),
+                        UserId = user.Id,
+                        MembershipTier = model.SelectedTier,
+                        Motivation = model.ApplicationMotivation!,
+                        AdditionalInfo = model.ApplicationAdditionalInfo,
+                        SignificantContribution = model.SelectedTier == MembershipTier.Asociado
+                            ? model.ApplicationSignificantContribution : null,
+                        RoleUnderstanding = model.SelectedTier == MembershipTier.Asociado
+                            ? model.ApplicationRoleUnderstanding : null,
+                        Language = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName,
+                        SubmittedAt = now,
+                        UpdatedAt = now
+                    };
+                    _dbContext.Applications.Add(application);
+                }
+            }
         }
 
         // Update display name on user to burner name (public-facing name)
@@ -382,6 +470,22 @@ public class ProfileController : Controller
             .ToList();
 
         await _volunteerHistoryService.SaveAsync(profile.Id, volunteerHistoryDtos);
+
+        // If profile was just created, check if user already has all required consents
+        // (they may have consented before creating their profile)
+        if (!profile.IsApproved && profile.ConsentCheckStatus == null)
+        {
+            var hasAllConsents = await _membershipCalculator.HasAllRequiredConsentsForTeamAsync(
+                user.Id, SystemTeamIds.Volunteers);
+            if (hasAllConsents)
+            {
+                profile.ConsentCheckStatus = ConsentCheckStatus.Pending;
+                profile.UpdatedAt = _clock.GetCurrentInstant();
+                await _dbContext.SaveChangesAsync();
+                _logger.LogInformation(
+                    "User {UserId} has all consents signed, consent check set to Pending", user.Id);
+            }
+        }
 
         _logger.LogInformation("User {UserId} updated their profile", user.Id);
 
@@ -481,7 +585,8 @@ public class ProfileController : Controller
             await _emailService.SendEmailVerificationAsync(
                 model.NewEmail.Trim(),
                 user.DisplayName,
-                verificationUrl!);
+                verificationUrl!,
+                user.PreferredLanguage);
 
             _logger.LogInformation(
                 "Sent email verification to {Email} for user {UserId}",
@@ -739,6 +844,7 @@ public class ProfileController : Controller
                 effectiveEmail,
                 user.DisplayName,
                 deletionDate.ToDateTimeUtc(),
+                user.PreferredLanguage,
                 CancellationToken.None);
         }
 
@@ -874,8 +980,11 @@ public class ProfileController : Controller
             {
                 a.Id,
                 a.Status,
+                a.MembershipTier,
                 a.Motivation,
                 a.AdditionalInfo,
+                a.SignificantContribution,
+                a.RoleUnderstanding,
                 SubmittedAt = a.SubmittedAt.ToString(null, CultureInfo.InvariantCulture),
                 ResolvedAt = a.ResolvedAt?.ToString(null, CultureInfo.InvariantCulture)
             }),

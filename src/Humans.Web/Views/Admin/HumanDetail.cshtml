@@ -1,3 +1,4 @@
+@using Humans.Web.ViewComponents
 @model Humans.Web.Models.AdminHumanDetailViewModel
 @{
     ViewData["Title"] = string.Format(Localizer["AdminHumanDetail_Title"].Value, Model.DisplayName);
@@ -11,31 +12,19 @@
     </ol>
 </nav>
 
-@if (TempData["SuccessMessage"] != null)
-{
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        @TempData["SuccessMessage"]
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-}
+<vc:temp-data-alerts />
 
 <div class="row">
     <div class="col-md-8">
+        @* Admin-specific info card (user ID, joined, last login) *@
         <div class="card mb-4">
             <div class="card-header">@Localizer["AdminHuman_Information"]</div>
             <div class="card-body">
                 <div class="row mb-3">
                     <div class="col-md-2">
-                        @if (!string.IsNullOrEmpty(Model.ProfilePictureUrl))
-                        {
-                            <img src="@Model.ProfilePictureUrl" alt="" class="rounded-circle img-fluid">
-                        }
-                        else
-                        {
-                            <div class="bg-secondary rounded-circle d-flex align-items-center justify-content-center text-white" style="width: 80px; height: 80px; font-size: 2rem;">
-                                @(string.IsNullOrEmpty(Model.DisplayName) ? "?" : Model.DisplayName[0])
-                            </div>
-                        }
+                        <vc:user-avatar profile-picture-url="@Model.ProfilePictureUrl"
+                                        display-name="@Model.DisplayName"
+                                        size="80" />
                     </div>
                     <div class="col-md-10">
                         <h4>@Model.DisplayName</h4>
@@ -55,9 +44,51 @@
                     </div>
                 </div>
 
+                @if (Model.IsRejected)
+                {
+                    <div class="alert alert-danger mt-3 mb-0">
+                        <strong><i class="fa-solid fa-ban me-1"></i> Rejected</strong>
+                        @if (!string.IsNullOrEmpty(Model.RejectionReason))
+                        {
+                            <p class="mb-1 mt-1" style="white-space: pre-wrap;">@Model.RejectionReason</p>
+                        }
+                        <small class="text-muted">
+                            @if (Model.RejectedAt.HasValue)
+                            {
+                                @Model.RejectedAt.Value.ToString("d MMMM yyyy HH:mm")
+                            }
+                            @if (!string.IsNullOrEmpty(Model.RejectedByName))
+                            {
+                                <text> by @Model.RejectedByName</text>
+                            }
+                        </small>
+                    </div>
+                }
+
                 <hr />
 
                 <dl class="row mb-0">
+                    <dt class="col-sm-3">@Localizer["AdminHuman_MembershipTier"]</dt>
+                    <dd class="col-sm-9">@Model.MembershipTier</dd>
+
+                    <dt class="col-sm-3">@Localizer["AdminHuman_ConsentCheck"]</dt>
+                    <dd class="col-sm-9">
+                        @if (Model.ConsentCheckStatus.HasValue)
+                        {
+                            var badgeClass = Model.ConsentCheckStatus.Value switch
+                            {
+                                Humans.Domain.Enums.ConsentCheckStatus.Cleared => "bg-success",
+                                Humans.Domain.Enums.ConsentCheckStatus.Flagged => "bg-danger",
+                                _ => "bg-warning"
+                            };
+                            <span class="badge @badgeClass">@Model.ConsentCheckStatus.Value</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">@Localizer["AdminHuman_NotStarted"]</span>
+                        }
+                    </dd>
+
                     <dt class="col-sm-3">@Localizer["AdminHuman_UserId"]</dt>
                     <dd class="col-sm-9"><code>@Model.UserId</code></dd>
 
@@ -75,40 +106,12 @@
                             <span class="text-muted">@Localizer["Admin_Never"]</span>
                         }
                     </dd>
-
-                    @if (!string.IsNullOrEmpty(Model.FirstName) || !string.IsNullOrEmpty(Model.LastName))
-                    {
-                        <dt class="col-sm-3">@Localizer["AdminHuman_FullName"]</dt>
-                        <dd class="col-sm-9">@Model.FirstName @Model.LastName</dd>
-                    }
-
-                    @if (!string.IsNullOrEmpty(Model.City))
-                    {
-                        <dt class="col-sm-3">@Localizer["Profile_Location"]</dt>
-                        <dd class="col-sm-9">@Model.City, @Model.CountryCode</dd>
-                    }
-
-                    @if (!string.IsNullOrEmpty(Model.EmergencyContactName) || !string.IsNullOrEmpty(Model.EmergencyContactPhone))
-                    {
-                        <dt class="col-sm-3">@Localizer["Profile_EmergencyContact"]</dt>
-                        <dd class="col-sm-9">
-                            @if (!string.IsNullOrEmpty(Model.EmergencyContactName))
-                            {
-                                @Model.EmergencyContactName
-                            }
-                            @if (!string.IsNullOrEmpty(Model.EmergencyContactRelationship))
-                            {
-                                <text> (@Model.EmergencyContactRelationship)</text>
-                            }
-                            @if (!string.IsNullOrEmpty(Model.EmergencyContactPhone))
-                            {
-                                <text> — </text><a href="tel:@Model.EmergencyContactPhone">@Model.EmergencyContactPhone</a>
-                            }
-                        </dd>
-                    }
                 </dl>
             </div>
         </div>
+
+        @* Profile card (shared component) *@
+        <vc:profile-card user-id="@Model.UserId" view-mode="@ProfileCardViewMode.Admin" />
 
         @if (!string.IsNullOrEmpty(Model.AdminNotes))
         {
@@ -283,6 +286,31 @@
                         <button type="submit" class="btn btn-danger w-100">@Localizer["AdminHuman_SuspendMember"]</button>
                     </form>
                 }
+                @if (Model.HasProfile && !Model.IsRejected)
+                {
+                    <hr />
+                    <form asp-action="RejectSignup" asp-route-id="@Model.UserId" method="post"
+                          data-confirm="Are you sure you want to reject this human's signup? This cannot be undone.">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-2">
+                            <textarea name="reason" class="form-control" rows="2" placeholder="Reason for rejection..."></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fa-solid fa-ban me-1"></i> Reject Signup
+                        </button>
+                    </form>
+                }
+                <environment exclude="Production">
+                    <hr />
+                    <form asp-action="PurgeHuman" asp-route-id="@Model.UserId" method="post"
+                          data-confirm="PURGE @Model.DisplayName? This severs their login — they will get a completely fresh account next time they sign in.">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fa-solid fa-skull-crossbones me-1"></i> Purge (Dev/QA Only)
+                        </button>
+                        <small class="form-text text-muted">Severs OAuth link and locks account. Next login creates a fresh user.</small>
+                    </form>
+                </environment>
             </div>
         </div>
     </div>

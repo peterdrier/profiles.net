@@ -49,10 +49,12 @@ public static class InfrastructureServiceCollectionExtensions
             services.AddScoped<IDriveActivityMonitorService, StubDriveActivityMonitorService>();
         }
 
+        services.AddScoped<IEmailRenderer, EmailRenderer>();
         services.AddScoped<IEmailService, SmtpEmailService>();
         services.AddScoped<IMembershipCalculator, MembershipCalculator>();
         services.AddScoped<IRoleAssignmentService, RoleAssignmentService>();
         services.AddScoped<IAuditLogService, AuditLogService>();
+        services.AddScoped<IApplicationDecisionService, ApplicationDecisionService>();
         services.AddScoped<SystemTeamSyncJob>();
         services.AddScoped<SyncLegalDocumentsJob>();
         services.AddScoped<SendReConsentReminderJob>();

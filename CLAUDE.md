@@ -37,7 +37,7 @@ Clean Architecture with 4 layers:
 
 ## Domain Entities
 
-See [`.claude/DATA_MODEL.md`](.claude/DATA_MODEL.md) for full data model, relationships, and serialization notes. Key entities: `User`, `Profile`, `ContactField`, `Application` (Asociado only), `RoleAssignment`, `LegalDocument`/`DocumentVersion`, `ConsentRecord` (append-only), `Team`/`TeamMember`, `GoogleResource`.
+See [`.claude/DATA_MODEL.md`](.claude/DATA_MODEL.md) for full data model, relationships, and serialization notes. Key entities: `User`, `Profile`, `ContactField`, `Application` (Colaborador/Asociado tier applications), `BoardVote` (transient), `RoleAssignment`, `LegalDocument`/`DocumentVersion`, `ConsentRecord` (append-only), `Team`/`TeamMember`, `GoogleResource`.
 
 ## Important: Shared Drives Only
 
@@ -49,24 +49,26 @@ See [`.claude/DATA_MODEL.md`](.claude/DATA_MODEL.md) for full data model, relati
 
 The `consent_records` table has database triggers that prevent UPDATE and DELETE operations. Only INSERT is allowed to maintain GDPR audit trail integrity.
 
-## Important: Volunteer vs Asociado — Two Separate Concepts
+## Important: Volunteer vs Tier Applications — Separate Concepts
 
-**Volunteer** = the standard member. ~100% of users. Onboarding: sign up, complete profile, consent to legal docs, board approves → added to Volunteers team. This is NOT done through the Application entity.
+**Volunteer** = the standard member. ~100% of users. Onboarding: sign up, complete profile, consent to legal docs, Consent Coordinator clears → auto-approved → added to Volunteers team. This is NOT done through the Application entity.
 
-**Asociado** = optional governance upgrade for ~20% of volunteers. Asociados are voting members who participate in assemblies and elections. This IS the Application entity (Governance section). Applying to become an Asociado is completely optional and has no effect on volunteer access, team membership, or resources.
+**Colaborador** = active contributor with project/event responsibilities. Requires application + Board vote. 2-year term.
 
-**NEVER conflate these two flows.** The Application/Governance workflow is NOT part of volunteer onboarding. It is a separate, optional path for long-term committed volunteers who want voting rights.
+**Asociado** = voting member with governance rights (assemblies, elections). Requires application + Board vote. 2-year term.
+
+**NEVER conflate Volunteer access with tier applications.** The Application/Board Voting workflow is NOT part of volunteer onboarding. It is a separate, optional path for volunteers who want Colaborador or Asociado status. Volunteer access proceeds in parallel and is never blocked by tier applications.
 
 ## Application Workflow State Machine
 
-The Application entity is for **Asociado applications only** (optional governance membership), NOT for becoming a volunteer.
+The Application entity is for **Colaborador and Asociado tier applications only**, NOT for becoming a volunteer.
 
 ```
-Submitted → UnderReview → Approved/Rejected
+Submitted → Approved/Rejected
          ↘ Withdrawn ↙
 ```
 
-Triggers: `StartReview`, `Approve`, `Reject`, `Withdraw`, `RequestMoreInfo`
+Triggers: `Approve`, `Reject`, `Withdraw`
 
 ## Namespace Alias
 
@@ -76,12 +78,32 @@ Due to namespace collision, use `MemberApplication` alias when referencing `Huma
 using MemberApplication = Humans.Domain.Entities.Application;
 ```
 
+## Important: UI Terminology — "Humans" Not "Members" or "Volunteers"
+
+In all user-facing text (views, localization strings, emails), use **"humans"** — not "members", "volunteers", or "users". This is the org's branded terminology. It applies across all locales (the word "humans" is kept in English even in es/de/fr/it translations). Internal code (entity names, variable names) is unaffected.
+
+Also: the system stores **birthday** (month + day only), not **date of birth** (which implies year). Use "birthday" in UI text.
+
+## Important: Coolify Docker Build Constraints
+
+Coolify strips `.git` from the Docker build context. Do NOT use `COPY .git` in the Dockerfile — it will fail on production deploys. Instead, Coolify passes `SOURCE_COMMIT` as a Docker build arg containing the full commit SHA. The `Directory.Build.props` MSBuild target for `SourceRevisionId` has a `Condition` to skip when the property is already set via `-p:`.
+
 ## Scale and Deployment Context
 
 - **Target scale: ~500 users total.** This is a small nonprofit membership system, not a high-traffic service.
 - **Single server deployment** — no distributed coordination, no multi-instance concerns. Database concurrency conflicts (e.g., DbContext thread safety) are irrelevant for parallelization decisions since there's only one process.
 - **Prefer in-memory caching over query optimization.** At this scale, loading entire datasets into RAM (e.g., all teams, all members) is cheaper and simpler than optimizing individual DB queries. Use `IMemoryCache` freely.
 - **Don't over-engineer for scale.** Pagination, batching, and query optimization matter less when the total dataset fits comfortably in memory. Simple, correct code beats performant-but-complex code.
+- **No concurrency tokens.** Do NOT add `IsConcurrencyToken()`, `[ConcurrencyCheck]`, or row versioning to any entity. At single-server scale with ~500 users, concurrency conflicts don't happen and optimistic concurrency only causes bugs. Never add them without explicit user permission.
+
+## Debugging: Check the Log File
+
+When debugging runtime errors, **always check the log file first** before speculating about causes. The Serilog file sink writes to:
+
+- **With debugger**: `%LOCALAPPDATA%\Temp\human\humans-YYYYMMDD.log`
+- **Console**: always enabled via `WriteTo.Console()`
+
+Use `Grep` on the log file filtering by entity ID, error keywords, or timestamp. Write diagnostic log messages (`_logger.LogWarning`/`LogError`) that include entity IDs, actual values, and expected values — not just "operation failed". When something goes wrong, the log should tell you *why*.
 
 ## LSP Integration
 

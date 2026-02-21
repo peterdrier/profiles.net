@@ -61,6 +61,12 @@ public class GovernanceController : Controller
 
         var statutesContent = await GetStatutesContentAsync();
 
+        // Tier member counts for the sidebar
+        var colaboradorCount = await _dbContext.Profiles
+            .CountAsync(p => p.MembershipTier == MembershipTier.Colaborador && !p.IsSuspended);
+        var asociadoCount = await _dbContext.Profiles
+            .CountAsync(p => p.MembershipTier == MembershipTier.Asociado && !p.IsSuspended);
+
         var viewModel = new GovernanceIndexViewModel
         {
             StatutesContent = statutesContent,
@@ -70,8 +76,9 @@ public class GovernanceController : Controller
             ApplicationResolvedAt = latestApplication?.ResolvedAt?.ToDateTimeUtc(),
             ApplicationStatusBadgeClass = latestApplication?.Status.GetBadgeClass(),
             CanApply = latestApplication == null ||
-                (latestApplication.Status != ApplicationStatus.Submitted &&
-                 latestApplication.Status != ApplicationStatus.UnderReview)
+                latestApplication.Status != ApplicationStatus.Submitted,
+            ColaboradorCount = colaboradorCount,
+            AsociadoCount = asociadoCount
         };
 
         return View(viewModel);

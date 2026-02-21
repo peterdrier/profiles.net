@@ -32,23 +32,10 @@ public class ApplicationTests
     }
 
     [Fact]
-    public void StartReview_ShouldTransitionToUnderReview()
-    {
-        var reviewerId = Guid.NewGuid();
-        var application = CreateSubmittedApplication();
-
-        application.StartReview(reviewerId, _clock);
-
-        application.Status.Should().Be(ApplicationStatus.UnderReview);
-        application.ReviewedByUserId.Should().Be(reviewerId);
-        application.ReviewStartedAt.Should().NotBeNull();
-    }
-
-    [Fact]
     public void Approve_ShouldTransitionToApproved()
     {
         var reviewerId = Guid.NewGuid();
-        var application = CreateApplicationUnderReview(reviewerId);
+        var application = CreateSubmittedApplication();
 
         application.Approve(reviewerId, "Welcome!", _clock);
 
@@ -61,7 +48,7 @@ public class ApplicationTests
     public void Reject_ShouldTransitionToRejected()
     {
         var reviewerId = Guid.NewGuid();
-        var application = CreateApplicationUnderReview(reviewerId);
+        var application = CreateSubmittedApplication();
 
         application.Reject(reviewerId, "Does not meet criteria", _clock);
 
@@ -82,21 +69,10 @@ public class ApplicationTests
     }
 
     [Fact]
-    public void Withdraw_FromUnderReview_ShouldTransitionToWithdrawn()
-    {
-        var reviewerId = Guid.NewGuid();
-        var application = CreateApplicationUnderReview(reviewerId);
-
-        application.Withdraw(_clock);
-
-        application.Status.Should().Be(ApplicationStatus.Withdrawn);
-    }
-
-    [Fact]
     public void RequestMoreInfo_ShouldTransitionBackToSubmitted()
     {
         var reviewerId = Guid.NewGuid();
-        var application = CreateApplicationUnderReview(reviewerId);
+        var application = CreateSubmittedApplication();
 
         application.RequestMoreInfo(reviewerId, "Please provide more details", _clock);
 
@@ -110,12 +86,79 @@ public class ApplicationTests
         var reviewerId = Guid.NewGuid();
         var application = CreateSubmittedApplication();
 
-        application.StartReview(reviewerId, _clock);
         application.Approve(reviewerId, "Approved", _clock);
 
-        application.StateHistory.Should().HaveCount(2);
-        application.StateHistory.First().Status.Should().Be(ApplicationStatus.UnderReview);
-        application.StateHistory.Last().Status.Should().Be(ApplicationStatus.Approved);
+        application.StateHistory.Should().HaveCount(1);
+        application.StateHistory.First().Status.Should().Be(ApplicationStatus.Approved);
+    }
+
+    [Fact]
+    public void NewApplication_ShouldDefaultToVolunteerTier()
+    {
+        var application = new Application
+        {
+            Id = Guid.NewGuid(),
+            UserId = Guid.NewGuid(),
+            Motivation = "Test",
+            SubmittedAt = _clock.GetCurrentInstant(),
+            UpdatedAt = _clock.GetCurrentInstant()
+        };
+
+        application.MembershipTier.Should().Be(MembershipTier.Volunteer);
+    }
+
+    [Theory]
+    [InlineData(MembershipTier.Colaborador)]
+    [InlineData(MembershipTier.Asociado)]
+    public void Application_CanSetMembershipTier(MembershipTier tier)
+    {
+        var application = CreateSubmittedApplication();
+        application.MembershipTier = tier;
+
+        application.MembershipTier.Should().Be(tier);
+    }
+
+    [Fact]
+    public void Application_CanSetTermExpiresAt()
+    {
+        var application = CreateSubmittedApplication();
+        var expiryDate = new LocalDate(2027, 12, 31);
+
+        application.TermExpiresAt = expiryDate;
+
+        application.TermExpiresAt.Should().Be(expiryDate);
+    }
+
+    [Fact]
+    public void Application_CanSetBoardMeetingDateAndDecisionNote()
+    {
+        var application = CreateSubmittedApplication();
+        var meetingDate = new LocalDate(2026, 3, 15);
+
+        application.BoardMeetingDate = meetingDate;
+        application.DecisionNote = "Approved unanimously";
+
+        application.BoardMeetingDate.Should().Be(meetingDate);
+        application.DecisionNote.Should().Be("Approved unanimously");
+    }
+
+    [Fact]
+    public void Application_CanSetRenewalReminderSentAt()
+    {
+        var application = CreateSubmittedApplication();
+        var sentAt = _clock.GetCurrentInstant();
+
+        application.RenewalReminderSentAt = sentAt;
+
+        application.RenewalReminderSentAt.Should().Be(sentAt);
+    }
+
+    [Fact]
+    public void Application_BoardVotes_ShouldBeEmptyByDefault()
+    {
+        var application = CreateSubmittedApplication();
+
+        application.BoardVotes.Should().BeEmpty();
     }
 
     private Application CreateSubmittedApplication()
@@ -128,12 +171,5 @@ public class ApplicationTests
             SubmittedAt = _clock.GetCurrentInstant(),
             UpdatedAt = _clock.GetCurrentInstant()
         };
-    }
-
-    private Application CreateApplicationUnderReview(Guid reviewerId)
-    {
-        var application = CreateSubmittedApplication();
-        application.StartReview(reviewerId, _clock);
-        return application;
     }
 }

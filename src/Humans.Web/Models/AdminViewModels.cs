@@ -1,3 +1,5 @@
+using Humans.Domain.Enums;
+
 namespace Humans.Web.Models;
 
 public class AdminDashboardViewModel
@@ -8,6 +10,13 @@ public class AdminDashboardViewModel
     public int PendingApplications { get; set; }
     public int PendingConsents { get; set; }
     public List<RecentActivityViewModel> RecentActivity { get; set; } = [];
+
+    // Application statistics
+    public int TotalApplications { get; set; }
+    public int ApprovedApplications { get; set; }
+    public int RejectedApplications { get; set; }
+    public int ColaboradorApplied { get; set; }
+    public int AsociadoApplied { get; set; }
 }
 
 public class RecentActivityViewModel
@@ -57,9 +66,17 @@ public class AdminHumanDetailViewModel
     public bool IsApproved { get; set; }
     public bool HasProfile { get; set; }
     public string? AdminNotes { get; set; }
+    public MembershipTier MembershipTier { get; set; }
+    public ConsentCheckStatus? ConsentCheckStatus { get; set; }
     public string? EmergencyContactName { get; set; }
     public string? EmergencyContactPhone { get; set; }
     public string? EmergencyContactRelationship { get; set; }
+
+    // Rejection
+    public bool IsRejected { get; set; }
+    public string? RejectionReason { get; set; }
+    public DateTime? RejectedAt { get; set; }
+    public string? RejectedByName { get; set; }
 
     // Stats
     public int ApplicationCount { get; set; }
@@ -80,6 +97,7 @@ public class AdminApplicationListViewModel
 {
     public List<AdminApplicationViewModel> Applications { get; set; } = [];
     public string? StatusFilter { get; set; }
+    public string? TierFilter { get; set; }
     public int TotalCount { get; set; }
     public int PageNumber { get; set; } = 1;
     public int PageSize { get; set; } = 20;
@@ -95,6 +113,7 @@ public class AdminApplicationViewModel
     public string StatusBadgeClass { get; set; } = "bg-secondary";
     public DateTime SubmittedAt { get; set; }
     public string MotivationPreview { get; set; } = string.Empty;
+    public string MembershipTier { get; set; } = string.Empty;
 }
 
 public class AdminApplicationDetailViewModel
@@ -107,12 +126,14 @@ public class AdminApplicationDetailViewModel
     public string Status { get; set; } = string.Empty;
     public string Motivation { get; set; } = string.Empty;
     public string? AdditionalInfo { get; set; }
+    public string? SignificantContribution { get; set; }
+    public string? RoleUnderstanding { get; set; }
+    public MembershipTier MembershipTier { get; set; }
     public string? Language { get; set; }
     public DateTime SubmittedAt { get; set; }
     public DateTime? ReviewStartedAt { get; set; }
     public string? ReviewerName { get; set; }
     public string? ReviewNotes { get; set; }
-    public bool CanStartReview { get; set; }
     public bool CanApproveReject { get; set; }
     public List<ApplicationHistoryViewModel> History { get; set; } = [];
 }

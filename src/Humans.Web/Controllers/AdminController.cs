@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Localization;
 using NodaTime;
 using Humans.Application.Interfaces;
+using Humans.Domain;
 using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
@@ -29,11 +30,13 @@ public class AdminController : Controller
     private readonly IAuditLogService _auditLogService;
     private readonly IMembershipCalculator _membershipCalculator;
     private readonly IRoleAssignmentService _roleAssignmentService;
+    private readonly IEmailService _emailService;
     private readonly IClock _clock;
     private readonly ILogger<AdminController> _logger;
     private readonly SystemTeamSyncJob _systemTeamSyncJob;
     private readonly HumansMetricsService _metrics;
     private readonly IStringLocalizer<SharedResource> _localizer;
+    private readonly IWebHostEnvironment _environment;
 
     public AdminController(
         HumansDbContext dbContext,
@@ -43,11 +46,13 @@ public class AdminController : Controller
         IAuditLogService auditLogService,
         IMembershipCalculator membershipCalculator,
         IRoleAssignmentService roleAssignmentService,
+        IEmailService emailService,
         IClock clock,
         ILogger<AdminController> logger,
         SystemTeamSyncJob systemTeamSyncJob,
         HumansMetricsService metrics,
-        IStringLocalizer<SharedResource> localizer)
+        IStringLocalizer<SharedResource> localizer,
+        IWebHostEnvironment environment)
     {
         _dbContext = dbContext;
         _userManager = userManager;
@@ -56,11 +61,13 @@ public class AdminController : Controller
         _auditLogService = auditLogService;
         _membershipCalculator = membershipCalculator;
         _roleAssignmentService = roleAssignmentService;
+        _emailService = emailService;
         _clock = clock;
         _logger = logger;
         _systemTeamSyncJob = systemTeamSyncJob;
         _metrics = metrics;
         _localizer = localizer;
+        _environment = environment;
     }
 
     [HttpGet("")]
@@ -68,7 +75,7 @@ public class AdminController : Controller
     {
         var totalMembers = await _dbContext.Users.CountAsync();
         var pendingApplications = await _dbContext.Applications
-            .CountAsync(a => a.Status == ApplicationStatus.Submitted || a.Status == ApplicationStatus.UnderReview);
+            .CountAsync(a => a.Status == ApplicationStatus.Submitted);
         var pendingVolunteers = await _dbContext.Profiles
             .CountAsync(p => !p.IsApproved && !p.IsSuspended);
 
@@ -103,6 +110,21 @@ public class AdminController : Controller
             })
             .ToListAsync();
 
+        // Application statistics (non-withdrawn)
+        var appStats = await _dbContext.Applications
+            .AsNoTracking()
+            .Where(a => a.Status != ApplicationStatus.Withdrawn)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Approved = g.Count(a => a.Status == ApplicationStatus.Approved),
+                Rejected = g.Count(a => a.Status == ApplicationStatus.Rejected),
+                Colaborador = g.Count(a => a.MembershipTier == MembershipTier.Colaborador),
+                Asociado = g.Count(a => a.MembershipTier == MembershipTier.Asociado)
+            })
+            .FirstOrDefaultAsync();
+
         var viewModel = new AdminDashboardViewModel
         {
             TotalMembers = totalMembers,
@@ -110,7 +132,12 @@ public class AdminController : Controller
             PendingVolunteers = pendingVolunteers,
             PendingApplications = pendingApplications,
             PendingConsents = pendingConsents,
-            RecentActivity = recentActivity
+            RecentActivity = recentActivity,
+            TotalApplications = appStats?.Total ?? 0,
+            ApprovedApplications = appStats?.Approved ?? 0,
+            RejectedApplications = appStats?.Rejected ?? 0,
+            ColaboradorApplied = appStats?.Colaborador ?? 0,
+            AsociadoApplied = appStats?.Asociado ?? 0
         };
 
         return View(viewModel);
@@ -207,6 +234,16 @@ public class AdminController : Controller
             })
             .ToListAsync();
 
+        // Load rejected-by user name if present
+        string? rejectedByName = null;
+        if (user.Profile?.RejectedByUserId != null)
+        {
+            var rejectedByUser = await _dbContext.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Id == user.Profile.RejectedByUserId.Value);
+            rejectedByName = rejectedByUser?.DisplayName;
+        }
+
         var viewModel = new AdminHumanDetailViewModel
         {
             UserId = user.Id,
@@ -215,17 +252,16 @@ public class AdminController : Controller
             ProfilePictureUrl = user.ProfilePictureUrl,
             CreatedAt = user.CreatedAt.ToDateTimeUtc(),
             LastLoginAt = user.LastLoginAt?.ToDateTimeUtc(),
-            FirstName = user.Profile?.FirstName,
-            LastName = user.Profile?.LastName,
-            City = user.Profile?.City,
-            CountryCode = user.Profile?.CountryCode,
             IsSuspended = user.Profile?.IsSuspended ?? false,
             IsApproved = user.Profile?.IsApproved ?? false,
             HasProfile = user.Profile != null,
             AdminNotes = user.Profile?.AdminNotes,
-            EmergencyContactName = user.Profile?.EmergencyContactName,
-            EmergencyContactPhone = user.Profile?.EmergencyContactPhone,
-            EmergencyContactRelationship = user.Profile?.EmergencyContactRelationship,
+            MembershipTier = user.Profile?.MembershipTier ?? MembershipTier.Volunteer,
+            ConsentCheckStatus = user.Profile?.ConsentCheckStatus,
+            IsRejected = user.Profile?.RejectedAt != null,
+            RejectionReason = user.Profile?.RejectionReason,
+            RejectedAt = user.Profile?.RejectedAt?.ToDateTimeUtc(),
+            RejectedByName = rejectedByName,
             ApplicationCount = user.Applications.Count,
             ConsentCount = user.ConsentRecords.Count,
             Applications = user.Applications
@@ -256,7 +292,7 @@ public class AdminController : Controller
     }
 
     [HttpGet("Applications")]
-    public async Task<IActionResult> Applications(string? status, int page = 1)
+    public async Task<IActionResult> Applications(string? status, string? tier, int page = 1)
     {
         var pageSize = 20;
         var query = _dbContext.Applications
@@ -271,8 +307,12 @@ public class AdminController : Controller
         {
             // Default: show pending applications
             query = query.Where(a =>
-                a.Status == ApplicationStatus.Submitted ||
-                a.Status == ApplicationStatus.UnderReview);
+                a.Status == ApplicationStatus.Submitted);
+        }
+
+        if (!string.IsNullOrWhiteSpace(tier) && Enum.TryParse<MembershipTier>(tier, out var tierEnum))
+        {
+            query = query.Where(a => a.MembershipTier == tierEnum);
         }
 
         var totalCount = await query.CountAsync();
@@ -290,7 +330,8 @@ public class AdminController : Controller
                 Status = a.Status.ToString(),
                 StatusBadgeClass = a.Status.GetBadgeClass(),
                 SubmittedAt = a.SubmittedAt.ToDateTimeUtc(),
-                MotivationPreview = a.Motivation.Length > 100 ? a.Motivation.Substring(0, 100) + "..." : a.Motivation
+                MotivationPreview = a.Motivation.Length > 100 ? a.Motivation.Substring(0, 100) + "..." : a.Motivation,
+                MembershipTier = a.MembershipTier.ToString()
             })
             .ToListAsync();
 
@@ -298,6 +339,7 @@ public class AdminController : Controller
         {
             Applications = applications,
             StatusFilter = status,
+            TierFilter = tier,
             TotalCount = totalCount,
             PageNumber = page,
             PageSize = pageSize
@@ -331,13 +373,15 @@ public class AdminController : Controller
             Status = application.Status.ToString(),
             Motivation = application.Motivation,
             AdditionalInfo = application.AdditionalInfo,
+            SignificantContribution = application.SignificantContribution,
+            RoleUnderstanding = application.RoleUnderstanding,
+            MembershipTier = application.MembershipTier,
             Language = application.Language,
             SubmittedAt = application.SubmittedAt.ToDateTimeUtc(),
             ReviewStartedAt = application.ReviewStartedAt?.ToDateTimeUtc(),
             ReviewerName = application.ReviewedByUser?.DisplayName,
             ReviewNotes = application.ReviewNotes,
-            CanStartReview = application.Status == ApplicationStatus.Submitted,
-            CanApproveReject = application.Status == ApplicationStatus.UnderReview,
+            CanApproveReject = application.Status == ApplicationStatus.Submitted,
             History = application.StateHistory
                 .OrderByDescending(h => h.ChangedAt)
                 .Select(h => new ApplicationHistoryViewModel
@@ -352,95 +396,6 @@ public class AdminController : Controller
         return View(viewModel);
     }
 
-    [HttpPost("Applications/{id}/Action")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ApplicationAction(Guid id, AdminApplicationActionModel model)
-    {
-        var currentUser = await _userManager.GetUserAsync(User);
-        if (currentUser == null)
-        {
-            return Unauthorized();
-        }
-
-        var application = await _dbContext.Applications
-            .Include(a => a.StateHistory)
-            .FirstOrDefaultAsync(a => a.Id == id);
-
-        if (application == null)
-        {
-            return NotFound();
-        }
-
-        switch (model.Action.ToUpperInvariant())
-        {
-            case "STARTREVIEW":
-                if (application.Status != ApplicationStatus.Submitted)
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_CannotStartReview"].Value;
-                    break;
-                }
-                application.StartReview(currentUser.Id, _clock);
-                _logger.LogInformation("Admin {AdminId} started review of application {ApplicationId}",
-                    currentUser.Id, application.Id);
-                TempData["SuccessMessage"] = _localizer["Admin_ReviewStarted"].Value;
-                break;
-
-            case "APPROVE":
-                if (application.Status != ApplicationStatus.UnderReview)
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_CannotApprove"].Value;
-                    break;
-                }
-                application.Approve(currentUser.Id, model.Notes, _clock);
-                _metrics.RecordApplicationProcessed("approved");
-                _logger.LogInformation("Admin {AdminId} approved application {ApplicationId}",
-                    currentUser.Id, application.Id);
-                TempData["SuccessMessage"] = _localizer["Admin_ApplicationApproved"].Value;
-                break;
-
-            case "REJECT":
-                if (application.Status != ApplicationStatus.UnderReview)
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_CannotReject"].Value;
-                    break;
-                }
-                if (string.IsNullOrWhiteSpace(model.Notes))
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_ProvideRejectionReason"].Value;
-                    break;
-                }
-                application.Reject(currentUser.Id, model.Notes, _clock);
-                _metrics.RecordApplicationProcessed("rejected");
-                _logger.LogInformation("Admin {AdminId} rejected application {ApplicationId}",
-                    currentUser.Id, application.Id);
-                TempData["SuccessMessage"] = _localizer["Admin_ApplicationRejected"].Value;
-                break;
-
-            case "REQUESTINFO":
-                if (application.Status != ApplicationStatus.UnderReview)
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_CannotRequestInfo"].Value;
-                    break;
-                }
-                if (string.IsNullOrWhiteSpace(model.Notes))
-                {
-                    TempData["ErrorMessage"] = _localizer["Admin_SpecifyInfoNeeded"].Value;
-                    break;
-                }
-                application.RequestMoreInfo(currentUser.Id, model.Notes, _clock);
-                _logger.LogInformation("Admin {AdminId} requested more info for application {ApplicationId}",
-                    currentUser.Id, application.Id);
-                TempData["SuccessMessage"] = _localizer["Admin_MoreInfoRequested"].Value;
-                break;
-
-            default:
-                TempData["ErrorMessage"] = _localizer["Admin_UnknownAction"].Value;
-                break;
-        }
-
-        await _dbContext.SaveChangesAsync();
-        return RedirectToAction(nameof(ApplicationDetail), new { id });
-    }
 
     [HttpPost("Humans/{id}/Suspend")]
     [ValidateAntiForgeryToken]
@@ -472,7 +427,7 @@ public class AdminController : Controller
         await _dbContext.SaveChangesAsync();
 
         _metrics.RecordMemberSuspended("admin");
-        _logger.LogInformation("Admin {AdminId} suspended member {MemberId}", currentUser?.Id, id);
+        _logger.LogInformation("Admin {AdminId} suspended human {HumanId}", currentUser?.Id, id);
 
         TempData["SuccessMessage"] = _localizer["Admin_MemberSuspended"].Value;
         return RedirectToAction(nameof(HumanDetail), new { id });
@@ -506,7 +461,7 @@ public class AdminController : Controller
 
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Admin {AdminId} unsuspended member {MemberId}", currentUser?.Id, id);
+        _logger.LogInformation("Admin {AdminId} unsuspended human {HumanId}", currentUser?.Id, id);
 
         TempData["SuccessMessage"] = _localizer["Admin_MemberUnsuspended"].Value;
         return RedirectToAction(nameof(HumanDetail), new { id });
@@ -545,10 +500,131 @@ public class AdminController : Controller
         await _systemTeamSyncJob.SyncVolunteersMembershipForUserAsync(id);
 
         _metrics.RecordVolunteerApproved();
-        _logger.LogInformation("Admin {AdminId} approved volunteer {MemberId}", currentUser?.Id, id);
+        _logger.LogInformation("Admin {AdminId} approved human {HumanId}", currentUser?.Id, id);
 
         TempData["SuccessMessage"] = _localizer["Admin_VolunteerApproved"].Value;
         return RedirectToAction(nameof(HumanDetail), new { id });
+    }
+
+    [HttpPost("Humans/{id}/Reject")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RejectSignup(Guid id, string? reason)
+    {
+        var user = await _dbContext.Users
+            .Include(u => u.Profile)
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        if (user?.Profile == null)
+        {
+            return NotFound();
+        }
+
+        if (user.Profile.RejectedAt != null)
+        {
+            TempData["ErrorMessage"] = "This human has already been rejected.";
+            return RedirectToAction(nameof(HumanDetail), new { id });
+        }
+
+        var currentUser = await _userManager.GetUserAsync(User);
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        var now = _clock.GetCurrentInstant();
+
+        user.Profile.RejectionReason = reason;
+        user.Profile.RejectedAt = now;
+        user.Profile.RejectedByUserId = currentUser.Id;
+        user.Profile.IsApproved = false;
+        user.Profile.UpdatedAt = now;
+
+        await _auditLogService.LogAsync(
+            AuditAction.SignupRejected, "User", id,
+            $"{user.DisplayName} rejected by {currentUser.DisplayName}{(string.IsNullOrWhiteSpace(reason) ? "" : $": {reason}")}",
+            currentUser.Id, currentUser.DisplayName);
+
+        await _dbContext.SaveChangesAsync();
+
+        try
+        {
+            await _emailService.SendSignupRejectedAsync(
+                user.Email ?? string.Empty,
+                user.DisplayName,
+                reason,
+                user.PreferredLanguage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send signup rejection email to {Email}", user.Email);
+        }
+
+        _logger.LogInformation("Admin {AdminId} rejected signup for human {HumanId}", currentUser.Id, id);
+
+        TempData["SuccessMessage"] = "Signup rejected.";
+        return RedirectToAction(nameof(HumanDetail), new { id });
+    }
+
+    [HttpPost("Humans/{id}/Purge")]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> PurgeHuman(Guid id)
+    {
+        if (_environment.IsProduction())
+        {
+            return NotFound();
+        }
+
+        var user = await _dbContext.Users.FindAsync(id);
+
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var currentUser = await _userManager.GetUserAsync(User);
+
+        if (user.Id == currentUser?.Id)
+        {
+            TempData["ErrorMessage"] = "You cannot purge your own account.";
+            return RedirectToAction(nameof(HumanDetail), new { id });
+        }
+
+        var displayName = user.DisplayName;
+
+        _logger.LogWarning(
+            "Admin {AdminId} purging human {HumanId} ({DisplayName}) in {Environment}",
+            currentUser?.Id, id, displayName, _environment.EnvironmentName);
+
+        // Sever OAuth link so next Google login creates a fresh user
+        var logins = await _userManager.GetLoginsAsync(user);
+        foreach (var login in logins)
+        {
+            await _userManager.RemoveLoginAsync(user, login.LoginProvider, login.ProviderKey);
+        }
+
+        // Remove UserEmails so the unique index doesn't block the new account
+        var userEmails = await _dbContext.UserEmails.Where(e => e.UserId == id).ToListAsync();
+        _dbContext.UserEmails.RemoveRange(userEmails);
+
+        // Change email so email-based lookup won't match
+        var purgedEmail = $"purged-{Guid.NewGuid()}@deleted.local";
+        user.Email = purgedEmail;
+        user.NormalizedEmail = purgedEmail.ToUpperInvariant();
+        user.UserName = purgedEmail;
+        user.NormalizedUserName = purgedEmail.ToUpperInvariant();
+        user.DisplayName = $"Purged ({displayName})";
+
+        // Lock out the account permanently
+        user.LockoutEnabled = true;
+        user.LockoutEnd = DateTimeOffset.MaxValue;
+
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogWarning("Purged human {DisplayName} ({HumanId})", displayName, id);
+
+        TempData["SuccessMessage"] = $"Purged {displayName}. They will get a fresh account on next login.";
+        return RedirectToAction(nameof(Humans));
     }
 
     [HttpGet("Teams")]
@@ -765,8 +841,8 @@ public class AdminController : Controller
             UserId = id,
             UserDisplayName = user.DisplayName,
             AvailableRoles = User.IsInRole(RoleNames.Admin)
-                ? [RoleNames.Admin, RoleNames.Board]
-                : [RoleNames.Board]
+                ? [RoleNames.Admin, RoleNames.Board, RoleNames.ConsentCoordinator, RoleNames.VolunteerCoordinator]
+                : [RoleNames.Board, RoleNames.ConsentCoordinator, RoleNames.VolunteerCoordinator]
         };
 
         return View(viewModel);
@@ -788,8 +864,8 @@ public class AdminController : Controller
             model.UserId = id;
             model.UserDisplayName = user.DisplayName;
             model.AvailableRoles = User.IsInRole(RoleNames.Admin)
-                ? [RoleNames.Admin, RoleNames.Board]
-                : [RoleNames.Board];
+                ? [RoleNames.Admin, RoleNames.Board, RoleNames.ConsentCoordinator, RoleNames.VolunteerCoordinator]
+                : [RoleNames.Board, RoleNames.ConsentCoordinator, RoleNames.VolunteerCoordinator];
             return View(model);
         }
 
@@ -1175,264 +1251,84 @@ public class AdminController : Controller
         return View(new AdminConfigurationViewModel { Items = items });
     }
     [HttpGet("EmailPreview")]
-    public IActionResult EmailPreview([FromServices] IOptions<EmailSettings> emailSettings)
+    public IActionResult EmailPreview(
+        [FromServices] IEmailRenderer renderer,
+        [FromServices] IOptions<EmailSettings> emailSettings)
     {
         var settings = emailSettings.Value;
         var cultures = new[] { "en", "es", "de", "fr", "it" };
 
-        var sampleName = "Maria Garc\u00eda";
-        var sampleEmail = "maria@example.com";
+        // Per-locale persona stubs for realistic previews
+        var personas = new Dictionary<string, (string Name, string Email)>(StringComparer.Ordinal)
+        {
+            ["en"] = ("Sally Smith", "sally@example.com"),
+            ["es"] = ("Mar\u00eda Garc\u00eda", "maria@example.com"),
+            ["de"] = ("Frieda Fischer", "frieda@example.com"),
+            ["fr"] = ("Fran\u00e7ois Dupont", "francois@example.com"),
+            ["it"] = ("Giulia Rossi", "giulia@example.com"),
+        };
+
         var sampleDocs = new[] { "Volunteer Agreement", "Privacy Policy" };
+        var sampleResources = new (string Name, string? Url)[]
+        {
+            ("Art Collective Shared Drive", "https://drive.google.com/drive/folders/example"),
+            ("art-collective@nobodies.team", "https://groups.google.com/g/art-collective"),
+        };
 
         var previews = new Dictionary<string, List<EmailPreviewItem>>(StringComparer.Ordinal);
 
         foreach (var culture in cultures)
         {
-            var ci = new System.Globalization.CultureInfo(culture);
-            var prev = System.Globalization.CultureInfo.CurrentUICulture;
-            System.Globalization.CultureInfo.CurrentUICulture = ci;
+            var (name, email) = personas[culture];
 
-            try
-            {
-                previews[culture] = GenerateEmailPreviews(settings, sampleName, sampleEmail, sampleDocs);
-            }
-            finally
-            {
-                System.Globalization.CultureInfo.CurrentUICulture = prev;
-            }
+            var items = new List<EmailPreviewItem>();
+
+            var c1 = renderer.RenderApplicationSubmitted(Guid.Empty, name);
+            items.Add(new EmailPreviewItem { Id = "application-submitted", Name = "Application Submitted (to Admin)", Recipient = settings.AdminAddress, Subject = c1.Subject, Body = c1.HtmlBody });
+
+            var c2 = renderer.RenderApplicationApproved(name, MembershipTier.Colaborador, culture);
+            items.Add(new EmailPreviewItem { Id = "application-approved", Name = "Application Approved", Recipient = email, Subject = c2.Subject, Body = c2.HtmlBody });
+
+            var c3 = renderer.RenderApplicationRejected(name, MembershipTier.Asociado, "Incomplete profile information", culture);
+            items.Add(new EmailPreviewItem { Id = "application-rejected", Name = "Application Rejected", Recipient = email, Subject = c3.Subject, Body = c3.HtmlBody });
+
+            var c4 = renderer.RenderSignupRejected(name, "Incomplete profile information", culture);
+            items.Add(new EmailPreviewItem { Id = "signup-rejected", Name = "Signup Rejected", Recipient = email, Subject = c4.Subject, Body = c4.HtmlBody });
+
+            var c5 = renderer.RenderReConsentsRequired(name, new[] { sampleDocs[0] }, culture);
+            items.Add(new EmailPreviewItem { Id = "reconsent-required", Name = "Re-Consent Required (single doc)", Recipient = email, Subject = c5.Subject, Body = c5.HtmlBody });
+
+            var c6 = renderer.RenderReConsentsRequired(name, sampleDocs, culture);
+            items.Add(new EmailPreviewItem { Id = "reconsents-required", Name = "Re-Consents Required (multiple docs)", Recipient = email, Subject = c6.Subject, Body = c6.HtmlBody });
+
+            var c7 = renderer.RenderReConsentReminder(name, sampleDocs, 14, culture);
+            items.Add(new EmailPreviewItem { Id = "reconsent-reminder", Name = "Re-Consent Reminder", Recipient = email, Subject = c7.Subject, Body = c7.HtmlBody });
+
+            var c8 = renderer.RenderWelcome(name, culture);
+            items.Add(new EmailPreviewItem { Id = "welcome", Name = "Welcome", Recipient = email, Subject = c8.Subject, Body = c8.HtmlBody });
+
+            var c9 = renderer.RenderAccessSuspended(name, "Outstanding consent requirements", culture);
+            items.Add(new EmailPreviewItem { Id = "access-suspended", Name = "Access Suspended", Recipient = email, Subject = c9.Subject, Body = c9.HtmlBody });
+
+            var c10 = renderer.RenderEmailVerification(name, "preferred@example.com", $"{settings.BaseUrl}/Profile/VerifyEmail?token=sample-token", culture);
+            items.Add(new EmailPreviewItem { Id = "email-verification", Name = "Email Verification", Recipient = "preferred@example.com", Subject = c10.Subject, Body = c10.HtmlBody });
+
+            var c11 = renderer.RenderAccountDeletionRequested(name, "March 15, 2026", culture);
+            items.Add(new EmailPreviewItem { Id = "deletion-requested", Name = "Account Deletion Requested", Recipient = email, Subject = c11.Subject, Body = c11.HtmlBody });
+
+            var c12 = renderer.RenderAccountDeleted(name, culture);
+            items.Add(new EmailPreviewItem { Id = "account-deleted", Name = "Account Deleted", Recipient = email, Subject = c12.Subject, Body = c12.HtmlBody });
+
+            var c13 = renderer.RenderAddedToTeam(name, "Art Collective", "art-collective", sampleResources, culture);
+            items.Add(new EmailPreviewItem { Id = "added-to-team", Name = "Added to Team", Recipient = email, Subject = c13.Subject, Body = c13.HtmlBody });
+
+            var c14 = renderer.RenderTermRenewalReminder(name, "Colaborador", "April 1, 2026", culture);
+            items.Add(new EmailPreviewItem { Id = "term-renewal-reminder", Name = "Term Renewal Reminder", Recipient = email, Subject = c14.Subject, Body = c14.HtmlBody });
+
+            previews[culture] = items;
         }
 
         return View(new EmailPreviewViewModel { Previews = previews });
-    }
-
-    private List<EmailPreviewItem> GenerateEmailPreviews(EmailSettings settings, string name, string email, string[] docs)
-    {
-        string Encode(string s) => System.Net.WebUtility.HtmlEncode(s);
-        var baseUrl = settings.BaseUrl;
-
-        return
-        [
-            new()
-            {
-                Id = "application-submitted",
-                Name = "Application Submitted (to Admin)",
-                Recipient = settings.AdminAddress,
-                Subject = string.Format(_localizer["Email_ApplicationSubmitted_Subject"].Value, name),
-                Body = $"""
-                    <h2>New Membership Application</h2>
-                    <p>A new membership application has been submitted.</p>
-                    <ul>
-                        <li><strong>Applicant:</strong> {Encode(name)}</li>
-                        <li><strong>Application ID:</strong> {Guid.Empty}</li>
-                    </ul>
-                    <p><a href="{baseUrl}/Admin/Applications">Review Application</a></p>
-                    """
-            },
-            new()
-            {
-                Id = "application-approved",
-                Name = "Application Approved",
-                Recipient = email,
-                Subject = _localizer["Email_ApplicationApproved_Subject"].Value,
-                Body = $"""
-                    <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>We're delighted to inform you that your membership application has been approved.
-                    Welcome to Humans!</p>
-                    <p>You can now access your member profile and explore teams:</p>
-                    <ul>
-                        <li><a href="{baseUrl}/Profile">View Your Profile</a></li>
-                        <li><a href="{baseUrl}/Teams">Browse Teams</a></li>
-                        <li><a href="{baseUrl}/Consent">Review Legal Documents</a></li>
-                    </ul>
-                    <p>If you have any questions, don't hesitate to reach out.</p>
-                    <p>Welcome aboard!<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "application-rejected",
-                Name = "Application Rejected",
-                Recipient = email,
-                Subject = _localizer["Email_ApplicationRejected_Subject"].Value,
-                Body = $"""
-                    <h2>Application Update</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>Thank you for your interest in joining us. After careful review,
-                    we regret to inform you that we are unable to approve your membership application at this time.</p>
-                    <p><strong>Reason:</strong> Incomplete profile information</p>
-                    <p>If you have any questions or would like to discuss this decision,
-                    please contact us at <a href="mailto:{settings.AdminAddress}">{settings.AdminAddress}</a>.</p>
-                    <p>Best regards,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "reconsent-required",
-                Name = "Re-Consent Required (single doc)",
-                Recipient = email,
-                Subject = string.Format(_localizer["Email_ReConsentRequired_Subject_Single"].Value, docs[0]),
-                Body = $"""
-                    <h2>Legal Document Update</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>We have updated the following required documents:</p>
-                    <ul>
-                        <li><strong>{Encode(docs[0])}</strong></li>
-                    </ul>
-                    <p>As a member, you need to review and accept these updated documents to maintain your active membership status.</p>
-                    <p><a href="{baseUrl}/Consent">Review and Accept</a></p>
-                    <p>If you have any questions about the changes, please contact us.</p>
-                    <p>Thank you,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "reconsents-required",
-                Name = "Re-Consents Required (multiple docs)",
-                Recipient = email,
-                Subject = _localizer["Email_ReConsentRequired_Subject_Multiple"].Value,
-                Body = $"""
-                    <h2>Legal Document Update</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>We have updated the following required documents:</p>
-                    <ul>
-                        {string.Join("\n", docs.Select(d => $"<li><strong>{Encode(d)}</strong></li>"))}
-                    </ul>
-                    <p>As a member, you need to review and accept these updated documents to maintain your active membership status.</p>
-                    <p><a href="{baseUrl}/Consent">Review and Accept</a></p>
-                    <p>If you have any questions about the changes, please contact us.</p>
-                    <p>Thank you,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "reconsent-reminder",
-                Name = "Re-Consent Reminder",
-                Recipient = email,
-                Subject = string.Format(System.Globalization.CultureInfo.CurrentCulture, _localizer["Email_ReConsentReminder_Subject"].Value, 14),
-                Body = $"""
-                    <h2>Consent Reminder</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>This is a reminder that you have <strong>14 days</strong> remaining to review and accept
-                    the following updated documents:</p>
-                    <ul>
-                        {string.Join("\n", docs.Select(d => $"<li>{Encode(d)}</li>"))}
-                    </ul>
-                    <p>If you do not accept these documents before the deadline, your membership access may be temporarily suspended.</p>
-                    <p><a href="{baseUrl}/Consent">Review Documents Now</a></p>
-                    <p>Thank you,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "welcome",
-                Name = "Welcome",
-                Recipient = email,
-                Subject = _localizer["Email_Welcome_Subject"].Value,
-                Body = $"""
-                    <h2>{_localizer["Email_Welcome_Heading"].Value}</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>Welcome to the Humans member portal!</p>
-                    <p>Here's what you can do:</p>
-                    <ul>
-                        <li><a href="{baseUrl}/Profile">Complete your profile</a></li>
-                        <li><a href="{baseUrl}/Teams">Join teams and working groups</a></li>
-                        <li><a href="{baseUrl}/Consent">Review legal documents</a></li>
-                    </ul>
-                    <p>If you have any questions, feel free to reach out to us.</p>
-                    <p>Best regards,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "access-suspended",
-                Name = "Access Suspended",
-                Recipient = email,
-                Subject = _localizer["Email_AccessSuspended_Subject"].Value,
-                Body = $"""
-                    <h2>Access Suspended</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>Your membership access has been temporarily suspended.</p>
-                    <p><strong>Reason:</strong> Outstanding consent requirements</p>
-                    <p>To restore your access, please take the required action:</p>
-                    <ul>
-                        <li><a href="{baseUrl}/Consent">Review pending consent requirements</a></li>
-                    </ul>
-                    <p>If you believe this is an error or have questions, please contact us at
-                    <a href="mailto:{settings.AdminAddress}">{settings.AdminAddress}</a>.</p>
-                    <p>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "email-verification",
-                Name = "Email Verification",
-                Recipient = "preferred@example.com",
-                Subject = _localizer["Email_VerifyEmail_Subject"].Value,
-                Body = $"""
-                    <h2>Email Verification</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>You requested to set <strong>preferred@example.com</strong> as your preferred email address.</p>
-                    <p>Please click the link below to verify this email address:</p>
-                    <p><a href="{baseUrl}/Profile/VerifyEmail?token=sample-token">Verify Email Address</a></p>
-                    <p>This link will expire in 24 hours.</p>
-                    <p>If you did not request this change, you can safely ignore this email.</p>
-                    <p>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "deletion-requested",
-                Name = "Account Deletion Requested",
-                Recipient = email,
-                Subject = _localizer["Email_DeletionRequested_Subject"].Value,
-                Body = $"""
-                    <h2>Account Deletion Request Received</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>We have received your request to delete your account. Your account and all associated data
-                    will be permanently deleted on <strong>March 15, 2026</strong>.</p>
-                    <p>If you change your mind, you can cancel this request before the deletion date by visiting:</p>
-                    <p><a href="{baseUrl}/Profile/Privacy">Cancel Deletion Request</a></p>
-                    <p>After deletion, this action cannot be undone and all your data will be permanently removed.</p>
-                    <p>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "account-deleted",
-                Name = "Account Deleted",
-                Recipient = email,
-                Subject = _localizer["Email_AccountDeleted_Subject"].Value,
-                Body = $"""
-                    <h2>Account Deleted</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>As requested, your Humans account has been permanently deleted.
-                    All your personal data has been removed from our systems.</p>
-                    <p>Thank you for being part of our community. If you ever wish to rejoin,
-                    you're welcome to submit a new membership application.</p>
-                    <p>Best wishes,<br/>The Humans Team</p>
-                    """
-            },
-            new()
-            {
-                Id = "added-to-team",
-                Name = "Added to Team",
-                Recipient = email,
-                Subject = string.Format(_localizer["Email_AddedToTeam_Subject"].Value, "Art Collective"),
-                Body = $"""
-                    <h2>Welcome to Art Collective!</h2>
-                    <p>Dear {Encode(name)},</p>
-                    <p>You have been added to the <strong>Art Collective</strong> team.</p>
-                    <p>Your team has the following resources:</p>
-                    <ul>
-                        <li><a href="https://drive.google.com/drive/folders/example">Art Collective Shared Drive</a></li>
-                        <li><a href="https://groups.google.com/g/art-collective">art-collective@nobodies.team</a></li>
-                    </ul>
-                    <p><a href="{baseUrl}/Teams/art-collective">View Team Page</a></p>
-                    <p>The Humans Team</p>
-                    """
-            }
-        ];
     }
 
     // Intentionally anonymous: exposes only migration names and counts (no sensitive data).
@@ -1456,7 +1352,7 @@ public class AdminController : Controller
 
     /// <summary>
     /// Checks whether the current user can assign/end the specified role.
-    /// Admin can manage any role. Board can manage Board and Lead only.
+    /// Admin can manage any role. Board can manage Board and coordinator roles.
     /// </summary>
     private bool CanManageRole(string roleName)
     {
@@ -1465,10 +1361,12 @@ public class AdminController : Controller
             return true;
         }
 
-        // Board members can manage the Board role
+        // Board members can manage Board and coordinator roles
         if (User.IsInRole(RoleNames.Board))
         {
-            return string.Equals(roleName, RoleNames.Board, StringComparison.Ordinal);
+            return string.Equals(roleName, RoleNames.Board, StringComparison.Ordinal) ||
+                   string.Equals(roleName, RoleNames.ConsentCoordinator, StringComparison.Ordinal) ||
+                   string.Equals(roleName, RoleNames.VolunteerCoordinator, StringComparison.Ordinal);
         }
 
         return false;
