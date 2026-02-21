@@ -1,3 +1,5 @@
+using Humans.Domain.Enums;
+
 namespace Humans.Application.Interfaces;
 
 /// <summary>
@@ -26,6 +28,7 @@ public interface IEmailService
     Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string? culture = null,
         CancellationToken cancellationToken = default);
 
@@ -34,12 +37,14 @@ public interface IEmailService
     /// </summary>
     /// <param name="userEmail">The applicant's email.</param>
     /// <param name="userName">The applicant's name.</param>
+    /// <param name="tier">The membership tier applied for.</param>
     /// <param name="reason">The reason for rejection.</param>
     /// <param name="culture">The recipient's preferred culture (ISO code, e.g. "es").</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task SendApplicationRejectedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string reason,
         string? culture = null,
         CancellationToken cancellationToken = default);

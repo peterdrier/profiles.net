@@ -1,4 +1,5 @@
 using System.Globalization;
+using Humans.Domain.Enums;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Hosting;
@@ -61,6 +62,7 @@ public class SmtpEmailService : IEmailService
     public async Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string? culture = null,
         CancellationToken cancellationToken = default)
     {
@@ -71,7 +73,7 @@ public class SmtpEmailService : IEmailService
             body = $"""
                 <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
                 <p>Dear {HtmlEncode(userName)},</p>
-                <p>We're delighted to inform you that your membership application has been approved.
+                <p>We're delighted to inform you that your {tier} application has been approved.
                 Welcome to Humans!</p>
                 <p>You can now access your member profile and explore teams:</p>
                 <ul>
@@ -92,6 +94,7 @@ public class SmtpEmailService : IEmailService
     public async Task SendApplicationRejectedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string reason,
         string? culture = null,
         CancellationToken cancellationToken = default)
@@ -104,7 +107,7 @@ public class SmtpEmailService : IEmailService
                 <h2>Application Update</h2>
                 <p>Dear {HtmlEncode(userName)},</p>
                 <p>Thank you for your interest in joining us. After careful review,
-                we regret to inform you that we are unable to approve your membership application at this time.</p>
+                we regret to inform you that we are unable to approve your {tier} application at this time.</p>
                 {(string.IsNullOrEmpty(reason) ? "" : $"<p><strong>Reason:</strong> {HtmlEncode(reason)}</p>")}
                 <p>If you have any questions or would like to discuss this decision,
                 please contact us at <a href="mailto:{_settings.AdminAddress}">{_settings.AdminAddress}</a>.</p>

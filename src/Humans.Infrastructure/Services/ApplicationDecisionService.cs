@@ -126,6 +126,7 @@ public class ApplicationDecisionService : IApplicationDecisionService
             await _emailService.SendApplicationApprovedAsync(
                 application.User.Email ?? string.Empty,
                 application.User.DisplayName,
+                application.MembershipTier,
                 application.User.PreferredLanguage);
         }
         catch (Exception ex)
@@ -203,6 +204,7 @@ public class ApplicationDecisionService : IApplicationDecisionService
             await _emailService.SendApplicationRejectedAsync(
                 application.User.Email ?? string.Empty,
                 application.User.DisplayName,
+                application.MembershipTier,
                 reason,
                 application.User.PreferredLanguage);
         }

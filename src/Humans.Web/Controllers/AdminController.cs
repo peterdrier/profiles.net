@@ -1313,7 +1313,7 @@ public class AdminController : Controller
                 Body = $"""
                     <h2>{_localizer["Email_ApplicationApproved_Heading"].Value}</h2>
                     <p>Dear {Encode(name)},</p>
-                    <p>We're delighted to inform you that your membership application has been approved.
+                    <p>We're delighted to inform you that your Colaborador application has been approved.
                     Welcome to Humans!</p>
                     <p>You can now access your member profile and explore teams:</p>
                     <ul>
@@ -1335,7 +1335,7 @@ public class AdminController : Controller
                     <h2>Application Update</h2>
                     <p>Dear {Encode(name)},</p>
                     <p>Thank you for your interest in joining us. After careful review,
-                    we regret to inform you that we are unable to approve your membership application at this time.</p>
+                    we regret to inform you that we are unable to approve your Asociado application at this time.</p>
                     <p><strong>Reason:</strong> Incomplete profile information</p>
                     <p>If you have any questions or would like to discuss this decision,
                     please contact us at <a href="mailto:{settings.AdminAddress}">{settings.AdminAddress}</a>.</p>

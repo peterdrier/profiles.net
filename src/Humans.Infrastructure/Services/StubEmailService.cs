@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Humans.Application.Interfaces;
+using Humans.Domain.Enums;
 
 namespace Humans.Infrastructure.Services;
 
@@ -30,6 +31,7 @@ public class StubEmailService : IEmailService
     public Task SendApplicationApprovedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string? culture = null,
         CancellationToken cancellationToken = default)
     {
@@ -42,6 +44,7 @@ public class StubEmailService : IEmailService
     public Task SendApplicationRejectedAsync(
         string userEmail,
         string userName,
+        MembershipTier tier,
         string reason,
         string? culture = null,
         CancellationToken cancellationToken = default)

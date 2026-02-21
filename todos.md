@@ -99,6 +99,9 @@ Helper methods re-query resources already loaded by parent methods. Redundant DB
 #### #59 / G-08: Extract duplicated controller business logic into shared services
 Legal docs slice extracted to `AdminLegalDocumentsController` + `IAdminLegalDocumentService`. Application approve/reject extracted to `IApplicationDecisionService`. Remaining: signup rejection (duplicated in Admin + OnboardingReview), volunteer approval (duplicated in Admin + OnboardingReview), and extending `IRoleAssignmentService` with assign/end/reassign orchestration. Consolidate into fewest services needed — extend existing interfaces where possible.
 
+#### #60: Replace magic string ViewModel properties with domain enums
+~50+ sites across 20+ ViewModels, 10+ controllers, and 3 views use `.ToString()` on domain enums instead of passing typed enums through. Affects `ApplicationStatus`, `MembershipStatus`, `TeamMemberRole`, `SystemTeamType`, `GoogleResourceType`, `TeamJoinRequestStatus`, `AuditAction`, `GoogleSyncSource`, `MembershipTier`. Also fix `StatusBadgeExtensions` to accept enums and add coding rules to prevent recurrence.
+
 #### G-09: Team membership caching
 Every page load queries team memberships. At ~500 users, in-memory cache with short TTL would eliminate most DB hits.
 
