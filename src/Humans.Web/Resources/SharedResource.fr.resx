@@ -1454,6 +1454,21 @@
   <data name="CityPlanning_Admin_ExportCard" xml:space="preserve"><value>Exporter</value></data>
   <data name="CityPlanning_Admin_ExportDescription" xml:space="preserve"><value>Télécharger tous les polygones de barrios pour {0} en tant que GeoJSON FeatureCollection.</value></data>
   <data name="CityPlanning_Admin_DownloadGeoJson" xml:space="preserve"><value>Télécharger GeoJSON ({0})</value></data>
+  <!-- Containers admin sub-page -->
+  <data name="CityPlanning_Admin_ContainersCard" xml:space="preserve"><value>Conteneurs ({0})</value></data>
+  <data name="CityPlanning_Admin_ContainersDesc" xml:space="preserve"><value>Gérer tous les conteneurs — de l'organisation et des barrios.</value></data>
+  <data name="CityPlanning_Admin_ManageContainers" xml:space="preserve"><value>Gérer les Conteneurs</value></data>
+  <data name="CityPlanning_Admin_ContainerPlacement" xml:space="preserve"><value>Placement des conteneurs</value></data>
+  <data name="CityPlanning_Admin_OpenContainerPlacement" xml:space="preserve"><value>Ouvrir</value></data>
+  <data name="CityPlanning_Admin_CloseContainerPlacement" xml:space="preserve"><value>Fermer</value></data>
+  <data name="CityPlanning_Admin_OrgContainersSection" xml:space="preserve"><value>Conteneurs de Nobodies</value></data>
+  <data name="CityPlanning_Admin_OrgContainersEmpty" xml:space="preserve"><value>Pas encore de conteneurs Nobodies pour {0}.</value></data>
+  <data name="CityPlanning_Admin_BarrioContainersSection" xml:space="preserve"><value>Conteneurs de Barrios</value></data>
+  <data name="CityPlanning_Admin_BarrioContainersEmpty" xml:space="preserve"><value>Pas encore de conteneurs pour {0}.</value></data>
+  <data name="CityPlanning_Admin_AddOrgContainer" xml:space="preserve"><value>Ajouter Conteneur Nobodies</value></data>
+  <data name="CityPlanning_Admin_AddBarrioContainer" xml:space="preserve"><value>Ajouter Conteneur — {0}</value></data>
+  <data name="CityPlanning_Admin_OrgContainerNamePlaceholder" xml:space="preserve"><value>ex. Conteneur de stockage A</value></data>
+  <data name="CityPlanning_Admin_OrgContainerDescPlaceholder" xml:space="preserve"><value>Taille, type, emplacement…</value></data>
   <data name="CityPlanning_HistoryTitle" xml:space="preserve"><value>Historique des polygones</value></data>
   <data name="CityPlanning_Loading" xml:space="preserve"><value>Chargement…</value></data>
   <data name="CityPlanning_Help_WhenIsIt" xml:space="preserve"><value>C'est quand ?</value></data>
@@ -1480,6 +1495,24 @@
   <data name="CityPlanning_Help_ColorsBody" xml:space="preserve"><value>Chaque barrio est coloré selon sa zone sonore préférée (modifiable depuis la page de ton barrio).</value></data>
 
 
+  <!-- ======================== -->
+  <!-- Containers               -->
+  <!-- ======================== -->
+  <data name="Container_Breadcrumb" xml:space="preserve"><value>Conteneurs</value></data>
+  <data name="Container_PlacementClosed" xml:space="preserve"><value>Le placement des conteneurs est actuellement fermé. Contactez city planning pour demander des modifications.</value></data>
+  <data name="Container_Empty" xml:space="preserve"><value>Pas encore de conteneurs enregistrés pour cette saison.</value></data>
+  <data name="Container_AddModal_Title" xml:space="preserve"><value>Ajouter Conteneur</value></data>
+  <data name="Container_EditModal_Title" xml:space="preserve"><value>Modifier Conteneur</value></data>
+  <data name="Container_UploadImageModal_Title" xml:space="preserve"><value>Télécharger Image — {0}</value></data>
+  <data name="Container_FieldName" xml:space="preserve"><value>Nom</value></data>
+  <data name="Container_FieldDescription" xml:space="preserve"><value>Description</value></data>
+  <data name="Container_NamePlaceholder" xml:space="preserve"><value>ex. Conteneur #1</value></data>
+  <data name="Container_DescPlaceholder" xml:space="preserve"><value>Taille, type, exigences spéciales…</value></data>
+  <data name="Container_ImageFileLabel" xml:space="preserve"><value>Fichier image (JPEG, PNG ou WebP — max 10 Mo)</value></data>
+  <data name="Container_UploadImageTitle" xml:space="preserve"><value>Télécharger l'image</value></data>
+  <data name="Container_RemoveImageTitle" xml:space="preserve"><value>Supprimer l'image</value></data>
+  <data name="Container_RemoveImageConfirm" xml:space="preserve"><value>Supprimer l'image de {0} ?</value></data>
+  <data name="Container_DeleteConfirm" xml:space="preserve"><value>Supprimer le conteneur {0} ?</value></data>
   <!-- ======================== -->
   <!-- User-Facing Views        -->
   <!-- ======================== -->

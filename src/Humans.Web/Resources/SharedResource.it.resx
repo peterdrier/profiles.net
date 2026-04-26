@@ -1454,6 +1454,21 @@
   <data name="CityPlanning_Admin_ExportCard" xml:space="preserve"><value>Esporta</value></data>
   <data name="CityPlanning_Admin_ExportDescription" xml:space="preserve"><value>Scarica tutti i poligoni dei barrios per {0} come GeoJSON FeatureCollection.</value></data>
   <data name="CityPlanning_Admin_DownloadGeoJson" xml:space="preserve"><value>Scarica GeoJSON ({0})</value></data>
+  <!-- Containers admin sub-page -->
+  <data name="CityPlanning_Admin_ContainersCard" xml:space="preserve"><value>Contenitori ({0})</value></data>
+  <data name="CityPlanning_Admin_ContainersDesc" xml:space="preserve"><value>Gestisci tutti i contenitori — dell'organizzazione e dei barrios.</value></data>
+  <data name="CityPlanning_Admin_ManageContainers" xml:space="preserve"><value>Gestisci Contenitori</value></data>
+  <data name="CityPlanning_Admin_ContainerPlacement" xml:space="preserve"><value>Posizionamento contenitori</value></data>
+  <data name="CityPlanning_Admin_OpenContainerPlacement" xml:space="preserve"><value>Apri</value></data>
+  <data name="CityPlanning_Admin_CloseContainerPlacement" xml:space="preserve"><value>Chiudi</value></data>
+  <data name="CityPlanning_Admin_OrgContainersSection" xml:space="preserve"><value>Contenitori Nobodies</value></data>
+  <data name="CityPlanning_Admin_OrgContainersEmpty" xml:space="preserve"><value>Nessun contenitore Nobodies per {0} ancora.</value></data>
+  <data name="CityPlanning_Admin_BarrioContainersSection" xml:space="preserve"><value>Contenitori Barrio</value></data>
+  <data name="CityPlanning_Admin_BarrioContainersEmpty" xml:space="preserve"><value>Nessun contenitore per {0} ancora.</value></data>
+  <data name="CityPlanning_Admin_AddOrgContainer" xml:space="preserve"><value>Aggiungi Contenitore Nobodies</value></data>
+  <data name="CityPlanning_Admin_AddBarrioContainer" xml:space="preserve"><value>Aggiungi Contenitore — {0}</value></data>
+  <data name="CityPlanning_Admin_OrgContainerNamePlaceholder" xml:space="preserve"><value>es. Contenitore Magazzino A</value></data>
+  <data name="CityPlanning_Admin_OrgContainerDescPlaceholder" xml:space="preserve"><value>Dimensione, tipo, posizione…</value></data>
   <data name="CityPlanning_HistoryTitle" xml:space="preserve"><value>Cronologia poligoni</value></data>
   <data name="CityPlanning_Loading" xml:space="preserve"><value>Caricamento…</value></data>
   <data name="CityPlanning_Help_WhenIsIt" xml:space="preserve"><value>Quando si svolge?</value></data>
@@ -1480,6 +1495,24 @@
   <data name="CityPlanning_Help_ColorsBody" xml:space="preserve"><value>Ogni barrio è colorato in base alla sua zona sonora preferita (modificabile dalla pagina del barrio).</value></data>
 
 
+  <!-- ======================== -->
+  <!-- Containers               -->
+  <!-- ======================== -->
+  <data name="Container_Breadcrumb" xml:space="preserve"><value>Contenitori</value></data>
+  <data name="Container_PlacementClosed" xml:space="preserve"><value>Il posizionamento dei contenitori è attualmente chiuso. Contatta il city planning per richiedere modifiche.</value></data>
+  <data name="Container_Empty" xml:space="preserve"><value>Nessun contenitore registrato per questa stagione.</value></data>
+  <data name="Container_AddModal_Title" xml:space="preserve"><value>Aggiungi Contenitore</value></data>
+  <data name="Container_EditModal_Title" xml:space="preserve"><value>Modifica Contenitore</value></data>
+  <data name="Container_UploadImageModal_Title" xml:space="preserve"><value>Carica Immagine — {0}</value></data>
+  <data name="Container_FieldName" xml:space="preserve"><value>Nome</value></data>
+  <data name="Container_FieldDescription" xml:space="preserve"><value>Descrizione</value></data>
+  <data name="Container_NamePlaceholder" xml:space="preserve"><value>es. Contenitore #1</value></data>
+  <data name="Container_DescPlaceholder" xml:space="preserve"><value>Dimensione, tipo, requisiti speciali…</value></data>
+  <data name="Container_ImageFileLabel" xml:space="preserve"><value>File immagine (JPEG, PNG o WebP — max 10 MB)</value></data>
+  <data name="Container_UploadImageTitle" xml:space="preserve"><value>Carica immagine</value></data>
+  <data name="Container_RemoveImageTitle" xml:space="preserve"><value>Rimuovi immagine</value></data>
+  <data name="Container_RemoveImageConfirm" xml:space="preserve"><value>Rimuovere l'immagine da {0}?</value></data>
+  <data name="Container_DeleteConfirm" xml:space="preserve"><value>Eliminare il contenitore {0}?</value></data>
   <!-- ======================== -->
   <!-- User-Facing Views        -->
   <!-- ======================== -->

@@ -172,16 +172,16 @@
             </div>
         </div>
 
-        <!-- Org Containers -->
+        <!-- Containers -->
         <div class="col-12">
             <div class="card">
                 <div class="card-header fw-semibold">
-                    <i class="fa-solid fa-box me-1"></i> Org Containers (@settings.Year)
+                    <i class="fa-solid fa-box me-1"></i> @string.Format(Localizer["CityPlanning_Admin_ContainersCard"], settings.Year)
                 </div>
                 <div class="card-body">
-                    <p class="mb-2">Infrastructure containers not tied to any specific barrio.</p>
+                    <p class="mb-2">@Localizer["CityPlanning_Admin_ContainersDesc"]</p>
                     <a asp-action="OrgContainers" asp-route-year="@settings.Year" class="btn btn-outline-secondary btn-sm">
-                        <i class="fa-solid fa-box me-1"></i> Manage Org Containers
+                        <i class="fa-solid fa-box me-1"></i> @Localizer["CityPlanning_Admin_ManageContainers"]
                     </a>
                 </div>
             </div>
