@@ -300,6 +300,7 @@ public class CityPlanningController : HumansControllerBase
         if (!await IsMapAdminAsync(user.Id, cancellationToken))
             return Forbid();
 
+        var settings = await _cityPlanningService.GetSettingsAsync(cancellationToken);
         var allContainers = await _containerService.GetAllByYearAsync(year, cancellationToken);
         var seasonBriefs = await _campService.GetCampSeasonBriefsForYearAsync(year, cancellationToken);
 
@@ -311,6 +312,7 @@ public class CityPlanningController : HumansControllerBase
         var vm = new OrgContainerIndexViewModel
         {
             Year = year,
+            IsContainerPlacementOpen = settings.IsContainerPlacementOpen,
             OrgContainers = allContainers
                 .Where(c => c.CampSeasonId is null)
                 .Select(ToContainerViewModel)

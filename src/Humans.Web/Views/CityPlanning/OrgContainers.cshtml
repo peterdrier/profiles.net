@@ -16,6 +16,38 @@
 
 <vc:temp-data-alerts />
 
+<div class="d-flex align-items-center gap-3 mb-4 p-3 border rounded">
+    <div>
+        <span class="fw-semibold me-2">Container placement:</span>
+        @if (Model.IsContainerPlacementOpen)
+        {
+            <span class="badge bg-success">Open</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">Closed</span>
+        }
+    </div>
+    @if (Model.IsContainerPlacementOpen)
+    {
+        <form method="post" asp-action="CloseContainerPlacement">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-warning btn-sm">
+                <i class="fa-solid fa-lock me-1"></i> Close
+            </button>
+        </form>
+    }
+    else
+    {
+        <form method="post" asp-action="OpenContainerPlacement">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-success btn-sm">
+                <i class="fa-solid fa-lock-open me-1"></i> Open
+            </button>
+        </form>
+    }
+</div>
+
 @* ── Org containers ──────────────────────────────────────────────────── *@
 <div class="d-flex align-items-center gap-2 mb-3">
     <h2 class="h4 mb-0">Org Containers</h2>

@@ -34,6 +34,7 @@ public class ContainerFormModel
 public class OrgContainerIndexViewModel
 {
     public int Year { get; set; }
+    public bool IsContainerPlacementOpen { get; set; }
     public List<ContainerViewModel> OrgContainers { get; set; } = new();
     public List<BarrioContainerGroup> BarrioGroups { get; set; } = new();
 }
