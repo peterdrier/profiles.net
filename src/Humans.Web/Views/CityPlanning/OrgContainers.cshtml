@@ -86,7 +86,7 @@ else
                             <form asp-action="DeleteOrgContainerImage" asp-route-id="@c.Id" method="post" class="d-inline">
                                 @Html.AntiForgeryToken()
                                 <button type="submit" class="btn btn-outline-warning btn-sm"
-                                        onclick="return confirm('Remove image from @c.Name?')">
+                                        data-confirm="Remove image from @c.Name?">
                                     <i class="fa-solid fa-image me-1"></i> Remove Image
                                 </button>
                             </form>
@@ -94,7 +94,7 @@ else
                         <form asp-action="DeleteOrgContainer" asp-route-id="@c.Id" method="post" class="d-inline">
                             @Html.AntiForgeryToken()
                             <button type="submit" class="btn btn-outline-danger btn-sm"
-                                    onclick="return confirm('Delete container @c.Name?')">
+                                    data-confirm="Delete container @c.Name?">
                                 <i class="fa-solid fa-trash me-1"></i> Delete
                             </button>
                         </form>
