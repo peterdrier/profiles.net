@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AwesomeAssertions;
 using Humans.Application.Interfaces.Budget;
 using Humans.Application.Interfaces.Camps;
+using Humans.Application.Interfaces.CitiPlanning;
 using Humans.Application.Interfaces.Teams;
 using Humans.Domain.Constants;
 using Humans.Web.Authorization;
@@ -29,6 +30,7 @@ public class AuthorizationPolicyTests : IDisposable
         // Register service stubs required by resource-based authorization handlers
         services.AddScoped(_ => Substitute.For<IBudgetService>());
         services.AddScoped(_ => Substitute.For<ICampService>());
+        services.AddScoped(_ => Substitute.For<ICityPlanningService>());
         services.AddScoped(_ => Substitute.For<ITeamService>());
         services.AddHumansAuthorizationPolicies();
         _serviceProvider = services.BuildServiceProvider();
