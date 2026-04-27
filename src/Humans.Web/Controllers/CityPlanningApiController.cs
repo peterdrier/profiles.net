@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Humans.Application.Interfaces.Camps;
 using Humans.Application.Interfaces.CitiPlanning;
+using Humans.Application.Interfaces.Containers;
 using Humans.Domain.Entities;
 using Humans.Web.Authorization;
 using Humans.Web.Extensions;
@@ -19,6 +20,7 @@ public class CityPlanningApiController : ControllerBase
 {
     private readonly ICityPlanningService _cityPlanningService;
     private readonly ICampService _campService;
+    private readonly IContainerService _containerService;
     private readonly IHubContext<CityPlanningHub> _hubContext;
     private readonly UserManager<User> _userManager;
     private readonly ILogger<CityPlanningApiController> _logger;
@@ -26,12 +28,14 @@ public class CityPlanningApiController : ControllerBase
     public CityPlanningApiController(
         ICityPlanningService cityPlanningService,
         ICampService campService,
+        IContainerService containerService,
         IHubContext<CityPlanningHub> hubContext,
         UserManager<User> userManager,
         ILogger<CityPlanningApiController> logger)
     {
         _cityPlanningService = cityPlanningService;
         _campService = campService;
+        _containerService = containerService;
         _hubContext = hubContext;
         _userManager = userManager;
         _logger = logger;
@@ -168,6 +172,87 @@ public class CityPlanningApiController : ControllerBase
         return Content(geoJson, "application/geo+json");
     }
 
+    /// <summary>Returns all containers for a year with canEdit flag per caller.</summary>
+    [HttpGet("containers/{year:int}")]
+    public async Task<IActionResult> GetContainers(int year, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUserId();
+        var isMapAdmin = await IsMapAdminAsync(userId, cancellationToken);
+        var settings = await _cityPlanningService.GetSettingsAsync(cancellationToken);
+        var userSeasonId = await _campService.GetCampLeadSeasonIdForYearAsync(userId, year, cancellationToken);
+
+        var containers = await _containerService.GetAllByYearAsync(year, cancellationToken);
+
+        var result = containers.Select(c => new
+        {
+            id = c.Id,
+            name = c.Name,
+            description = c.Description,
+            campSeasonId = c.CampSeasonId,
+            locationGeoJson = c.LocationGeoJson,
+            canEdit = isMapAdmin ||
+                      (settings.IsContainerPlacementOpen &&
+                       userSeasonId.HasValue &&
+                       c.CampSeasonId == userSeasonId),
+        });
+
+        return Ok(result);
+    }
+
+    /// <summary>Save or update the placement GeoJSON for a container.</summary>
+    [HttpPut("containers/{id:guid}/placement")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SaveContainerPlacement(
+        Guid id,
+        [FromBody] SaveContainerPlacementRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = CurrentUserId();
+        var container = await _containerService.GetByIdAsync(id, cancellationToken);
+        if (container is null) return NotFound();
+
+        var isMapAdmin = await IsMapAdminAsync(userId, cancellationToken);
+        if (!isMapAdmin)
+        {
+            var settings = await _cityPlanningService.GetSettingsAsync(cancellationToken);
+            var userSeasonId = await _campService.GetCampLeadSeasonIdForYearAsync(userId, container.Year, cancellationToken);
+            if (!settings.IsContainerPlacementOpen ||
+                !userSeasonId.HasValue ||
+                container.CampSeasonId != userSeasonId)
+                return Forbid();
+        }
+
+        if (string.IsNullOrWhiteSpace(request.GeoJson) || !IsValidContainerPlacementGeoJson(request.GeoJson))
+            return UnprocessableEntity("Invalid container placement GeoJSON.");
+
+        var updated = await _containerService.SavePlacementAsync(id, request.GeoJson, cancellationToken);
+        return Ok(new { id = updated.Id, locationGeoJson = updated.LocationGeoJson });
+    }
+
+    /// <summary>Clear the placement GeoJSON for a container.</summary>
+    [HttpDelete("containers/{id:guid}/placement")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ClearContainerPlacement(Guid id, CancellationToken cancellationToken)
+    {
+        var userId = CurrentUserId();
+        var container = await _containerService.GetByIdAsync(id, cancellationToken);
+        if (container is null) return NotFound();
+
+        var isMapAdmin = await IsMapAdminAsync(userId, cancellationToken);
+        if (!isMapAdmin)
+        {
+            var settings = await _cityPlanningService.GetSettingsAsync(cancellationToken);
+            var userSeasonId = await _campService.GetCampLeadSeasonIdForYearAsync(userId, container.Year, cancellationToken);
+            if (!settings.IsContainerPlacementOpen ||
+                !userSeasonId.HasValue ||
+                container.CampSeasonId != userSeasonId)
+                return Forbid();
+        }
+
+        await _containerService.ClearPlacementAsync(id, cancellationToken);
+        return NoContent();
+    }
+
     private static bool IsValidJson(string value)
     {
         try
@@ -180,4 +265,27 @@ public class CityPlanningApiController : ControllerBase
             return false;
         }
     }
+
+    private static bool IsValidContainerPlacementGeoJson(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (!string.Equals(root.GetProperty("type").GetString(), "Feature", StringComparison.Ordinal)) return false;
+            var geom = root.GetProperty("geometry");
+            if (!string.Equals(geom.GetProperty("type").GetString(), "Polygon", StringComparison.Ordinal)) return false;
+            var props = root.GetProperty("properties");
+            if (!props.TryGetProperty("center_lng", out _)) return false;
+            if (!props.TryGetProperty("center_lat", out _)) return false;
+            if (!props.TryGetProperty("rotation_degrees", out _)) return false;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }
+
+public record SaveContainerPlacementRequest(string GeoJson);
