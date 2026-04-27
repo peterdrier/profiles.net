@@ -133,6 +133,9 @@ public sealed class ContainerService : IContainerService
 
     public async Task<ContainerDto> SavePlacementAsync(Guid id, string geoJson, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(geoJson))
+            throw new ArgumentException("GeoJson must not be empty.", nameof(geoJson));
+
         var container = await _repo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Container not found.");
 

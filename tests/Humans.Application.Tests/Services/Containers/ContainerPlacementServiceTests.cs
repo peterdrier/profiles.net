@@ -15,30 +15,29 @@ namespace Humans.Application.Tests.Services.Containers;
 
 public class ContainerPlacementServiceTests : IDisposable
 {
-    private readonly HumansDbContext _dbContext;
+    private readonly DbContextOptions<HumansDbContext> _dbOptions;
     private readonly FakeClock _clock;
     private readonly ContainerService _sut;
     private readonly Instant _startTime = Instant.FromUtc(2026, 4, 26, 10, 0, 0);
 
     public ContainerPlacementServiceTests()
     {
-        var dbOptions = new DbContextOptionsBuilder<HumansDbContext>()
+        _dbOptions = new DbContextOptionsBuilder<HumansDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
-        _dbContext = new HumansDbContext(dbOptions);
         _clock = new FakeClock(_startTime);
-        var repo = new ContainerRepository(new TestDbContextFactory(dbOptions));
+        var repo = new ContainerRepository(new TestDbContextFactory(_dbOptions));
         _sut = new ContainerService(repo, Substitute.For<IContainerImageStorage>(), _clock);
     }
 
     public void Dispose()
     {
-        _dbContext.Dispose();
         GC.SuppressFinalize(this);
     }
 
     private async Task<Container> SeedContainerAsync(Guid? campSeasonId = null)
     {
+        await using var ctx = new HumansDbContext(_dbOptions);
         var container = new Container
         {
             Id = Guid.NewGuid(),
@@ -48,8 +47,8 @@ public class ContainerPlacementServiceTests : IDisposable
             CreatedAt = _startTime,
             UpdatedAt = _startTime,
         };
-        _dbContext.Containers.Add(container);
-        await _dbContext.SaveChangesAsync();
+        ctx.Containers.Add(container);
+        await ctx.SaveChangesAsync();
         return container;
     }
 
@@ -81,11 +80,13 @@ public class ContainerPlacementServiceTests : IDisposable
         var container = await SeedContainerAsync();
         var geoJson = """{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[]]},"properties":{"center_lng":-0.137,"center_lat":41.699,"rotation_degrees":0}}""";
         await _sut.SavePlacementAsync(container.Id, geoJson);
+        _clock.AdvanceSeconds(60);
 
         await _sut.ClearPlacementAsync(container.Id);
 
         var updated = await _sut.GetByIdAsync(container.Id);
         updated!.LocationGeoJson.Should().BeNull();
+        updated.UpdatedAt.Should().Be(_clock.GetCurrentInstant());
     }
 
     [HumansFact]
