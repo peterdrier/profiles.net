@@ -25,9 +25,8 @@ export function buildContainerPolygon(centerLng, centerLat, rotationDegrees) {
     const east = turf.destination(center, HALF_LEN_M,  90, { units: 'meters' }).geometry.coordinates;
     const tip  = turf.destination(center, TIP_DIST_M,  90, { units: 'meters' }).geometry.coordinates;
 
-    // Lat offset for width (same at any longitude direction)
+    // Lat offset for width (symmetric: south offset = same magnitude as north)
     const northLat = turf.destination(center, HALF_W_M, 0, { units: 'meters' }).geometry.coordinates[1];
-    const southLat = turf.destination(center, HALF_W_M, 180, { units: 'meters' }).geometry.coordinates[1];
     const dLat = northLat - centerLat; // positive delta
 
     const backNW  = [west[0], centerLat + dLat];
