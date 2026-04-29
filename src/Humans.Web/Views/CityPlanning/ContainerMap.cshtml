@@ -41,6 +41,8 @@
     </style>
 }
 
+@Html.AntiForgeryToken()
+
 <div id="map-page">
     <div id="container-sidebar" class="border-end">
         <div class="px-3 py-2 border-bottom fw-semibold">@Localizer["Container_Breadcrumb"] @Model.Year</div>
