@@ -231,7 +231,7 @@ public class CityPlanningApiController : ControllerBase
             var props = f?["properties"]?.AsObject();
             if (props != null)
             {
-                props["containerId"]   = c.Id.ToString();
+                props["containerId"] = c.Id.ToString();
                 props["containerName"] = c.Name;
                 props["type"] = "Container";
             }
@@ -240,7 +240,7 @@ public class CityPlanningApiController : ControllerBase
 
         var collection = new System.Text.Json.Nodes.JsonObject
         {
-            ["type"]     = "FeatureCollection",
+            ["type"] = "FeatureCollection",
             ["features"] = new System.Text.Json.Nodes.JsonArray(features.Select(f => (System.Text.Json.Nodes.JsonNode?)f).ToArray()),
         };
 
