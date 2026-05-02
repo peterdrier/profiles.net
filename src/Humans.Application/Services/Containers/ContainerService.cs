@@ -85,7 +85,9 @@ public sealed class ContainerService : IContainerService
             ?? throw new InvalidOperationException("Container not found.");
 
         if (container.ImageStoragePath is not null)
+        {
             _imageStorage.DeleteImage(container.ImageStoragePath);
+        }
 
         await _repo.DeleteAsync(id, ct);
     }
@@ -95,15 +97,22 @@ public sealed class ContainerService : IContainerService
         CancellationToken ct = default)
     {
         if (!AllowedContentTypes.Contains(contentType))
+        {
             throw new InvalidOperationException("Only JPEG, PNG, and WebP images are allowed.");
+        }
+
         if (length > MaxImageBytes)
+        {
             throw new InvalidOperationException("Image must be under 10 MB.");
+        }
 
         var container = await _repo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Container not found.");
 
         if (container.ImageStoragePath is not null)
+        {
             _imageStorage.DeleteImage(container.ImageStoragePath);
+        }
 
         var storagePath = await _imageStorage.SaveImageAsync(id, stream, contentType, ct);
         container.ImageStoragePath = storagePath;
@@ -120,7 +129,9 @@ public sealed class ContainerService : IContainerService
             ?? throw new InvalidOperationException("Container not found.");
 
         if (container.ImageStoragePath is null)
+        {
             return;
+        }
 
         _imageStorage.DeleteImage(container.ImageStoragePath);
         container.ImageStoragePath = null;
@@ -134,7 +145,9 @@ public sealed class ContainerService : IContainerService
     public async Task<ContainerDto> SavePlacementAsync(Guid id, string geoJson, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(geoJson))
+        {
             throw new ArgumentException("GeoJson must not be empty.", nameof(geoJson));
+        }
 
         var container = await _repo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Container not found.");

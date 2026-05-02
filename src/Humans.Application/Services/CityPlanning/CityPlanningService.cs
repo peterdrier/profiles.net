@@ -132,7 +132,9 @@ public sealed class CityPlanningService : ICityPlanningService
     {
         var rows = await _repo.GetHistoryForCampSeasonAsync(campSeasonId, cancellationToken);
         if (rows.Count == 0)
+        {
             return [];
+        }
 
         // Resolve display names through IUserService — no cross-domain .Include().
         var userIds = rows.Select(r => r.ModifiedByUserId).Distinct().ToList();
