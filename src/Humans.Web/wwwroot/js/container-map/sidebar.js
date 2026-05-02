@@ -4,19 +4,21 @@
 const unplacedEl = document.getElementById('sidebar-unplaced');
 const placedEl   = document.getElementById('sidebar-placed');
 
-let _containers  = [];    // current container data array
-let _campNames   = {};    // campSeasonId → campName
-let _activeId    = null;  // currently active container ID
+let _containers        = [];    // current container data array
+let _campNames         = {};    // campSeasonId → campName
+let _activeId          = null;  // currently active container ID
+let _filterCampSeasonId = null; // if set, sidebar only shows this barrio's containers
 let _onActivate  = null;  // callback(container) when user clicks an unplaced card
 let _onClear     = null;  // callback(container) when user clicks "Clear placement"
 let _onSelect    = null;  // callback(container) when user clicks a placed card
 let _onLocate    = null;  // callback(container) when user clicks the locate button
 
-export function initSidebar(onActivate, onClear, onSelect, onLocate) {
-    _onActivate = onActivate;
-    _onClear    = onClear;
-    _onSelect   = onSelect;
-    _onLocate   = onLocate;
+export function initSidebar(onActivate, onClear, onSelect, onLocate, filterCampSeasonId = null) {
+    _onActivate         = onActivate;
+    _onClear            = onClear;
+    _onSelect           = onSelect;
+    _onLocate           = onLocate;
+    _filterCampSeasonId = filterCampSeasonId;
 }
 
 /** Provide the campSeasonId → campName lookup used for barrio group headers. */
@@ -54,8 +56,11 @@ export function scrollToPlaced(id) {
 }
 
 function render() {
-    renderSection(unplacedEl, _containers.filter(c => !c.locationGeoJson), false);
-    renderSection(placedEl,   _containers.filter(c =>  c.locationGeoJson), true);
+    const visible = _filterCampSeasonId
+        ? _containers.filter(c => c.campSeasonId === _filterCampSeasonId)
+        : _containers;
+    renderSection(unplacedEl, visible.filter(c => !c.locationGeoJson), false);
+    renderSection(placedEl,   visible.filter(c =>  c.locationGeoJson), true);
 }
 
 function renderSection(sectionEl, items, isPlaced) {

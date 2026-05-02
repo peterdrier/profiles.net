@@ -112,6 +112,7 @@ async function init() {
             const f = JSON.parse(container.locationGeoJson);
             map.flyTo({ center: [f.properties.center_lng, f.properties.center_lat], duration: 400 });
         },
+        CONFIG.IS_MAP_ADMIN ? null : CONFIG.USER_CAMP_SEASON_ID || null,
     );
     setContainers(containers);
 

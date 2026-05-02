@@ -305,11 +305,15 @@ public class CityPlanningController : HumansControllerBase
             return Forbid();
 
         string campSlug = string.Empty;
+        string campName = string.Empty;
         if (!isMapAdmin && userSeasonId.HasValue)
         {
             var displayData = await _campService.GetCampSeasonDisplayDataForYearAsync(year, cancellationToken);
             if (displayData.TryGetValue(userSeasonId.Value, out var data))
+            {
                 campSlug = data.CampSlug;
+                campName = data.Name;
+            }
         }
 
         return View(new ContainerMapViewModel
@@ -318,6 +322,7 @@ public class CityPlanningController : HumansControllerBase
             IsMapAdmin = isMapAdmin,
             UserCampSeasonId = userSeasonId?.ToString() ?? string.Empty,
             CampSlug = campSlug,
+            CampName = campName,
         });
     }
 

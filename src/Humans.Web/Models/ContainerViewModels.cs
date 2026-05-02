@@ -54,4 +54,5 @@ public class ContainerMapViewModel
     public bool IsMapAdmin { get; set; }
     public string UserCampSeasonId { get; set; } = string.Empty; // empty for admins
     public string CampSlug { get; set; } = string.Empty; // empty for admins
+    public string CampName { get; set; } = string.Empty; // empty for admins
 }
