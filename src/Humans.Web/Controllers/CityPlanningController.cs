@@ -84,7 +84,7 @@ public class CityPlanningController : HumansControllerBase
         return View();
     }
 
-    [HttpGet("Admin")]
+    [HttpGet("BarrioMap/Admin")]
     public async Task<IActionResult> Admin(CancellationToken cancellationToken)
     {
         var (error, user) = await RequireCurrentUserAsync();
@@ -97,7 +97,7 @@ public class CityPlanningController : HumansControllerBase
         return View();
     }
 
-    [HttpPost("Admin/OpenPlacement")]
+    [HttpPost("BarrioMap/Admin/OpenPlacement")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> OpenPlacement(CancellationToken cancellationToken)
     {
@@ -111,7 +111,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpPost("Admin/ClosePlacement")]
+    [HttpPost("BarrioMap/Admin/ClosePlacement")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ClosePlacement(CancellationToken cancellationToken)
     {
@@ -125,7 +125,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpPost("Admin/OpenContainerPlacement")]
+    [HttpPost("BarrioMap/Admin/OpenContainerPlacement")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> OpenContainerPlacement(CancellationToken cancellationToken)
     {
@@ -141,7 +141,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year = settings.Year });
     }
 
-    [HttpPost("Admin/CloseContainerPlacement")]
+    [HttpPost("BarrioMap/Admin/CloseContainerPlacement")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CloseContainerPlacement(CancellationToken cancellationToken)
     {
@@ -157,7 +157,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year = settings.Year });
     }
 
-    [HttpPost("Admin/UploadLimitZone")]
+    [HttpPost("BarrioMap/Admin/UploadLimitZone")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadLimitZone(IFormFile file, CancellationToken cancellationToken)
     {
@@ -188,7 +188,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpPost("Admin/UpdatePlacementDates")]
+    [HttpPost("BarrioMap/Admin/UpdatePlacementDates")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UpdatePlacementDates(string? opensAt, string? closesAt, CancellationToken cancellationToken)
     {
@@ -221,7 +221,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpGet("Admin/DownloadLimitZone")]
+    [HttpGet("BarrioMap/Admin/DownloadLimitZone")]
     public async Task<IActionResult> DownloadLimitZone(CancellationToken cancellationToken)
     {
         var (error, user) = await RequireCurrentUserAsync();
@@ -236,7 +236,7 @@ public class CityPlanningController : HumansControllerBase
         return File(bytes, "application/geo+json", $"limit-zone-{settings.Year}.geojson");
     }
 
-    [HttpPost("Admin/DeleteLimitZone")]
+    [HttpPost("BarrioMap/Admin/DeleteLimitZone")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteLimitZone(CancellationToken cancellationToken)
     {
@@ -250,7 +250,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpPost("Admin/UploadOfficialZones")]
+    [HttpPost("BarrioMap/Admin/UploadOfficialZones")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadOfficialZones(IFormFile file, CancellationToken cancellationToken)
     {
@@ -281,7 +281,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Admin));
     }
 
-    [HttpGet("Admin/DownloadOfficialZones")]
+    [HttpGet("BarrioMap/Admin/DownloadOfficialZones")]
     public async Task<IActionResult> DownloadOfficialZones(CancellationToken cancellationToken)
     {
         var (error, user) = await RequireCurrentUserAsync();
@@ -296,7 +296,7 @@ public class CityPlanningController : HumansControllerBase
         return File(bytes, "application/geo+json", $"official-zones-{settings.Year}.geojson");
     }
 
-    [HttpPost("Admin/DeleteOfficialZones")]
+    [HttpPost("BarrioMap/Admin/DeleteOfficialZones")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOfficialZones(CancellationToken cancellationToken)
     {
@@ -349,7 +349,7 @@ public class CityPlanningController : HumansControllerBase
         });
     }
 
-    [HttpGet("Admin/Containers/{year}")]
+    [HttpGet("BarrioMap/Admin/Containers/{year}")]
     public async Task<IActionResult> Containers(int year, CancellationToken cancellationToken)
     {
         var (error, user) = await RequireCurrentUserAsync();
@@ -402,7 +402,7 @@ public class CityPlanningController : HumansControllerBase
         IsPlaced = c.LocationGeoJson is not null,
     };
 
-    [HttpPost("Admin/Containers/{year}/Barrios/{seasonId}/Create")]
+    [HttpPost("BarrioMap/Admin/Containers/{year}/Barrios/{seasonId}/Create")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateBarrioContainer(int year, Guid seasonId, ContainerFormModel model, CancellationToken cancellationToken)
     {
@@ -428,7 +428,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year });
     }
 
-    [HttpPost("Admin/Containers/{year}/Create")]
+    [HttpPost("BarrioMap/Admin/Containers/{year}/Create")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> CreateOrgContainer(int year, ContainerFormModel model, CancellationToken cancellationToken)
     {
@@ -454,7 +454,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year });
     }
 
-    [HttpPost("Admin/Containers/{id}/Edit")]
+    [HttpPost("BarrioMap/Admin/Containers/{id}/Edit")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> EditOrgContainer(Guid id, ContainerFormModel model, CancellationToken cancellationToken)
     {
@@ -483,7 +483,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year = container.Year });
     }
 
-    [HttpPost("Admin/Containers/{id}/Delete")]
+    [HttpPost("BarrioMap/Admin/Containers/{id}/Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOrgContainer(Guid id, CancellationToken cancellationToken)
     {
@@ -502,7 +502,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year });
     }
 
-    [HttpPost("Admin/Containers/{id}/Image/Upload")]
+    [HttpPost("BarrioMap/Admin/Containers/{id}/Image/Upload")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> UploadOrgContainerImage(Guid id, IFormFile? file, CancellationToken cancellationToken)
     {
@@ -534,7 +534,7 @@ public class CityPlanningController : HumansControllerBase
         return RedirectToAction(nameof(Containers), new { year = container.Year });
     }
 
-    [HttpPost("Admin/Containers/{id}/Image/Delete")]
+    [HttpPost("BarrioMap/Admin/Containers/{id}/Image/Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteOrgContainerImage(Guid id, CancellationToken cancellationToken)
     {
