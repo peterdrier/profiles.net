@@ -375,7 +375,8 @@ public class CityPlanningController : HumansControllerBase
         Name = c.Name,
         Description = c.Description,
         ImageUrl = c.ImageStoragePath,
-        ImageFileName = c.ImageFileName
+        ImageFileName = c.ImageFileName,
+        IsPlaced = c.LocationGeoJson is not null,
     };
 
     [HttpPost("Admin/Containers/{year}/Barrios/{seasonId}/Create")]

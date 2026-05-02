@@ -20,6 +20,7 @@ public class ContainerViewModel
     public string? Description { get; set; }
     public string? ImageUrl { get; set; }
     public string? ImageFileName { get; set; }
+    public bool IsPlaced { get; set; }
 }
 
 public class ContainerFormModel
