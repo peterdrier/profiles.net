@@ -1,4 +1,6 @@
 // Server-side values injected via data-* attributes on #map, plus static constants.
+import { ESRI_TILES, MAP_BOUNDS } from '../shared/map-constants.js';
+
 const el = document.getElementById('map');
 
 export const CONFIG = {
@@ -6,9 +8,6 @@ export const CONFIG = {
     IS_PLACEMENT_OPEN:   el.dataset.isPlacementOpen === 'true',
     IS_MAP_ADMIN:        el.dataset.isMapAdmin === 'true',
 
-    ESRI_TILES: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    MAP_BOUNDS: [
-        [-0.14285979741055144, 41.696961407716145],
-        [-0.13157837273621453, 41.70290716137069],
-    ], // [SW, NE] corners of festival site
+    ESRI_TILES,
+    MAP_BOUNDS, // [SW, NE] corners of festival site
 };

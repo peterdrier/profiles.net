@@ -3,6 +3,7 @@ import { appState } from './state.js';
 import { CONFIG } from './config.js';
 import { isOutsideZone, overlapsOtherCamps, getSoundZoneOutOfRange, SIZE_RATIO_UPPER, SIZE_RATIO_LOWER } from './geometry.js';
 import { setActivePolygonDim } from './layers.js';
+import { isMeasuring } from '../shared/measure.js';
 
 function getCampSoundZone(campSeasonId) {
     if (!campSeasonId) return -1;
@@ -29,7 +30,7 @@ function escHtml(s) {
 // --- Popup ---
 
 export function onCampPolygonClick(e) {
-    if (appState.activeCampSeasonId || appState.measuringActive) return;
+    if (appState.activeCampSeasonId || isMeasuring()) return;
     const props = e.features[0].properties;
     const campSeasonId = props.campSeasonId;
     const isOwn = props.campSeasonId === CONFIG.USER_CAMP_SEASON_ID;

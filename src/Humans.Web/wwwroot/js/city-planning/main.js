@@ -2,7 +2,9 @@
 // Shows official zones and camps always; containers and camp limits are togglable.
 
 import { CONFIG } from './config.js';
-import { initMeasure, enterMeasureMode, exitMeasureMode, isMeasuring } from '../container-map/measure.js';
+import { initMeasure, enterMeasureMode, exitMeasureMode, isMeasuring } from './shared/measure.js';
+import { addOfficialZonesLayers } from './shared/official-zones-layer.js';
+import { SOUND_ZONE_FILL_EXPR, SOUND_ZONE_LINE_EXPR } from './shared/sound-zone-colors.js';
 
 const LAYER_GROUPS = {
     containers:  ['containers-fill', 'containers-active-fill', 'containers-labels'],
@@ -26,16 +28,7 @@ async function init() {
     const state = await fetch('/api/city-planning/state').then(r => r.json());
 
     // ── Official zones (always visible) ──────────────────────────────────────
-    if (state.officialZonesGeoJson) {
-        map.addSource('official-zones', { type: 'geojson', data: JSON.parse(state.officialZonesGeoJson) });
-        map.addLayer({ id: 'official-zones-fill', type: 'fill', source: 'official-zones', paint: { 'fill-color': '#555555', 'fill-opacity': 0.12 } });
-        map.addLayer({ id: 'official-zones-line', type: 'line', source: 'official-zones', paint: { 'line-color': '#555555', 'line-width': 1.5 } });
-        map.addLayer({
-            id: 'official-zones-labels', type: 'symbol', source: 'official-zones',
-            layout: { 'text-field': ['get', 'name'], 'text-size': 12, 'text-anchor': 'center', 'text-allow-overlap': false },
-            paint: { 'text-color': '#333333', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
-        });
-    }
+    addOfficialZonesLayers(map, state.officialZonesGeoJson);
 
     // ── Camps (always visible) ────────────────────────────────────────────────
     const campFeatures = (state.campPolygons ?? [])
@@ -51,21 +44,11 @@ async function init() {
     map.addSource('camp-polygons', { type: 'geojson', data: { type: 'FeatureCollection', features: campFeatures } });
     map.addLayer({
         id: 'camp-polygons-fill', type: 'fill', source: 'camp-polygons',
-        paint: {
-            'fill-color': ['match', ['get', 'soundZone'],
-                0, '#88aadd', 1, '#88bb88', 2, '#ddcc66', 3, '#ddaa66', 4, '#dd8888', '#aaaaaa',
-            ],
-            'fill-opacity': 0.25,
-        },
+        paint: { 'fill-color': SOUND_ZONE_FILL_EXPR, 'fill-opacity': 0.25 },
     });
     map.addLayer({
         id: 'camp-polygons-outline', type: 'line', source: 'camp-polygons',
-        paint: {
-            'line-color': ['match', ['get', 'soundZone'],
-                0, '#2266cc', 1, '#229944', 2, '#cc9900', 3, '#cc6600', 4, '#cc1111', '#666666',
-            ],
-            'line-width': 1.5,
-        },
+        paint: { 'line-color': SOUND_ZONE_LINE_EXPR, 'line-width': 1.5 },
     });
     map.addLayer({
         id: 'camp-polygons-labels', type: 'symbol', source: 'camp-polygons',

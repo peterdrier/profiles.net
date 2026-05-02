@@ -9,7 +9,7 @@ import {
 } from './edit.js';
 import { initSignalR } from './signalr.js';
 import { MarqueeDirectSelectMode } from './marquee-direct-select.js';
-import { initMeasure, enterMeasureMode, exitMeasureMode } from './measure.js';
+import { initMeasure, enterMeasureMode, exitMeasureMode, isMeasuring } from '../shared/measure.js';
 
 async function init() {
     appState.map = new maplibregl.Map({
@@ -78,7 +78,7 @@ async function init() {
 
 // Global keydown: Delete/Backspace for vertex deletion when draw doesn't have focus
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && appState.measuringActive) {
+    if (e.key === 'Escape' && isMeasuring()) {
         exitMeasureMode();
         return;
     }
@@ -138,8 +138,9 @@ document.getElementById('cancel-btn')?.addEventListener('click', () => {
 });
 
 document.getElementById('measure-btn')?.addEventListener('click', () => {
-    if (appState.measuringActive) exitMeasureMode();
-    else enterMeasureMode();
+    if (isMeasuring()) { exitMeasureMode(); return; }
+    if (appState.activeCampSeasonId) exitEditMode();
+    enterMeasureMode();
 });
 
 init();
