@@ -100,11 +100,6 @@ export function addContainerLayers(map) {
         filter: ['==', ['get', 'canEdit'], false],
         paint: { 'fill-color': '#e8a020', 'fill-opacity': 0.6 },
     });
-    map.addLayer({
-        id: 'containers-readonly-outline', type: 'line', source: 'containers',
-        filter: ['==', ['get', 'canEdit'], false],
-        paint: { 'line-color': '#c07010', 'line-width': 1.5 },
-    });
 
     // Editable containers (canEdit = true, not active)
     map.addLayer({
@@ -112,20 +107,11 @@ export function addContainerLayers(map) {
         filter: ['==', ['get', 'canEdit'], true],
         paint: { 'fill-color': '#e8a020', 'fill-opacity': 0.85 },
     });
-    map.addLayer({
-        id: 'containers-editable-outline', type: 'line', source: 'containers',
-        filter: ['==', ['get', 'canEdit'], true],
-        paint: { 'line-color': '#ffffff', 'line-width': 2 },
-    });
 
     // Active container (separate source)
     map.addLayer({
         id: 'containers-active-fill', type: 'fill', source: 'container-active',
         paint: { 'fill-color': '#4fc3f7', 'fill-opacity': 0.9 },
-    });
-    map.addLayer({
-        id: 'containers-active-outline', type: 'line', source: 'container-active',
-        paint: { 'line-color': '#ffffff', 'line-width': 2.5 },
     });
 
     // Labels (shown at close zoom on non-active containers)
