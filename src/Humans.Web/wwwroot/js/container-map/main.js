@@ -26,7 +26,7 @@ async function init() {
         container: 'map',
         style: {
             version: 8,
-            sources: { esri: { type: 'raster', tiles: [CONFIG.ESRI_TILES], tileSize: 256, attribution: '© Esri' } },
+            sources: { esri: { type: 'raster', tiles: [CONFIG.ESRI_TILES], tileSize: 256, maxzoom: 19, attribution: '© Esri' } },
             layers: [{ id: 'esri-layer', type: 'raster', source: 'esri' }],
         },
         bounds: CONFIG.MAP_BOUNDS,
