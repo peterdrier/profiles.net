@@ -1464,6 +1464,7 @@
   <!-- CityPlanning                -->
   <!-- ======================== -->
   <!-- Map page -->
+  <data name="CityPlanning_BarrioMapTitle" xml:space="preserve"><value>Barrio placement map</value></data>
   <data name="CityPlanning_PlacementPhase" xml:space="preserve"><value>Placement phase</value></data>
   <data name="CityPlanning_StatusOpen" xml:space="preserve"><value>Open</value></data>
   <data name="CityPlanning_StatusClosed" xml:space="preserve"><value>Closed</value></data>
@@ -1477,7 +1478,8 @@
   <data name="CityPlanning_BarrioZones" xml:space="preserve"><value>Barrio zones</value></data>
   <data name="CityPlanning_Layers" xml:space="preserve"><value>Layers</value></data>
   <data name="CityPlanning_AdminLink" xml:space="preserve"><value>Admin</value></data>
-  <data name="CityPlanning_GoToPlacementMap" xml:space="preserve"><value>Go to placement map</value></data>
+  <data name="CityPlanning_GoToPlacementMap" xml:space="preserve"><value>Go to barrio placement</value></data>
+  <data name="CityPlanning_GoToContainerMap" xml:space="preserve"><value>Go to container placement</value></data>
   <data name="CityPlanning_PlacementPhaseInfo" xml:space="preserve"><value>Placement phase info</value></data>
   <!-- Admin page -->
   <data name="CityPlanning_Admin_Title" xml:space="preserve"><value>Barrio Map Admin</value></data>

@@ -99,7 +99,7 @@
                             <a class="nav-link" asp-area="" asp-controller="Calendar" asp-action="Index">Calendar</a>
                         </li>
                         <li class="nav-item" authorize-policy="IsActiveMember">
-                            <a class="nav-link" asp-area="" asp-controller="CityPlanning" asp-action="BarrioMap">@Localizer["Nav_City"]</a>
+                            <a class="nav-link" asp-area="" asp-controller="CityPlanning" asp-action="Index">@Localizer["Nav_City"]</a>
                         </li>
                         @if (!isAuthenticated || !hasProfile)
                         {

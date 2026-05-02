@@ -1448,6 +1448,7 @@
   <!-- ======================== -->
   <!-- CityPlanning                -->
   <!-- ======================== -->
+  <data name="CityPlanning_BarrioMapTitle" xml:space="preserve"><value>Carte de placement des barrios</value></data>
   <data name="CityPlanning_PlacementPhase" xml:space="preserve"><value>Phase de placement</value></data>
   <data name="CityPlanning_StatusOpen" xml:space="preserve"><value>Ouverte</value></data>
   <data name="CityPlanning_StatusClosed" xml:space="preserve"><value>Fermée</value></data>
@@ -1461,7 +1462,8 @@
   <data name="CityPlanning_BarrioZones" xml:space="preserve"><value>Zones de barrio</value></data>
   <data name="CityPlanning_Layers" xml:space="preserve"><value>Couches</value></data>
   <data name="CityPlanning_AdminLink" xml:space="preserve"><value>Admin</value></data>
-  <data name="CityPlanning_GoToPlacementMap" xml:space="preserve"><value>Aller à la carte de placement</value></data>
+  <data name="CityPlanning_GoToPlacementMap" xml:space="preserve"><value>Aller au placement des barrios</value></data>
+  <data name="CityPlanning_GoToContainerMap" xml:space="preserve"><value>Aller au placement des conteneurs</value></data>
   <data name="CityPlanning_Admin_Title" xml:space="preserve"><value>Admin Carte des Barrios</value></data>
   <data name="CityPlanning_Admin_ViewMap" xml:space="preserve"><value>Voir la carte</value></data>
   <data name="CityPlanning_Admin_PlacementPhaseCard" xml:space="preserve"><value>Phase de Placement</value></data>
@@ -1575,8 +1577,8 @@
   <data name="Container_RemoveImageTitle" xml:space="preserve"><value>Supprimer l'image</value></data>
   <data name="Container_RemoveImageConfirm" xml:space="preserve"><value>Supprimer l'image de {0} ?</value></data>
   <data name="Container_DeleteConfirm" xml:space="preserve"><value>Supprimer le conteneur {0} ?</value></data>
-  <data name="ContainerMap_Unplaced" xml:space="preserve"><value>Non placés</value></data>
-  <data name="ContainerMap_Placed" xml:space="preserve"><value>Placés</value></data>
+  <data name="ContainerMap_Unplaced" xml:space="preserve"><value>Non placé</value></data>
+  <data name="ContainerMap_Placed" xml:space="preserve"><value>Placé</value></data>
   <data name="ContainerMap_Placing" xml:space="preserve"><value>En cours…</value></data>
   <data name="ContainerMap_ClearPlacement" xml:space="preserve"><value>Retirer le placement</value></data>
   <data name="ContainerMap_PlaceOnMap" xml:space="preserve"><value>Placer sur la carte</value></data>

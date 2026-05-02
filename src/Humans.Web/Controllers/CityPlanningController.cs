@@ -41,11 +41,18 @@ public class CityPlanningController : HumansControllerBase
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
-        var (error, _) = await RequireCurrentUserAsync();
+        var (error, user) = await RequireCurrentUserAsync();
         if (error != null) return error;
 
         var settings = await _cityPlanningService.GetSettingsAsync(cancellationToken);
+        var isMapAdmin = await IsMapAdminAsync(user.Id, cancellationToken);
+        var userSeasonId = await _campService.GetCampLeadSeasonIdForYearAsync(user.Id, settings.Year, cancellationToken);
+
         ViewBag.Year = settings.Year;
+        ViewBag.IsMapAdmin = isMapAdmin;
+        ViewBag.IsBarrioLead = userSeasonId.HasValue;
+        ViewBag.IsPlacementOpen = settings.IsPlacementOpen;
+        ViewBag.IsContainerPlacementOpen = settings.IsContainerPlacementOpen;
 
         return View();
     }

@@ -1,6 +1,12 @@
 @{
     ViewData["Title"] = "City Planning";
     var year = (int)ViewBag.Year;
+    var isMapAdmin = ViewBag.IsMapAdmin == true;
+    var isBarrioLead = ViewBag.IsBarrioLead == true;
+    var isPlacementOpen = ViewBag.IsPlacementOpen == true;
+    var isContainerPlacementOpen = ViewBag.IsContainerPlacementOpen == true;
+    var showBarrioMapLink = isMapAdmin || (isBarrioLead && isPlacementOpen);
+    var showContainerMapLink = isMapAdmin || (isBarrioLead && isContainerPlacementOpen);
 }
 
 @section Styles {
@@ -38,6 +44,25 @@
                 </button>
             </div>
         </div>
+        @if (showBarrioMapLink || showContainerMapLink)
+        {
+            <div class="card shadow-sm">
+                <div class="card-body py-2 px-3 d-flex flex-column gap-1">
+                    @if (showBarrioMapLink)
+                    {
+                        <a asp-action="BarrioMap" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fa-solid fa-map-location-dot me-1"></i> @Localizer["CityPlanning_GoToPlacementMap"]
+                        </a>
+                    }
+                    @if (showContainerMapLink)
+                    {
+                        <a asp-action="ContainerMap" asp-route-year="@year" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="fa-solid fa-box me-1"></i> @Localizer["CityPlanning_GoToContainerMap"]
+                        </a>
+                    }
+                </div>
+            </div>
+        }
     </div>
 </div>
 
