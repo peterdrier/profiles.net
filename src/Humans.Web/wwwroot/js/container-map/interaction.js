@@ -1,6 +1,6 @@
 // Custom drag-to-move and drag-handle-to-rotate interaction for container placement.
 
-import { buildContainerPolygon, getTriangleTipCoords, rotationFromBearing } from './geometry.js';
+import { buildContainerPolygon, getRotationHandleCoordsForContainer, rotationFromBearing } from './geometry.js';
 import { updateActiveSource } from './layers.js';
 
 let _map         = null;
@@ -63,7 +63,7 @@ export function activateContainer(container, centerLng, centerLat) {
 
     updateActiveSource(_map, _activeFeature);
     repositionHandle();
-    rotationHandle.style.display = 'block';
+    rotationHandle.style.display = 'flex';
 
     _map.panTo([centerLng, centerLat], { duration: 300 });
 }
@@ -81,7 +81,7 @@ export function selectPlacedContainer(container) {
 
     updateActiveSource(_map, _activeFeature);
     repositionHandle();
-    rotationHandle.style.display = 'block';
+    rotationHandle.style.display = 'flex';
 }
 
 /**
@@ -179,8 +179,8 @@ async function onDocumentMouseUp() {
 
 function repositionHandle() {
     if (!_activeFeature || !_map) return;
-    const tipCoords = getTriangleTipCoords(_activeFeature);
-    const pixel     = _map.project(tipCoords);
+    const backCenter = getRotationHandleCoordsForContainer(_activeFeature);
+    const pixel      = _map.project(backCenter);
     rotationHandle.style.left = `${pixel.x}px`;
     rotationHandle.style.top  = `${pixel.y}px`;
 }

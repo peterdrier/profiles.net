@@ -53,11 +53,18 @@ export function buildContainerPolygon(centerLng, centerLat, rotationDegrees) {
 }
 
 /**
- * Returns the [lng, lat] of the triangle tip vertex from a built polygon.
- * Used to position the rotation handle DOM element.
+ * Returns the [lng, lat] position to place the rotation handle (next to the door triangle)
  */
-export function getTriangleTipCoords(feature) {
-    return feature.geometry.coordinates[0][TRIANGLE_TIP_INDEX];
+export function getRotationHandleCoordsForContainer(feature) {
+    const coords = feature.geometry.coordinates[0];
+    const s = coords[3]; // tri-base-S
+    const n = coords[5]; // tri-base-N
+    const baseCenter = [(s[0] + n[0]) / 2, (s[1] + n[1]) / 2];
+    const tip = coords[4];
+    return [
+      tip[0] + (tip[0] - baseCenter[0]),
+      tip[1] + (tip[1] - baseCenter[1]),
+    ];
 }
 
 /**
