@@ -249,6 +249,8 @@ public class ContainerController : HumansControllerBase
         var dto = await _containerService.GetByIdAsync(id, ct);
         if (dto is null) return null;
 
+        // ContainerAuthorizationHandler only reads CampSeasonId (to check camp lead ownership).
+        // If the handler is extended to inspect other fields, populate them here too.
         return new Container
         {
             Id = dto.Id,
