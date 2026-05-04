@@ -24,6 +24,7 @@ public static class AuthorizationPolicyExtensions
         services.AddScoped<IAuthorizationHandler, AgentRateLimitHandler>();
         services.AddScoped<IAuthorizationHandler, BudgetAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, CampAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, StoreOrderAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, TeamAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, IsAnyTeamManagerOrCoordinatorHandler>();
         services.AddSingleton<IAuthorizationHandler, IssuesAuthorizationHandler>();
@@ -52,6 +53,7 @@ public static class AuthorizationPolicyExtensions
                     RoleNames.TicketAdmin,
                     RoleNames.FeedbackAdmin,
                     RoleNames.FinanceAdmin,
+                    RoleNames.StoreAdmin,
                     RoleNames.NoInfoAdmin,
                     RoleNames.VolunteerCoordinator,
                     RoleNames.ConsentCoordinator));
@@ -85,6 +87,9 @@ public static class AuthorizationPolicyExtensions
 
             options.AddPolicy(PolicyNames.FinanceAdminOrAdmin, policy =>
                 policy.RequireRole(RoleNames.FinanceAdmin, RoleNames.Admin));
+
+            options.AddPolicy(PolicyNames.StoreCatalogAdmin, policy =>
+                policy.RequireRole(RoleNames.StoreAdmin, RoleNames.FinanceAdmin, RoleNames.Admin));
 
             options.AddPolicy(PolicyNames.ReviewQueueAccess, policy =>
                 policy.RequireRole(RoleNames.ConsentCoordinator, RoleNames.VolunteerCoordinator,

@@ -112,4 +112,12 @@ public enum AuditAction
     UserEmailAdded,
     ShiftSignupCreated,
     ShiftSignupReassigned,
+    StoreOrderCreated,
+    StoreLineAdded,
+    StoreLineRemoved,
+    StoreCounterpartyEdited,
+    StoreProductCreated,
+    StoreProductUpdated,
+    StoreProductDeactivated,
+    StorePaymentRecorded,
 }
