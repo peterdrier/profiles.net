@@ -65,6 +65,7 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
     private readonly IUserEmailService _userEmailService;
     private readonly IAuditLogService _auditLogService;
     private readonly ISyncSettingsService _syncSettingsService;
+    private readonly IGoogleRemovalNotificationService _removalNotifications;
     private readonly GoogleWorkspaceOptions _options;
     private readonly IClock _clock;
     private readonly IServiceProvider _serviceProvider;
@@ -83,6 +84,7 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
         IUserEmailService userEmailService,
         IAuditLogService auditLogService,
         ISyncSettingsService syncSettingsService,
+        IGoogleRemovalNotificationService removalNotifications,
         IOptions<GoogleWorkspaceOptions> options,
         IClock clock,
         IServiceProvider serviceProvider,
@@ -100,6 +102,7 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
         _userEmailService = userEmailService;
         _auditLogService = auditLogService;
         _syncSettingsService = syncSettingsService;
+        _removalNotifications = removalNotifications;
         _options = options.Value;
         _clock = clock;
         _serviceProvider = serviceProvider;
@@ -326,11 +329,25 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
     /// <remarks>
     /// GATEWAY METHOD: the only path that removes a user from a Google Group.
     /// Respects SyncSettings — skips if GoogleGroups mode is not AddAndRemove.
+    /// Public callers default to <see cref="SyncRemovalReason.Reconciliation"/>;
+    /// the internal email-rotation cleanup in <see cref="AddUserToTeamResourcesAsync"/>
+    /// passes <see cref="SyncRemovalReason.EmailRotation"/> as advisory
+    /// telemetry — the post-removal notification fires either way (issue
+    /// peterdrier/Humans#639). The user receives a Variant 2 ("secondary
+    /// cleanup") email at the rotated-out address.
     /// </remarks>
-    public async Task RemoveUserFromGroupAsync(
+    public Task RemoveUserFromGroupAsync(
         Guid groupResourceId,
         string userEmail,
         CancellationToken cancellationToken = default)
+        => RemoveUserFromGroupAsync(
+            groupResourceId, userEmail, SyncRemovalReason.Reconciliation, cancellationToken);
+
+    private async Task RemoveUserFromGroupAsync(
+        Guid groupResourceId,
+        string userEmail,
+        SyncRemovalReason reason,
+        CancellationToken cancellationToken)
     {
         var mode = await _syncSettingsService.GetModeAsync(SyncServiceType.GoogleGroups, cancellationToken);
         if (mode != SyncMode.AddAndRemove)
@@ -378,6 +395,27 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
             $"Removed {userEmail} from Google Group ({resource.Name})",
             nameof(GoogleWorkspaceSyncService),
             userEmail, "MEMBER", GoogleSyncSource.ManualSync, success: true);
+
+        // Issue peterdrier/Humans#639 — notify the affected user only on a
+        // confirmed Google API removal. The notification service applies its
+        // own variant + suppression logic (orphan address, email rotation).
+        try
+        {
+            var groupEmail = TryDeriveGroupEmail(resource);
+            await _removalNotifications.NotifyRemovalAsync(
+                userEmail,
+                GoogleResourceType.Group,
+                resource.Name,
+                groupEmail,
+                reason,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to enqueue removal notification for {UserEmail} from group {GroupId}",
+                userEmail, resource.GoogleId);
+        }
     }
 
     /// <summary>
@@ -435,13 +473,17 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
     /// <summary>
     /// GATEWAY METHOD: the only path that removes a user from a Google Drive
     /// resource. Respects SyncSettings — skips if GoogleDrive mode is not
-    /// AddAndRemove.
+    /// AddAndRemove. The <paramref name="reason"/> defaults to
+    /// <see cref="SyncRemovalReason.Reconciliation"/> and is forwarded to
+    /// the notification service for audit / telemetry; it does not
+    /// currently drive suppression (issue peterdrier/Humans#639).
     /// </summary>
     private async Task RemoveUserFromDriveAsync(
         GoogleResource resource,
         string permissionId,
         string userEmail,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        SyncRemovalReason reason = SyncRemovalReason.Reconciliation)
     {
         var mode = await _syncSettingsService.GetModeAsync(SyncServiceType.GoogleDrive, cancellationToken);
         if (mode != SyncMode.AddAndRemove)
@@ -464,6 +506,56 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
             $"Removed Drive access for {userEmail} ({resource.Name})",
             nameof(GoogleWorkspaceSyncService),
             userEmail, resource.DrivePermissionLevel.ToApiRole(), GoogleSyncSource.ManualSync, success: true);
+
+        // Issue peterdrier/Humans#639 — notify only on confirmed delete.
+        try
+        {
+            await _removalNotifications.NotifyRemovalAsync(
+                userEmail,
+                resource.ResourceType,
+                resource.Name,
+                resource.Url,
+                reason,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to enqueue Drive removal notification for {UserEmail} on {GoogleId}",
+                userEmail, resource.GoogleId);
+        }
+    }
+
+    /// <summary>
+    /// Best-effort derivation of a Google Group's primary email address
+    /// from its resource URL (<c>https://groups.google.com/a/{domain}/g/{prefix}</c>).
+    /// Returns <c>null</c> when the URL is missing or cannot be parsed —
+    /// callers fall back to the resource name in that case (issue
+    /// peterdrier/Humans#639 graceful-fallback acceptance criterion).
+    /// </summary>
+    private string? TryDeriveGroupEmail(GoogleResource resource)
+    {
+        if (resource.ResourceType != GoogleResourceType.Group)
+        {
+            return null;
+        }
+        if (string.IsNullOrWhiteSpace(resource.Url))
+        {
+            return null;
+        }
+
+        const string marker = "/g/";
+        var idx = resource.Url.IndexOf(marker, StringComparison.Ordinal);
+        if (idx < 0)
+        {
+            return null;
+        }
+        var prefix = resource.Url[(idx + marker.Length)..].TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(_options.Domain))
+        {
+            return null;
+        }
+        return $"{prefix}@{_options.Domain}";
     }
 
     // ==========================================================================
@@ -589,7 +681,11 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
                 await AddUserToGroupAsync(resource.Id, googleEmail, cancellationToken);
                 if (previousEmail is not null)
                 {
-                    await RemoveUserFromGroupAsync(resource.Id, previousEmail, cancellationToken);
+                    // Tag the removal as EmailRotation for audit; the recipient
+                    // still gets a Variant 2 ("secondary cleanup") email
+                    // (issue peterdrier/Humans#639).
+                    await RemoveUserFromGroupAsync(
+                        resource.Id, previousEmail, SyncRemovalReason.EmailRotation, cancellationToken);
                 }
             }
             else
@@ -612,7 +708,8 @@ public sealed class GoogleWorkspaceSyncService : IGoogleSyncService
                     await AddUserToGroupAsync(resource.Id, googleEmail, cancellationToken);
                     if (previousEmail is not null)
                     {
-                        await RemoveUserFromGroupAsync(resource.Id, previousEmail, cancellationToken);
+                        await RemoveUserFromGroupAsync(
+                            resource.Id, previousEmail, SyncRemovalReason.EmailRotation, cancellationToken);
                     }
                 }
                 else
