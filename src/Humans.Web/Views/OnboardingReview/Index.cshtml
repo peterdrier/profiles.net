@@ -31,10 +31,18 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
                         <human-link user-id="@item.UserId" display-name="@item.DisplayName"
-                                    mode="AvatarName" size="40"
-                                    profile-picture-url="@item.ProfilePictureUrl">
-                            <small class="text-muted">@item.Email</small>
-                        </human-link>
+                                    mode="Avatar" size="40" show-popover="false"
+                                    profile-picture-url="@item.ProfilePictureUrl" />
+                        <a asp-controller="Profile" asp-action="ViewProfile" asp-route-id="@item.UserId"
+                           class="ms-2 text-decoration-none text-reset"
+                           data-human-popover="true"
+                           data-user-id="@item.UserId">
+                            <span class="fw-semibold">@item.DisplayName</span>
+                            @if (!string.IsNullOrWhiteSpace(item.LegalName))
+                            {
+                                <span class="fw-normal text-muted"> - @item.LegalName</span>
+                            }
+                        </a>
                     </div>
                     <div class="text-end">
                         @if (item.MembershipTier != MembershipTier.Volunteer)
@@ -74,10 +82,18 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div class="d-flex align-items-center">
                         <human-link user-id="@item.UserId" display-name="@item.DisplayName"
-                                    mode="AvatarName" size="40"
-                                    profile-picture-url="@item.ProfilePictureUrl">
-                            <small class="text-muted">@item.Email</small>
-                        </human-link>
+                                    mode="Avatar" size="40" show-popover="false"
+                                    profile-picture-url="@item.ProfilePictureUrl" />
+                        <a asp-controller="Profile" asp-action="ViewProfile" asp-route-id="@item.UserId"
+                           class="ms-2 text-decoration-none text-reset"
+                           data-human-popover="true"
+                           data-user-id="@item.UserId">
+                            <span class="fw-semibold">@item.DisplayName</span>
+                            @if (!string.IsNullOrWhiteSpace(item.LegalName))
+                            {
+                                <span class="fw-normal text-muted"> - @item.LegalName</span>
+                            }
+                        </a>
                     </div>
                     <div class="text-end">
                         @if (item.MembershipTier != MembershipTier.Volunteer)

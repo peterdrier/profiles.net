@@ -409,6 +409,7 @@ public class OnboardingReviewController : HumansControllerBase
         {
             UserId = profile.UserId,
             DisplayName = itemUser?.DisplayName ?? "Unknown",
+            LegalName = profile.FullName,
             ProfilePictureUrl = itemUser?.ProfilePictureUrl,
             Email = itemUser?.Email ?? string.Empty,
             ConsentCheckStatus = profile.ConsentCheckStatus,
