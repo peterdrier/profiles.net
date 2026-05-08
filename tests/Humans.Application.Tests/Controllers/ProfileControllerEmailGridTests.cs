@@ -8,6 +8,7 @@ using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Campaigns;
 using Humans.Application.Interfaces.Email;
 using Humans.Application.Interfaces.Gdpr;
+using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.HumanLifecycle;
 using Humans.Application.Interfaces.Onboarding;
 using Humans.Application.Interfaces.Profiles;
@@ -101,6 +102,7 @@ public class ProfileControllerEmailGridTests
             new FakeClock(Instant.FromUtc(2026, 4, 30, 12, 0)),
             _authorizationService,
             Substitute.For<IUserService>(),
+            Substitute.For<IMembershipCalculator>(),
             Substitute.For<IHttpClientFactory>(),
             _signInManager,
             Options.Create(new GoogleWorkspaceOptions()));

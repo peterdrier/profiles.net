@@ -41,7 +41,8 @@ public record FullProfile(
     IReadOnlyList<string>? AllVerifiedEmails = null,
     string? GoogleEmail = null,
     IReadOnlyList<UserEmailSnapshot>? UserEmails = null,
-    ProfileState? State = null)
+    ProfileState? State = null,
+    bool IsRejected = false)
 {
     /// <summary>
     /// Backward-compat alias for the renamed <see cref="PrimaryEmail"/>. Kept
@@ -126,7 +127,8 @@ public record FullProfile(
             AllVerifiedEmails: verified,
             GoogleEmail: google,
             UserEmails: snapshots,
-            State: profile.State);
+            State: profile.State,
+            IsRejected: profile.RejectedAt is not null);
     }
 
     /// <summary>
@@ -173,7 +175,8 @@ public record FullProfile(
                 ? Array.Empty<string>()
                 : new[] { notificationEmail },
             GoogleEmail: null,
-            State: profile.State);
+            State: profile.State,
+            IsRejected: profile.RejectedAt is not null);
     }
 
     public static FullProfile Create(Profile profile, User user, string? notificationEmail = null) =>
