@@ -32,6 +32,7 @@ Per-human personal data: profile, contact fields, emails, communication preferen
 - **CV Entries** (sub-aggregate of Profile, table `volunteer_history_entries`) record volunteer involvement history.
 - **Profile Languages** (sub-aggregate of Profile, table `profile_languages`) record self-assessed proficiency in ISO 639-1 language codes.
 - **Duplicate Account Detection** scans for email addresses appearing on multiple accounts (across `User.Email` and `UserEmail.Email`, with gmail/googlemail equivalence). Admin can resolve by archiving the duplicate and re-linking its logins to the real account.
+- **Email Problems** scans every UserEmail invariant violation (multi/zero IsPrimary or IsGoogle, unverified rows, cross-user collisions, orphan rows, ghost AspNetUserLogins). Reads source-of-truth from the `FullProfile` cache. Read-only-plus-three-actions admin surface; the cross-user merge action shares its kernel with `IAccountMergeService.AcceptAsync`.
 - **Account Merge** consolidates two accounts into one, transferring all associated data (emails, contact fields, CV entries, role assignments, memberships) to the surviving account.
 
 ## Data Model
@@ -173,11 +174,12 @@ Per-user email addresses (login, verified, notifications). Cross-domain nav `Use
 | UserId | Guid | FK → User (Cascade) — **FK only**, no nav |
 | Email | string (256) | Required |
 | IsVerified | bool | Required |
-| IsOAuth | bool | True for the OAuth login email; cannot be deleted |
-| IsNotificationTarget | bool | Exactly one verified email per user is the system-notification target |
+| Provider | string? (50) | OAuth provider that owns this row when the user signed in via OIDC ("Google" today; future Apple/Microsoft). Null when no OAuth identity is linked. Single-row-per-(Provider, ProviderKey) is service-enforced |
+| ProviderKey | string? (256) | OAuth subject/key (OIDC `sub`) for the linked identity. Stable across Google Workspace email renames; OAuth callback updates `Email` when claims diverge. Same-user merge in `UserEmailRepository.RewriteEmailAddressAsync` propagates `Provider`/`ProviderKey` to the surviving row to preserve OAuth linkage |
+| IsGoogle | bool | User-controlled flag for the canonical Google Workspace identity (used by Google sync and Workspace admin). At-most-one-true-per-UserId is service-enforced. **Never auto-derived** — set only via explicit user action in the Profile email grid |
+| IsPrimary | bool | Exactly one verified email per user is the system-notification target. Service-enforced via `EnsurePrimaryInvariantAsync`; column persists under legacy name `IsNotificationTarget` per `no-column-drops-for-decoupling.md` |
 | Visibility | ContactFieldVisibility? | Stored as string (max 50); null hides the email from profile view |
 | VerificationSentAt | Instant? | Last time a verification email was sent (rate limiting) |
-| DisplayOrder | int | Sort order in the UI |
 | CreatedAt / UpdatedAt | Instant | Maintained by `UserEmailService` |
 
 **Indexes:** `UserId`; **unique partial index** on `Email` filtered to `IsVerified = true` (Postgres `"IsVerified" = true`) — prevents email squatting across accounts.
@@ -337,6 +339,11 @@ Admin-only flows for the section's cross-account hygiene:
 | `/Admin/DuplicateAccounts` | List detected duplicate-account groups (`AdminDuplicateAccountsController`) |
 | `/Admin/DuplicateAccounts/Detail` | Side-by-side comparison of two candidate accounts |
 | `/Admin/DuplicateAccounts/Resolve` | Archive the duplicate and re-link logins to the survivor |
+| `/Profile/Admin/EmailProblems` | List UserEmail invariant violations across all accounts (`ProfileAdminController`) |
+| `/Profile/Admin/EmailProblems/Compare` | Side-by-side detail for a case-5 cross-user email collision |
+| `/Profile/Admin/EmailProblems/Merge` | POST — admin-initiated merge via `IAccountMergeService.AdminMergeAsync` |
+| `/Profile/Admin/EmailProblems/DeleteOrphanEmail` | POST — delete a single orphan UserEmail row |
+| `/Profile/Admin/EmailProblems/DeleteGhostLogins` | POST — delete every AspNetUserLogins row for a userId with no UserEmails |
 
 ## Actors & Roles
 
@@ -395,7 +402,7 @@ Admin-only flows for the section's cross-account hygiene:
 
 ## Architecture
 
-**Owning services:** `ProfileService`, `ContactFieldService`, `UserEmailService`, `CommunicationPreferenceService`, `AccountMergeService`, `DuplicateAccountService`
+**Owning services:** `ProfileService`, `ContactFieldService`, `UserEmailService`, `CommunicationPreferenceService`, `AccountMergeService`, `DuplicateAccountService`, `EmailProblemsService`
 **Owned tables:** `profiles`, `contact_fields`, `user_emails`, `communication_preferences`, `volunteer_history_entries`, `profile_languages`, `account_merge_requests`
 **Status:** (A) Migrated — canonical §15 reference implementation (peterdrier/Humans PR #235, 2026-04-20). `AccountMergeService` / `DuplicateAccountService` moved into `Humans.Application/Services/Profile/` after the original migration (they now live alongside the other Profile-section services in the code tree; design-rules §8 ownership updated accordingly).
 
