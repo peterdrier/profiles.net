@@ -36,14 +36,40 @@ public interface IUserEmailService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Verifies an email address using a token.
-    /// If the email is already verified on another account, creates a merge request
-    /// instead of completing verification.
-    /// Returns a result indicating the email and whether a merge request was created.
+    /// Verifies an email address using a token. <paramref name="emailId"/>
+    /// identifies the specific pending row the verification link was issued
+    /// for — the token is bound to this row's Id via the token's purpose
+    /// suffix, so passing it here disambiguates when the same user has
+    /// multiple pending plain rows (issue nobodies-collective/Humans#611).
+    /// If the email is already verified on another account, creates a merge
+    /// request instead of completing verification. Returns a result
+    /// indicating the email and whether a merge request was created.
     /// </summary>
     Task<VerifyEmailResult> VerifyEmailAsync(
         Guid userId,
+        Guid emailId,
         string token,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Admin-only: marks a pending plain (non-OAuth) UserEmail row verified
+    /// without consuming a verification token. Used when the user can't
+    /// complete the token flow themselves (mailbox unreachable, lost link,
+    /// expired link) but the admin has confirmed ownership through other
+    /// means. Mirrors <see cref="VerifyEmailAsync"/>'s duplicate-email
+    /// branch — if the address is already verified on another account, a
+    /// merge request is created instead of completing verification.
+    /// Writes an audit entry attributing the action to
+    /// <paramref name="actorUserId"/>. Throws
+    /// <see cref="System.ComponentModel.DataAnnotations.ValidationException"/>
+    /// when the row is not found, already verified, or has a non-null
+    /// <see cref="UserEmail.Provider"/> (provider-attached rows are verified
+    /// through the OAuth callback, not this path).
+    /// </summary>
+    Task<VerifyEmailResult> AdminMarkVerifiedAsync(
+        Guid userId,
+        Guid emailId,
+        Guid actorUserId,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -190,6 +216,32 @@ public interface IUserEmailService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Returns every <see cref="UserEmail"/> entity belonging to
+    /// <paramref name="userId"/>, including the per-row metadata
+    /// (<c>IsVerified</c>, <c>IsPrimary</c>, <c>IsGoogle</c>,
+    /// <c>Provider</c>, etc.). Used by cross-section callers
+    /// (GoogleAdmin / GoogleWorkspaceSync) that need the row-level metadata
+    /// to compute Google-rename detection or sync flags. Returns an empty
+    /// list when the user has no emails. The return type is the raw
+    /// entity rather than a DTO because the callers genuinely need the
+    /// per-row flags — projecting to a DTO would just rename them.
+    /// </summary>
+    Task<IReadOnlyList<UserEmail>> GetEntitiesByUserIdAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns every <see cref="UserEmail"/> grouped by <c>UserId</c>. Used
+    /// by cross-section callers that need to bulk-load row-level metadata
+    /// for a known set of users (e.g. the Google sync hot path that calls
+    /// this once per reconcile). Users with no emails are absent from the
+    /// returned dictionary.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<UserEmail>>> GetEntitiesByUserIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns the notification-target email for each of the given user ids
     /// (batch query). Users with no notification target are absent from the
     /// returned dictionary. Used by cross-section callers (Tickets "who
@@ -235,9 +287,17 @@ public interface IUserEmailService
     /// Rewrites the user's <see cref="Domain.Entities.UserEmail"/> row
     /// whose address matches <paramref name="oldEmail"/> (case-insensitive) to
     /// <paramref name="newEmail"/> and stamps <c>UpdatedAt</c>. Used by the
-    /// admin rename-fix flow. No-op if the user has no matching row.
+    /// admin rename-fix flow and by the OAuth rename detector.
+    ///
+    /// Returns a <see cref="RewriteEmailAddressOutcome"/> describing what
+    /// happened (rewritten, merged into a same-user row, cross-user conflict,
+    /// or source row not found). Never throws on a unique-index conflict —
+    /// see <see cref="IUserEmailRepository.RewriteEmailAddressAsync"/> for the
+    /// branching contract. Cross-user conflicts are logged at
+    /// <c>LogWarning</c> with structured properties (no exception object) and
+    /// surfaced to admins via the duplicate-account detection flow.
     /// </summary>
-    Task RewriteEmailAddressAsync(
+    Task<RewriteEmailAddressOutcome> RewriteEmailAddressAsync(
         Guid userId, string oldEmail, string newEmail,
         CancellationToken cancellationToken = default);
 
@@ -266,6 +326,47 @@ public interface IUserEmailService
     /// </summary>
     Task<bool> SetGoogleAsync(
         Guid userId, Guid userEmailId, Guid actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears <see cref="UserEmail.IsGoogle"/> on a single row without promoting
+    /// any sibling — admin recovery path for the data-corruption case where
+    /// multiple rows have <c>IsGoogle = true</c> for the same user (an
+    /// invariant violation that bypasses <see cref="SetGoogleAsync"/>).
+    /// Returns <c>false</c> when the row is not found for this user or is
+    /// already cleared. Owner-gated via
+    /// <see cref="IUserEmailRepository.GetByIdAndUserIdAsync"/>.
+    /// </summary>
+    Task<bool> ClearGoogleAsync(
+        Guid userId, Guid userEmailId, Guid actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clears <see cref="UserEmail.IsPrimary"/> on a single row without
+    /// promoting any sibling — admin recovery path for cases where multiple
+    /// rows are flagged primary or where the admin needs to deliberately
+    /// pick a new primary after dropping the current one. Leaves the user
+    /// in the temporarily-no-primary state; the admin is expected to call
+    /// <see cref="SetPrimaryAsync"/> afterward (or
+    /// <c>EnsurePrimaryInvariantAsync</c> will fire on the next mutating
+    /// path). Returns <c>false</c> when the row is not found for this user
+    /// or is already cleared.
+    /// </summary>
+    Task<bool> ClearPrimaryAsync(
+        Guid userId, Guid userEmailId, Guid actorUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns one entry per user whose UserEmail rows currently violate the
+    /// admin-visible flag invariants:
+    /// <list type="bullet">
+    /// <item>more than one row with <c>IsGoogle = true</c>; or</item>
+    /// <item>verified rows present but the count of <c>IsPrimary = true</c>
+    /// verified rows is not exactly 1.</item>
+    /// </list>
+    /// Used by the Google admin "email flag violations" remediation screen.
+    /// </summary>
+    Task<IReadOnlyList<UserEmailFlagViolation>> GetEmailFlagViolationsAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -329,3 +430,30 @@ public record UserEmailMatch(
     bool IsPrimary,
     bool IsVerified,
     Instant UpdatedAt);
+
+/// <summary>
+/// Per-user summary of UserEmail flag-invariant violations. Returned by
+/// <see cref="IUserEmailService.GetEmailFlagViolationsAsync"/> for the
+/// admin remediation screen.
+/// </summary>
+/// <param name="UserId">The user with the violation.</param>
+/// <param name="DisplayName">Display name (for the admin grid). May be null
+/// if the User row is missing or has no display name.</param>
+/// <param name="IsGoogleCount">How many rows have <c>IsGoogle = true</c>.
+/// A healthy value is 0 or 1; values &gt; 1 are violations.</param>
+/// <param name="VerifiedCount">How many rows are verified.</param>
+/// <param name="VerifiedPrimaryCount">How many verified rows have
+/// <c>IsPrimary = true</c>. A healthy value is 1 (when verified rows exist)
+/// or 0 (when no verified rows exist).</param>
+/// <param name="HasMultipleGoogle">Convenience flag — true when
+/// <see cref="IsGoogleCount"/> &gt; 1.</param>
+/// <param name="HasPrimaryProblem">Convenience flag — true when verified
+/// rows exist and <see cref="VerifiedPrimaryCount"/> is not exactly 1.</param>
+public record UserEmailFlagViolation(
+    Guid UserId,
+    string? DisplayName,
+    int IsGoogleCount,
+    int VerifiedCount,
+    int VerifiedPrimaryCount,
+    bool HasMultipleGoogle,
+    bool HasPrimaryProblem);

@@ -67,7 +67,7 @@ public class AdminController : HumansControllerBase
         CancellationToken ct)
     {
         var firstName = User.Identity?.Name?.Split(' ').FirstOrDefault() ?? "";
-        var activeHumans = await profileService.GetActiveApprovedCountAsync(ct);
+        var activeHumans = (await profileService.GetActiveApprovedUserIdsAsync(ct)).Count;
         var (filled, total, ratio) = await shifts.GetOverallCoverageAsync(ct);
         var openFeedback = await feedback.GetActionableCountAsync(ct);
         var recent = (await auditLog.GetRecentAsync(8, ct))
@@ -136,9 +136,9 @@ public class AdminController : HumansControllerBase
 
     [HttpGet("Logs")]
     [Authorize(Policy = PolicyNames.AdminOnly)]
-    public IActionResult Logs(int count = 200)
+    public IActionResult Logs(int count = 1000)
     {
-        count = Math.Clamp(count, 1, 200);
+        count = Math.Clamp(count, 1, 1000);
         var sink = Infrastructure.InMemoryLogSink.Instance;
         var events = sink.GetEvents(count);
         ViewBag.LifetimeCounts = sink.GetLifetimeCounts();

@@ -143,6 +143,8 @@
   <data name="Dashboard_ProfileCard" xml:space="preserve"><value>Profile</value></data>
   <data name="Dashboard_ProfileComplete" xml:space="preserve"><value>Your profile is complete.</value></data>
   <data name="Dashboard_ProfileIncomplete" xml:space="preserve"><value>Complete your profile to help us know you better.</value></data>
+  <data name="Dashboard_ProfileCompletionPercent" xml:space="preserve"><value>Your profile is {0}% complete</value><comment>{0} = percentage 0-99</comment></data>
+  <data name="Dashboard_FinishProfile" xml:space="preserve"><value>Finish profile</value></data>
   <data name="Dashboard_ViewProfile" xml:space="preserve"><value>View Profile</value></data>
   <data name="Dashboard_ConsentsCard" xml:space="preserve"><value>Agreements</value></data>
   <data name="Dashboard_ConsentsNeeded" xml:space="preserve"><value>&lt;strong&gt;{0}&lt;/strong&gt; of {1} documents need your consent.</value><comment>{0} = pending count, {1} = total required</comment></data>
@@ -362,6 +364,8 @@
   <data name="Emails_Description" xml:space="preserve"><value>Manage your email addresses. Your sign-in email is always included. Add additional emails, set which one receives notifications, and control profile visibility.</value></data>
   <data name="Emails_YourEmails" xml:space="preserve"><value>Your Email Addresses</value></data>
   <data name="Emails_AddNew" xml:space="preserve"><value>Add Email Address</value></data>
+  <data name="Emails_MergeWarningTitle" xml:space="preserve"><value>Merging accounts?</value></data>
+  <data name="Emails_MergeWarningBody" xml:space="preserve"><value>Account merge is for combining two accounts that belong to the same person (for example, an old email and a new email that are both yours). It is not a way to share or transfer tickets, bookings, or other items between two different people. Ticket transfer between humans is a separate feature, coming soon.</value></data>
   <data name="Emails_VerificationWillBeSent" xml:space="preserve"><value>A verification email will be sent to this address.</value></data>
   <data name="Emails_SendVerification" xml:space="preserve"><value>Send Verification Email</value></data>
   <data name="Emails_ResendCooldown" xml:space="preserve"><value>You can request a new verification email in {0} minute(s).</value><comment>{0} = minutes remaining</comment></data>
@@ -1362,21 +1366,22 @@
   <data name="Feedback_Error" xml:space="preserve"><value>Something went wrong submitting your feedback. Please try again.</value></data>
 
   <!-- Agent Widget -->
-  <data name="Agent_ConsentPrompt" xml:space="preserve"><value>Before using the in-app helper, please review and accept the Agent Chat Terms.</value></data>
-  <data name="Agent_ConsentReviewButton" xml:space="preserve"><value>Review Agent Chat Terms</value></data>
-  <data name="Agent_HistoryActions" xml:space="preserve"><value>Actions</value></data>
-  <data name="Agent_HistoryDelete" xml:space="preserve"><value>Delete</value></data>
   <data name="Agent_HistoryEmpty" xml:space="preserve"><value>No conversations yet.</value></data>
   <data name="Agent_HistoryLastMessage" xml:space="preserve"><value>Last message</value></data>
   <data name="Agent_HistoryMessages" xml:space="preserve"><value>Messages</value></data>
   <data name="Agent_HistoryStarted" xml:space="preserve"><value>Started</value></data>
   <data name="Agent_HistoryTitle" xml:space="preserve"><value>Agent — My Conversations</value></data>
   <data name="Agent_InputPlaceholder" xml:space="preserve"><value>Ask a question about how the system works…</value></data>
-  <data name="Agent_PanelTitle" xml:space="preserve"><value>Helper</value></data>
+  <data name="Agent_PanelTitle" xml:space="preserve"><value>Assistant</value></data>
+  <data name="Agent_TermsLink" xml:space="preserve"><value>AI Terms</value></data>
   <data name="Agent_Send" xml:space="preserve"><value>Send</value></data>
   <data name="Agent_ViewHistory" xml:space="preserve"><value>History</value></data>
   <data name="Agent_WidgetButton" xml:space="preserve"><value>Open the helper</value></data>
-  <data name="Nav_Agent" xml:space="preserve"><value>Helper</value></data>
+  <data name="Help_WidgetButton" xml:space="preserve"><value>Help</value></data>
+  <data name="Help_Menu_TalkWithAgent" xml:space="preserve"><value>Talk with the Assistant</value></data>
+  <data name="Help_Menu_CreateIssue" xml:space="preserve"><value>Create issue</value></data>
+  <data name="Help_Agent_IssueProposed" xml:space="preserve"><value>I can't answer this myself. I've drafted an issue for the team — please review and submit it.</value></data>
+  <data name="Nav_Agent" xml:space="preserve"><value>Assistant</value></data>
 
   <!-- Magic Link Auth -->
   <data name="Email_MagicLinkLogin_Subject" xml:space="preserve"><value>Your login link for Nobodies</value></data>
@@ -1687,6 +1692,10 @@
   <data name="CommPrefs_Alert" xml:space="preserve"><value>Alert</value></data>
   <data name="CommPrefs_BackToProfile" xml:space="preserve"><value>Back to Profile</value></data>
   <data name="CommPrefs_BackToDashboard" xml:space="preserve"><value>Back to Dashboard</value></data>
+  <data name="CommPrefs_OneClick_Prompt" xml:space="preserve"><value>You clicked an unsubscribe link from {0} emails.</value></data>
+  <data name="CommPrefs_OneClick_Hint" xml:space="preserve"><value>One-click unsubscribe, or fine-tune the matrix below.</value></data>
+  <data name="CommPrefs_OneClick_Button" xml:space="preserve"><value>Unsubscribe from {0}</value></data>
+  <data name="CommPrefs_OneClick_Done" xml:space="preserve"><value>Unsubscribed. You can re-enable any category below.</value></data>
 
   <data name="Emails_Header_Email" xml:space="preserve"><value>Email</value></data>
   <data name="Emails_Header_Status" xml:space="preserve"><value>Status</value></data>
@@ -1804,6 +1813,17 @@
   <data name="Shifts_SaveAvailability" xml:space="preserve"><value>Save Availability</value></data>
   <data name="Shifts_DaysSelected" xml:space="preserve"><value>days selected</value></data>
   <data name="Shifts_SlotsFull" xml:space="preserve"><value>Some days still need help but all available slots are currently full. Check back later in case spots open up.</value></data>
+  <data name="Shifts_ConfirmSignup_Title" xml:space="preserve"><value>Confirm your {0} sign-up</value></data>
+  <data name="Shifts_ConfirmSignup_Phase" xml:space="preserve"><value>You're signing up for {0} ({1} phase).</value></data>
+  <data name="Shifts_ConfirmSignup_Range" xml:space="preserve"><value>From {0} to {1} ({2} days).</value></data>
+  <data name="Shifts_ConfirmSignup_Range_Single" xml:space="preserve"><value>For {0} (1 day).</value></data>
+  <data name="Shifts_ConfirmSignup_ArriveBy" xml:space="preserve"><value>You'll be expected on site by {0}.</value></data>
+  <data name="Shifts_ConfirmSignup_Prompt" xml:space="preserve"><value>Is this the period you intended to sign up for?</value></data>
+  <data name="Shifts_ConfirmSignup_Confirm" xml:space="preserve"><value>Confirm sign-up</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Heading" xml:space="preserve"><value>Some days in this range conflict with shifts you're already signed up for:</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Row" xml:space="preserve"><value>{0} — already signed up for {1} ({2}–{3})</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_PartialNote" xml:space="preserve"><value>You're already signed up on a few of these days, so we'll only add the ones that are free.</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_AllBlocked" xml:space="preserve"><value>Looks like you already have a shift booked on every day in this range, so we can't add any of these.</value></data>
 
   <data name="ShiftDash_Title" xml:space="preserve"><value>Shift Dashboard</value></data>
   <data name="ShiftDash_ShiftsCount" xml:space="preserve"><value>{0} shifts</value><comment>{0} = count</comment></data>
@@ -1923,6 +1943,13 @@
   <data name="ShiftDash_PeriodFilter_EventShifts" xml:space="preserve"><value>Event</value></data>
   <data name="ShiftDash_PeriodFilter_Strike" xml:space="preserve"><value>Strike</value></data>
 
+  <data name="ShiftDash_SubPeriodFilter_Label" xml:space="preserve"><value>Set-up phase:</value></data>
+  <data name="ShiftDash_SubPeriodFilter_All" xml:space="preserve"><value>All set-up</value></data>
+  <data name="ShiftDash_SubPeriodFilter_FirstCrew" xml:space="preserve"><value>First crew</value></data>
+  <data name="ShiftDash_SubPeriodFilter_SetupWeek" xml:space="preserve"><value>Set-up week</value></data>
+  <data name="ShiftDash_SubPeriodFilter_PreEventWeek" xml:space="preserve"><value>Pre-event week</value></data>
+  <data name="ShiftDash_SubPeriodFilter_FinishingWeekend" xml:space="preserve"><value>Finishing weekend</value></data>
+
   <data name="ShiftDash_Departments_Title" xml:space="preserve"><value>Departments</value></data>
   <data name="ShiftDash_Departments_SortNote" xml:space="preserve"><value>sorted by lowest slot fill % first</value></data>
   <data name="ShiftDash_Countdown_Label" xml:space="preserve"><value>Countdown to feet on the ground</value></data>
@@ -2008,9 +2035,22 @@
   <data name="EmailGrid_SetGoogleRejected" xml:space="preserve"><value>Could not set Google service email — the row is unknown or not verified.</value></data>
   <data name="EmailGrid_UnlinkRejected" xml:space="preserve"><value>Could not unlink — the row is unknown or has no sign-in provider.</value></data>
   <data name="EmailGrid_GoogleServiceUpdated" xml:space="preserve"><value>Google service email updated. Sync will be retried with the new email.</value></data>
+  <data name="EmailGrid_GoogleFlagCleared" xml:space="preserve"><value>Google identity flag cleared from that row.</value></data>
+  <data name="EmailGrid_SetPrimary" xml:space="preserve"><value>Set primary</value></data>
+  <data name="EmailGrid_SetGoogle" xml:space="preserve"><value>Set Google</value></data>
+  <data name="EmailGrid_ClearGoogleRejected" xml:space="preserve"><value>Could not clear Google flag — the row is unknown or not currently flagged.</value></data>
+  <data name="EmailGrid_PrimaryFlagCleared" xml:space="preserve"><value>Primary flag cleared from that row.</value></data>
+  <data name="EmailGrid_ClearPrimaryRejected" xml:space="preserve"><value>Could not clear primary flag — the row is unknown or not currently flagged.</value></data>
+  <data name="EmailGrid_Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="EmailGrid_ConfirmClearGoogle" xml:space="preserve"><value>Clear the Google identity flag from this email row?</value></data>
+  <data name="EmailGrid_ConfirmClearPrimary" xml:space="preserve"><value>Clear the primary flag from this email row?</value></data>
   <data name="EmailGrid_UnlinkSuccess" xml:space="preserve"><value>Sign-in provider unlinked.</value></data>
   <data name="EmailGrid_DeleteRejectedHasProvider" xml:space="preserve"><value>This email is linked to a sign-in provider. Use Unlink instead.</value></data>
   <data name="EmailGrid_AdminAddSentVerification" xml:space="preserve"><value>Verification email sent to the user.</value></data>
+  <data name="EmailGrid_AdminVerify" xml:space="preserve"><value>Verify</value></data>
+  <data name="EmailGrid_ConfirmAdminVerify" xml:space="preserve"><value>Manually mark this email verified without the user clicking the link?</value></data>
+  <data name="EmailGrid_AdminVerifySuccess" xml:space="preserve"><value>Email manually verified.</value></data>
+  <data name="EmailGrid_AdminVerifyMergeRequested" xml:space="preserve"><value>This address is already verified on another account. A merge request was created instead of verifying.</value></data>
   <data name="EmailGrid_LinkFailed" xml:space="preserve"><value>We couldn't link this Google account. Please try again.</value></data>
   <data name="AdminDetail_ManageEmails" xml:space="preserve"><value>Manage emails</value></data>
 
@@ -2085,5 +2125,46 @@
   <data name="Issue_Assignee_Updated" xml:space="preserve"><value>Assignee updated.</value></data>
   <data name="Issue_Section_Updated" xml:space="preserve"><value>Section updated.</value></data>
   <data name="Issue_GitHub_Linked" xml:space="preserve"><value>Linked to GitHub.</value></data>
+
+  <data name="Welcome_Title" xml:space="preserve"><value>Welcome</value></data>
+  <data name="Welcome_Heading" xml:space="preserve"><value>You're in.</value></data>
+  <data name="Welcome_Subtitle" xml:space="preserve"><value>Your ticket for Elsewhere 2026 is confirmed.</value></data>
+  <data name="Welcome_ShiftsTitle" xml:space="preserve"><value>Now let's make this thing happen together.</value></data>
+  <data name="Welcome_ShiftsBody" xml:space="preserve"><value>Elsewhere isn't a festival you show up to — it's one you help build. Every human picks shifts: setting up before, keeping things running during, and taking it all down after.</value></data>
+  <data name="Welcome_ShiftsBody2" xml:space="preserve"><value>To browse and sign up for shifts, you need a Humans account. It takes a couple of minutes.</value></data>
+  <data name="Welcome_CTA" xml:space="preserve"><value>Sign in or create account</value></data>
+  <data name="Welcome_Footer" xml:space="preserve"><value>Already have an account? Same button — sign in and you'll land straight on the shifts page.</value></data>
+  <data name="Welcome_Contact" xml:space="preserve"><value>Questions? Reach us at</value></data>
+
+  <!-- Google sync removal notifications (issue peterdrier/Humans#639) -->
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Subject" xml:space="preserve"><value>You have been removed from the group {0}</value><comment>{0} = group email</comment></data>
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Group access removed&lt;/h2&gt;
+&lt;p&gt;Hi {0},&lt;/p&gt;
+&lt;p&gt;Your access to the Google Group &lt;strong&gt;{1}&lt;/strong&gt; (&lt;code&gt;{2}&lt;/code&gt;) has been removed.&lt;/p&gt;
+&lt;p&gt;This was an automatic action based on your current team and role assignments at Nobodies. You will no longer receive messages sent to this group.&lt;/p&gt;
+&lt;p&gt;If you believe this was done in error, please contact your team coordinator.&lt;/p&gt;
+&lt;p&gt;The Humans Team&lt;/p&gt;</value><comment>{0} = user name, {1} = group display name, {2} = group email</comment></data>
+
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Subject" xml:space="preserve"><value>Your access to {0} has been removed</value><comment>{0} = folder name</comment></data>
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Drive access removed&lt;/h2&gt;
+&lt;p&gt;Hi {0},&lt;/p&gt;
+&lt;p&gt;Your access to the shared folder &lt;strong&gt;{1}&lt;/strong&gt; has been removed.&lt;/p&gt;
+&lt;p&gt;This was an automatic action based on your current team and role assignments at Nobodies.&lt;/p&gt;
+&lt;p&gt;If you believe this was done in error, please contact your team coordinator.&lt;/p&gt;
+&lt;p&gt;The Humans Team&lt;/p&gt;</value><comment>{0} = user name, {1} = folder name</comment></data>
+
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Subject" xml:space="preserve"><value>{0} no longer has Nobodies group access</value><comment>{0} = removed email</comment></data>
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Body" xml:space="preserve"><value>&lt;h2&gt;Secondary email tidied up&lt;/h2&gt;
+&lt;p&gt;Hi {0},&lt;/p&gt;
+&lt;p&gt;The address &lt;strong&gt;{1}&lt;/strong&gt; has been removed from Nobodies groups and shared folders.&lt;/p&gt;
+&lt;p&gt;Your primary Nobodies email is now &lt;strong&gt;{2}&lt;/strong&gt;, and your access to groups and shared folders through that address is unchanged. This message is just so you have a record of which address was tidied up.&lt;/p&gt;
+&lt;p&gt;If you believe {1} should still have had access, please contact your team coordinator.&lt;/p&gt;
+&lt;p&gt;The Humans Team&lt;/p&gt;</value><comment>{0} = user name, {1} = removed email, {2} = current Google email</comment></data>
+
+  <!-- ======================== -->
+  <!-- Onboarding Widget Banner -->
+  <!-- ======================== -->
+  <data name="OnboardingBanner_Text" xml:space="preserve"><value>Finish setting up your account to access shifts and team features.</value></data>
+  <data name="OnboardingBanner_Cta" xml:space="preserve"><value>Continue setup →</value></data>
 
 </root>

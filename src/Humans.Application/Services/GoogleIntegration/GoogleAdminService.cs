@@ -54,6 +54,21 @@ public sealed class GoogleAdminService : IGoogleAdminService
         _logger = logger;
     }
 
+    // Resolve a single Workspace email to the linked human's UserId for audit
+    // attribution. Returns null when the address isn't linked. Mirrors the
+    // verified > UpdatedAt > UserId tie-break used by GetWorkspaceAccountListAsync
+    // so the audit subject matches what /Google/Accounts shows.
+    private async Task<Guid?> TryFindLinkedUserIdAsync(string email, CancellationToken ct)
+    {
+        var matches = await _userEmailService.MatchByEmailsAsync([email], ct);
+        return matches
+            .OrderByDescending(m => m.IsVerified)
+            .ThenByDescending(m => m.UpdatedAt)
+            .ThenBy(m => m.UserId)
+            .Select(m => (Guid?)m.UserId)
+            .FirstOrDefault();
+    }
+
     public async Task<WorkspaceAccountListResult> GetWorkspaceAccountListAsync(
         CancellationToken ct = default)
     {
@@ -117,7 +132,9 @@ public sealed class GoogleAdminService : IGoogleAdminService
                     LastLoginTime: account.LastLoginTime,
                     MatchedUserId: matched?.UserId,
                     MatchedDisplayName: matchedUser?.DisplayName,
-                    IsUsedAsPrimary: isUsedAsPrimary));
+                    IsUsedAsPrimary: isUsedAsPrimary,
+                    IsEnrolledIn2Sv: account.IsEnrolledIn2Sv,
+                    RecoveryEmail: account.RecoveryEmail));
             }
 
             var sorted = accountInfos
@@ -125,6 +142,9 @@ public sealed class GoogleAdminService : IGoogleAdminService
                 .ToList();
 
             var linkedCount = sorted.Count(a => a.MatchedUserId.HasValue);
+            // Missing-2FA only applies to accounts that can actually be used — suspended
+            // accounts can't sign in at all, so flagging their 2FA gap is noise.
+            var missingTwoFactorCount = sorted.Count(a => !a.IsSuspended && !a.IsEnrolledIn2Sv);
 
             return new WorkspaceAccountListResult(
                 Accounts: sorted,
@@ -133,7 +153,8 @@ public sealed class GoogleAdminService : IGoogleAdminService
                 SuspendedAccounts: sorted.Count(a => a.IsSuspended),
                 LinkedAccounts: linkedCount,
                 UnlinkedAccounts: sorted.Count - linkedCount,
-                NotPrimaryCount: notPrimaryCount);
+                NotPrimaryCount: notPrimaryCount,
+                MissingTwoFactorCount: missingTwoFactorCount);
         }
         catch (Exception ex)
         {
@@ -146,6 +167,7 @@ public sealed class GoogleAdminService : IGoogleAdminService
                 LinkedAccounts: 0,
                 UnlinkedAccounts: 0,
                 NotPrimaryCount: 0,
+                MissingTwoFactorCount: 0,
                 ErrorMessage: "Failed to load @nobodies.team accounts. Check the logs for details.");
         }
     }
@@ -290,22 +312,11 @@ public sealed class GoogleAdminService : IGoogleAdminService
         string email, Guid actorUserId,
         CancellationToken ct = default)
     {
+        string newPassword;
         try
         {
-            var newPassword = PasswordGenerator.GenerateTemporary();
+            newPassword = PasswordGenerator.GenerateTemporary();
             await _workspaceUserService.ResetPasswordAsync(email, newPassword, ct);
-
-            // Audit AFTER Google API success — the "business save" here is the
-            // Workspace-side password reset. No local DB write happens in this flow.
-            await _auditLogService.LogAsync(
-                AuditAction.WorkspaceAccountPasswordReset,
-                "WorkspaceAccount", Guid.Empty,
-                $"Reset password for @{NobodiesTeamDomain} account: {email}",
-                actorUserId);
-
-            return new WorkspaceAccountActionResult(true,
-                Message: $"Password reset for {email}. New temporary password: {newPassword}",
-                TemporaryPassword: newPassword);
         }
         catch (Exception ex)
         {
@@ -313,6 +324,204 @@ public sealed class GoogleAdminService : IGoogleAdminService
             return new WorkspaceAccountActionResult(false,
                 ErrorMessage: $"Failed to reset password for {email}.");
         }
+
+        // Audit AFTER Google API success — the "business save" here is the
+        // Workspace-side password reset. No local DB write happens in this flow.
+        // EntityId carries the linked human's UserId when the address resolves
+        // to one, so the audit row renders with the human's name as subject;
+        // unlinked accounts log with Guid.Empty and fall back to the email tail.
+        // Isolate from the outer flow: if the linked-user lookup or audit
+        // persistence throws (DB outage, timeout, cancellation), the password
+        // has already been rotated in Workspace and the caller MUST still
+        // receive the new temporary password — otherwise they retry, lock
+        // the human out further, and we own the confusion. Surface the audit
+        // failure loudly via a critical log for out-of-band reconciliation.
+        try
+        {
+            var linkedUserId = await TryFindLinkedUserIdAsync(email, ct);
+            await _auditLogService.LogAsync(
+                AuditAction.WorkspaceAccountPasswordReset,
+                "WorkspaceAccount", linkedUserId ?? Guid.Empty,
+                email,
+                actorUserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex,
+                "Audit-log write failed AFTER password reset for {Email} by actor {ActorUserId}. Password was rotated; reconcile audit trail manually.",
+                email, actorUserId);
+        }
+
+        return new WorkspaceAccountActionResult(true,
+            Message: $"Password reset for {email}. New temporary password: {newPassword}",
+            TemporaryPassword: newPassword);
+    }
+
+    private async Task<WorkspaceBackupCodesResult> GenerateBackupCodesAsync(
+        string email, Guid actorUserId,
+        CancellationToken ct = default)
+    {
+        IReadOnlyList<string> codes;
+        try
+        {
+            codes = await _workspaceUserService.GenerateBackupCodesAsync(email, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate backup codes for: {Email}", email);
+            return new WorkspaceBackupCodesResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: $"Failed to generate backup codes for {email}. Check logs for details.");
+        }
+
+        if (codes.Count == 0)
+        {
+            // Generate succeeded but List returned 0 — API hiccup or race.
+            // No codes to deliver and nothing to audit; surface a clear failure
+            // instead of recording "Generated 0 backup codes" in the audit log.
+            _logger.LogWarning(
+                "Backup-code generation for {Email} returned 0 codes; nothing to deliver",
+                email);
+            return new WorkspaceBackupCodesResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: $"Backup codes were generated for {email} but none were returned. Check logs and try again.");
+        }
+
+        // Audit AFTER the Workspace-side rotation succeeds. If audit persistence
+        // throws we must still hand the codes back: Google has already
+        // invalidated any previously-issued set, so dropping the new ones
+        // locks the human out. Surface the audit failure loudly via a critical
+        // log so it can be reconciled out-of-band.
+        try
+        {
+            // EntityId carries the linked human's UserId when the address resolves
+            // to one, so the audit row renders with the human's name as subject;
+            // unlinked accounts log with Guid.Empty and fall back to the email tail.
+            var linkedUserId = await TryFindLinkedUserIdAsync(email, ct);
+            await _auditLogService.LogAsync(
+                AuditAction.WorkspaceAccountBackupCodesGenerated,
+                "WorkspaceAccount", linkedUserId ?? Guid.Empty,
+                $"{codes.Count} code(s), {email}",
+                actorUserId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex,
+                "Audit-log write failed AFTER backup codes were generated for {Email} by actor {ActorUserId}. Codes were delivered; reconcile audit trail manually.",
+                email, actorUserId);
+        }
+
+        return new WorkspaceBackupCodesResult(
+            Success: true,
+            Email: email,
+            Codes: codes,
+            Message: $"Generated {codes.Count} backup code(s) for {email}. Deliver them securely — they cannot be retrieved again.");
+    }
+
+    public async Task<WorkspaceRecoveryCredentialsResult> ResetPasswordAndGenerate2FaAsync(
+        string email, Guid actorUserId,
+        CancellationToken ct = default)
+    {
+        // Refuse if the account is already enrolled in 2-Step Verification.
+        // The combined flow rotates the backup-code set destructively, so
+        // running it against a properly-set-up account would silently break
+        // the human's working 2FA. Always re-check live Directory state — the
+        // UI hides the button, but a hand-crafted POST must hit the same gate.
+        WorkspaceUserAccount? liveAccount;
+        try
+        {
+            liveAccount = await _workspaceUserService.GetAccountAsync(email, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to fetch live 2SV state for: {Email}", email);
+            return new WorkspaceRecoveryCredentialsResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: $"Failed to verify 2FA enrollment for {email}. Aborted; no changes made.");
+        }
+
+        if (liveAccount is null)
+        {
+            _logger.LogWarning(
+                "Reset+2FA refused for {Email}: account not found in Workspace Directory. Actor: {ActorUserId}.",
+                email, actorUserId);
+            return new WorkspaceRecoveryCredentialsResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: $"Account {email} not found in Workspace Directory.");
+        }
+
+        if (liveAccount.IsEnrolledIn2Sv)
+        {
+            _logger.LogWarning(
+                "Reset+2FA refused for {Email}: already enrolled in 2-Step Verification. Actor: {ActorUserId}.",
+                email, actorUserId);
+
+            // Audit AFTER the refusal decision. If audit persistence throws,
+            // log Critical and still return the user-facing refusal — degrading
+            // gracefully on an audit-side outage matches the BackupCodesGenerated
+            // pattern below, and forcing a 500 here would mask a safe outcome
+            // (no Workspace mutation happened).
+            try
+            {
+                await _auditLogService.LogAsync(
+                    AuditAction.WorkspaceAccountResetBlockedFor2Sv,
+                    "WorkspaceAccount", Guid.Empty,
+                    $"Refused Reset+2FA for @{NobodiesTeamDomain} account {email}: already enrolled in 2-Step Verification",
+                    actorUserId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex,
+                    "Audit-log write failed for Reset+2FA refusal on {Email} by actor {ActorUserId}. Refusal was still surfaced to the admin; reconcile audit trail manually.",
+                    email, actorUserId);
+            }
+
+            return new WorkspaceRecoveryCredentialsResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: $"{email} is already enrolled in 2FA. Reset+2FA is for locked-out humans only — use the plain Reset Password button, or rotate 2FA in the Google Admin console.");
+        }
+
+        // Step 1: reset the password. Audit + return on failure — there's
+        // no point grabbing a backup code if the human can't sign in anyway.
+        var resetResult = await ResetPasswordAsync(email, actorUserId, ct);
+        if (!resetResult.Success || resetResult.TemporaryPassword is null)
+        {
+            return new WorkspaceRecoveryCredentialsResult(
+                Success: false,
+                Email: email,
+                ErrorMessage: resetResult.ErrorMessage
+                    ?? $"Failed to reset password for {email}. Check logs for details.");
+        }
+
+        // Step 2: grab a backup code. If this fails, the password is still
+        // valid — return Success with just the password and an explanatory
+        // message so the admin can deliver what we have. (Google rotates
+        // codes destructively, so a partial success is better than re-asking
+        // the admin to start over.)
+        var codesResult = await GenerateBackupCodesAsync(email, actorUserId, ct);
+        if (!codesResult.Success || codesResult.Codes is not { Count: > 0 })
+        {
+            return new WorkspaceRecoveryCredentialsResult(
+                Success: true,
+                Email: email,
+                TempPassword: resetResult.TemporaryPassword,
+                BackupCode: null,
+                Message: $"Password reset for {email}. Backup-code generation failed — "
+                       + (codesResult.ErrorMessage
+                            ?? "deliver the password only and ask the human to re-attempt the 2FA request out-of-band."));
+        }
+
+        return new WorkspaceRecoveryCredentialsResult(
+            Success: true,
+            Email: email,
+            TempPassword: resetResult.TemporaryPassword,
+            BackupCode: codesResult.Codes[0],
+            Message: $"Password reset and one backup code issued for {email}. Deliver both securely — neither can be retrieved again.");
     }
 
     public async Task<WorkspaceAccountActionResult> LinkAccountAsync(
@@ -501,25 +710,30 @@ public sealed class GoogleAdminService : IGoogleAdminService
     {
         try
         {
-            // Load all users (UserEmails included by GetAllUsersAsync), then
-            // filter to those whose canonical IsGoogle Workspace identity is
-            // a @nobodies.team address.
+            // Issue #635 (§15i): read UserEmails through the owning section
+            // service (design-rules §2c) instead of traversing user.UserEmails
+            // cross-domain. The service returns the entities so this caller
+            // can read per-row IsVerified / IsGoogle / Provider flags.
             var allUsers = await _userService.GetAllUsersAsync(ct);
+            var allUserIds = allUsers.Select(u => u.Id).ToList();
+            var emailsByUserId = await _userEmailService.GetEntitiesByUserIdsAsync(allUserIds, ct);
 
             var nobodiesUsers = allUsers
-                .Select(u => new
+                .Select(u =>
                 {
-                    u.Id,
-                    u.DisplayName,
-                    GoogleEmail = u.UserEmails
+                    var emails = emailsByUserId.TryGetValue(u.Id, out var list)
+                        ? list
+                        : Array.Empty<UserEmail>();
+                    var googleEmail = emails
                         .Where(e => e.IsVerified && e.IsGoogle)
                         .Select(e => e.Email)
                         .FirstOrDefault()
-                        ?? u.UserEmails
+                        ?? emails
                             .Where(e => e.IsVerified && e.Provider != null)
                             .OrderBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
                             .Select(e => e.Email)
-                            .FirstOrDefault()
+                            .FirstOrDefault();
+                    return new { u.Id, u.DisplayName, GoogleEmail = googleEmail };
                 })
                 .Where(x => x.GoogleEmail is not null &&
                     x.GoogleEmail.EndsWith($"@{NobodiesTeamDomain}", StringComparison.OrdinalIgnoreCase))
@@ -604,19 +818,21 @@ public sealed class GoogleAdminService : IGoogleAdminService
     {
         try
         {
-            // GetByIdsWithEmailsAsync so the canonical IsGoogle UserEmail row
-            // resolves below — singular GetByIdAsync does not load UserEmails.
-            var usersById = await _userService.GetByIdsWithEmailsAsync([userId], ct);
-            if (!usersById.TryGetValue(userId, out var user))
+            // Issue #635 (§15i): read UserEmails through the owning section
+            // service (design-rules §2c) instead of traversing user.UserEmails
+            // cross-domain.
+            var user = await _userService.GetByIdAsync(userId, ct);
+            if (user is null)
             {
                 return new EmailRenameFixResult(false, ErrorMessage: "Human not found.");
             }
 
-            var oldEmail = user.UserEmails
+            var userEmails = await _userEmailService.GetEntitiesByUserIdAsync(userId, ct);
+            var oldEmail = userEmails
                 .Where(e => e.IsVerified && e.IsGoogle)
                 .Select(e => e.Email)
                 .FirstOrDefault()
-                ?? user.UserEmails
+                ?? userEmails
                     .Where(e => e.IsVerified && e.Provider != null)
                     .OrderBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
                     .Select(e => e.Email)
@@ -638,7 +854,33 @@ public sealed class GoogleAdminService : IGoogleAdminService
             // Update the corresponding UserEmail row if one exists for the old email —
             // delegated to the owning section so no user_emails writes happen here.
             // Self-persists via IUserEmailRepository.
-            await _userEmailService.RewriteEmailAddressAsync(userId, oldEmail, newEmail, ct);
+            var rewriteOutcome = await _userEmailService.RewriteEmailAddressAsync(
+                userId, oldEmail, newEmail, ct);
+
+            // Only Rewritten / MergedIntoExistingRowForSameUser are real successes.
+            // CrossUserConflict means another user already owns newEmail (issue 622)
+            // — surface as failure so the admin sees the duplicate-account flow
+            // rather than a false-success message + phantom audit row.
+            // SourceRowNotFound means there was no row to rewrite in the first place.
+            if (rewriteOutcome == RewriteEmailAddressOutcome.CrossUserConflict)
+            {
+                return new EmailRenameFixResult(false,
+                    ErrorMessage:
+                        $"'{newEmail}' already belongs to another user. Resolve via the duplicate-account flow before retrying.");
+            }
+            if (rewriteOutcome == RewriteEmailAddressOutcome.SourceRowNotFound)
+            {
+                // We just resolved oldEmail from this user's verified rows above;
+                // SourceRowNotFound here means the row disappeared between the
+                // lookup and the rewrite — log at Warning so the prod log viewer
+                // shows the discrepancy (the admin UI gets the failure message,
+                // but observability would otherwise be invisible).
+                _logger.LogWarning(
+                    "Admin {AdminId} email rename: source row not found for user {UserId} oldEmail {OldEmail} — row may have been removed concurrently.",
+                    actorUserId, userId, oldEmail);
+                return new EmailRenameFixResult(false,
+                    ErrorMessage: $"No UserEmail row found for '{oldEmail}'.");
+            }
 
             _logger.LogInformation(
                 "Admin {AdminId} fixing email rename for user {UserId}: '{OldEmail}' -> '{NewEmail}'",

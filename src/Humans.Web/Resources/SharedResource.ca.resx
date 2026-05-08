@@ -1362,6 +1362,8 @@
   <data name="Emails_ManageEmails" xml:space="preserve"><value>Adreces de correu</value></data>
   <data name="Emails_ManageEmailsHelp" xml:space="preserve"><value>Afegeix adreces de correu addicionals, controla notificacions i estableix la visibilitat del perfil.</value></data>
   <data name="Emails_ManageLater" xml:space="preserve"><value>Pots afegir i gestionar adreces de correu addicionals des del teu perfil després de completar la configuració.</value></data>
+  <data name="Emails_MergeWarningBody" xml:space="preserve"><value>La fusió de comptes serveix per combinar dos comptes que pertanyen a la mateixa persona (per exemple, un correu antic i un de nou, tots dos teus). No és una manera de compartir o transferir entrades, reserves o altres elements entre dues persones diferents. La transferència d'entrades entre humans és una funció separada, properament.</value></data>
+  <data name="Emails_MergeWarningTitle" xml:space="preserve"><value>Fusionar comptes?</value></data>
   <data name="Emails_ResendCooldown" xml:space="preserve"><value>Pots sol·licitar un correu de verificació nou d’aquí a {0} minut(s).</value></data>
   <data name="Emails_SendVerification" xml:space="preserve"><value>Envia correu de verificació</value></data>
   <data name="Emails_Title" xml:space="preserve"><value>Adreces de correu</value></data>
@@ -1652,6 +1654,10 @@
   <data name="CommPrefs_Alert" xml:space="preserve"><value>Alerta</value></data>
   <data name="CommPrefs_BackToProfile" xml:space="preserve"><value>Tornar al perfil</value></data>
   <data name="CommPrefs_BackToDashboard" xml:space="preserve"><value>Tornar al tauler</value></data>
+  <data name="CommPrefs_OneClick_Prompt" xml:space="preserve"><value>Has fet clic en un enllaç per donar-te de baixa dels correus de {0}.</value></data>
+  <data name="CommPrefs_OneClick_Hint" xml:space="preserve"><value>Dóna't de baixa amb un sol clic, o ajusta els detalls a la matriu de sota.</value></data>
+  <data name="CommPrefs_OneClick_Button" xml:space="preserve"><value>Donar-se de baixa de {0}</value></data>
+  <data name="CommPrefs_OneClick_Done" xml:space="preserve"><value>T'has donat de baixa. Pots tornar a activar qualsevol categoria a sota.</value></data>
 
   <data name="Emails_Header_Email" xml:space="preserve"><value>Correu</value></data>
   <data name="Emails_Header_Status" xml:space="preserve"><value>Estat</value></data>
@@ -1769,6 +1775,17 @@
   <data name="Shifts_SaveAvailability" xml:space="preserve"><value>Desar disponibilitat</value></data>
   <data name="Shifts_DaysSelected" xml:space="preserve"><value>dies seleccionats</value></data>
   <data name="Shifts_SlotsFull" xml:space="preserve"><value>Alguns dies encara necessiten ajuda, però totes les places disponibles estan completes. Torna més tard per si s'obren places.</value></data>
+  <data name="Shifts_ConfirmSignup_Title" xml:space="preserve"><value>Confirma la teva inscripció al {0}</value></data>
+  <data name="Shifts_ConfirmSignup_Phase" xml:space="preserve"><value>T'estàs inscrivint a {0} (fase de {1}).</value></data>
+  <data name="Shifts_ConfirmSignup_Range" xml:space="preserve"><value>Del {0} al {1} ({2} dies).</value></data>
+  <data name="Shifts_ConfirmSignup_Range_Single" xml:space="preserve"><value>Per al {0} (1 dia).</value></data>
+  <data name="Shifts_ConfirmSignup_ArriveBy" xml:space="preserve"><value>S'espera que siguis al lloc abans del {0}.</value></data>
+  <data name="Shifts_ConfirmSignup_Prompt" xml:space="preserve"><value>És aquest el període en què volies inscriure't?</value></data>
+  <data name="Shifts_ConfirmSignup_Confirm" xml:space="preserve"><value>Confirmar inscripció</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Heading" xml:space="preserve"><value>Alguns dies d'aquest rang entren en conflicte amb torns en què ja estàs inscrit/a:</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Row" xml:space="preserve"><value>{0} — ja inscrit/a a {1} ({2}–{3})</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_PartialNote" xml:space="preserve"><value>Ja estàs inscrit/a en alguns d'aquests dies, així que només afegirem els que estiguin lliures.</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_AllBlocked" xml:space="preserve"><value>Sembla que ja tens un torn reservat cada dia d'aquest rang, així que no en podem afegir cap.</value></data>
 
   <data name="ShiftDash_Title" xml:space="preserve"><value>Tauler de torns</value></data>
   <data name="ShiftDash_ShiftsCount" xml:space="preserve"><value>{0} torns</value><comment>{0} = count</comment></data>
@@ -1870,10 +1887,6 @@
   <data name="Privacy_ComplaintBody" xml:space="preserve"><value>Si no estàs satisfet amb la nostra resposta, tens dret a presentar una reclamació davant l'Agència Espanyola de Protecció de Dades (AEPD) a {0}.</value><comment>{0} = AEPD URL</comment></data>
 
   <!-- Agent Widget -->
-  <data name="Agent_ConsentPrompt" xml:space="preserve"><value>Abans d'usar l'assistent, accepta les condicions.</value></data>
-  <data name="Agent_ConsentReviewButton" xml:space="preserve"><value>Revisar condicions</value></data>
-  <data name="Agent_HistoryActions" xml:space="preserve"><value>Accions</value></data>
-  <data name="Agent_HistoryDelete" xml:space="preserve"><value>Elimina</value></data>
   <data name="Agent_HistoryEmpty" xml:space="preserve"><value>Encara no hi ha converses.</value></data>
   <data name="Agent_HistoryLastMessage" xml:space="preserve"><value>Últim missatge</value></data>
   <data name="Agent_HistoryMessages" xml:space="preserve"><value>Missatges</value></data>
@@ -1881,9 +1894,14 @@
   <data name="Agent_HistoryTitle" xml:space="preserve"><value>Assistent — Les meves converses</value></data>
   <data name="Agent_InputPlaceholder" xml:space="preserve"><value>Pregunta com funciona el sistema…</value></data>
   <data name="Agent_PanelTitle" xml:space="preserve"><value>Assistent</value></data>
+  <data name="Agent_TermsLink" xml:space="preserve"><value>Condicions IA</value></data>
   <data name="Agent_ViewHistory" xml:space="preserve"><value>Historial</value></data>
   <data name="Agent_Send" xml:space="preserve"><value>Envia</value></data>
   <data name="Agent_WidgetButton" xml:space="preserve"><value>Obrir l'assistent</value></data>
+  <data name="Help_WidgetButton" xml:space="preserve"><value>Ajuda</value></data>
+  <data name="Help_Menu_TalkWithAgent" xml:space="preserve"><value>Parlar amb l'Assistent</value></data>
+  <data name="Help_Menu_CreateIssue" xml:space="preserve"><value>Crear incidència</value></data>
+  <data name="Help_Agent_IssueProposed" xml:space="preserve"><value>No puc respondre això jo mateix. He redactat una incidència per a l'equip — revisa-la i envia-la, si us plau.</value></data>
   <data name="Nav_Agent" xml:space="preserve"><value>Assistent</value></data>
 
 
@@ -2043,5 +2061,46 @@
   <data name="Issue_Assignee_Updated" xml:space="preserve"><value>Assignació actualitzada.</value></data>
   <data name="Issue_Section_Updated" xml:space="preserve"><value>Secció actualitzada.</value></data>
   <data name="Issue_GitHub_Linked" xml:space="preserve"><value>Vinculada amb GitHub.</value></data>
+
+  <data name="Welcome_Title" xml:space="preserve"><value>Benvinguda</value></data>
+  <data name="Welcome_Heading" xml:space="preserve"><value>Ja hi ets.</value></data>
+  <data name="Welcome_Subtitle" xml:space="preserve"><value>La teva entrada per a Elsewhere 2026 està confirmada.</value></data>
+  <data name="Welcome_ShiftsTitle" xml:space="preserve"><value>Ara fem que això passi entre tots.</value></data>
+  <data name="Welcome_ShiftsBody" xml:space="preserve"><value>Elsewhere no és un festival on véns — és un que ajudes a construir. Cada human tria torns: muntatge abans, operació durant i desmuntatge després.</value></data>
+  <data name="Welcome_ShiftsBody2" xml:space="preserve"><value>Per veure els torns i apuntar-t'hi, necessites un compte a Humans. Només porta un parell de minuts.</value></data>
+  <data name="Welcome_CTA" xml:space="preserve"><value>Inicia sessió o crea un compte</value></data>
+  <data name="Welcome_Footer" xml:space="preserve"><value>Ja tens compte? El mateix botó — inicia sessió i arribaràs directament als torns.</value></data>
+  <data name="Welcome_Contact" xml:space="preserve"><value>Preguntes? Escriu-nos a</value></data>
+
+  <!-- Google sync removal notifications (issue peterdrier/Humans#639) -->
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Subject" xml:space="preserve"><value>Has estat tret del grup {0}</value><comment>{0} = group email</comment></data>
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Accés al grup retirat&lt;/h2&gt;
+&lt;p&gt;Hola {0},&lt;/p&gt;
+&lt;p&gt;S'ha retirat el teu accés al Grup de Google &lt;strong&gt;{1}&lt;/strong&gt; (&lt;code&gt;{2}&lt;/code&gt;).&lt;/p&gt;
+&lt;p&gt;Aquesta acció ha estat automàtica segons els teus equips i rols actuals a Nobodies. Ja no rebràs els missatges enviats a aquest grup.&lt;/p&gt;
+&lt;p&gt;Si creus que això és un error, posa't en contacte amb la persona coordinadora del teu equip.&lt;/p&gt;
+&lt;p&gt;L'equip de Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = group display name, {2} = group email</comment></data>
+
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Subject" xml:space="preserve"><value>S'ha retirat el teu accés a {0}</value><comment>{0} = folder name</comment></data>
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Accés a Drive retirat&lt;/h2&gt;
+&lt;p&gt;Hola {0},&lt;/p&gt;
+&lt;p&gt;S'ha retirat el teu accés a la carpeta compartida &lt;strong&gt;{1}&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;Aquesta acció ha estat automàtica segons els teus equips i rols actuals a Nobodies.&lt;/p&gt;
+&lt;p&gt;Si creus que això és un error, posa't en contacte amb la persona coordinadora del teu equip.&lt;/p&gt;
+&lt;p&gt;L'equip de Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = folder name</comment></data>
+
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Subject" xml:space="preserve"><value>{0} ja no té accés als grups de Nobodies</value><comment>{0} = removed email</comment></data>
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Body" xml:space="preserve"><value>&lt;h2&gt;Correu secundari netejat&lt;/h2&gt;
+&lt;p&gt;Hola {0},&lt;/p&gt;
+&lt;p&gt;L'adreça &lt;strong&gt;{1}&lt;/strong&gt; s'ha retirat dels grups i carpetes compartides de Nobodies.&lt;/p&gt;
+&lt;p&gt;La teva adreça principal a Nobodies és ara &lt;strong&gt;{2}&lt;/strong&gt;, i el teu accés als grups i carpetes compartides a través d'aquesta adreça no ha canviat. Aquest missatge serveix només perquè tinguis constància de l'adreça que s'ha netejat.&lt;/p&gt;
+&lt;p&gt;Si creus que {1} hauria de continuar tenint accés, posa't en contacte amb la persona coordinadora del teu equip.&lt;/p&gt;
+&lt;p&gt;L'equip de Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = removed email, {2} = current Google email</comment></data>
+
+  <!-- ======================== -->
+  <!-- Onboarding Widget Banner -->
+  <!-- ======================== -->
+  <data name="OnboardingBanner_Text" xml:space="preserve"><value>Finish setting up your account to access shifts and team features.</value><comment>TODO: translate</comment></data>
+  <data name="OnboardingBanner_Cta" xml:space="preserve"><value>Continue setup →</value><comment>TODO: translate</comment></data>
 
 </root>

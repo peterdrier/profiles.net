@@ -237,18 +237,21 @@ public sealed class TicketSyncService : ITicketSyncService, IUserMerge
 
     private async Task<Dictionary<string, Guid>> BuildEmailLookupAsync(CancellationToken ct)
     {
-        // Match against ALL user emails (Google, verified, unverified).
-        // Normalize for comparison so gmail/googlemail aliases resolve to the same human.
-        // If multiple users share same email, prefer the canonical Workspace
-        // (IsGoogle) row so ticket-checkout matches the Google identity.
+        // Match against verified user emails only (issue #645). Unverified emails
+        // are not trustworthy enough to drive ticket → user matching, and the prior
+        // IsGoogle tiebreak silently picked one identity over another for collisions
+        // that span verified rows. A normalized verified email is supposed to be
+        // owned by exactly one user — multiple-user collisions among verified rows
+        // are a data-integrity error, not an expected condition, so they leave the
+        // email unmatched and emit LogError. Email is normalized so gmail/googlemail
+        // aliases resolve to the same human.
         var entries = await _ticketRepository.GetAllUserEmailLookupEntriesAsync(ct);
 
         var lookup = new Dictionary<string, Guid>(NormalizingEmailComparer.Instance);
         var grouped = entries.GroupBy(e => e.Email, NormalizingEmailComparer.Instance);
         foreach (var group in grouped)
         {
-            var groupEntries = group.ToList();
-            var distinctUserIds = groupEntries.Select(e => e.UserId).Distinct().ToList();
+            var distinctUserIds = group.Select(e => e.UserId).Distinct().ToList();
 
             if (distinctUserIds.Count == 1)
             {
@@ -256,18 +259,11 @@ public sealed class TicketSyncService : ITicketSyncService, IUserMerge
             }
             else
             {
-                // Multiple users share this email — prefer the IsGoogle row.
-                var googleEntry = groupEntries.FirstOrDefault(e => e.IsGoogle);
-                if (googleEntry is not null)
-                {
-                    lookup[group.Key] = googleEntry.UserId;
-                }
-                else
-                {
-                    _logger.LogWarning(
-                        "Email {Email} shared by {Count} users with no IsGoogle owner, leaving unmatched",
-                        group.Key, distinctUserIds.Count);
-                }
+                // Multiple verified users share this email — should not happen.
+                // Log as error and leave unmatched so neither user gets the ticket.
+                _logger.LogError(
+                    "Email {Email} verified by {Count} users, leaving unmatched",
+                    group.Key, distinctUserIds.Count);
             }
         }
 
@@ -373,9 +369,18 @@ public sealed class TicketSyncService : ITicketSyncService, IUserMerge
         var updated = new List<TicketOrder>(ordersToEnrich.Count);
         foreach (var order in ordersToEnrich)
         {
+            // Belt-and-suspenders: skip placeholder / whitespace-only PaymentIntent ids
+            // the repository filter should already exclude. Trim guards against
+            // unprintable characters that slipped past TT (em-dash, NBSP, etc.).
+            var trimmedPi = order.StripePaymentIntentId?.Trim();
+            if (trimmedPi is null or "" or "--")
+            {
+                continue;
+            }
+
             try
             {
-                var details = await _stripeService.GetPaymentDetailsAsync(order.StripePaymentIntentId!, ct);
+                var details = await _stripeService.GetPaymentDetailsAsync(trimmedPi, ct);
                 if (details is null) continue;
 
                 order.PaymentMethod = details.PaymentMethod;
@@ -386,9 +391,12 @@ public sealed class TicketSyncService : ITicketSyncService, IUserMerge
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex,
-                    "Failed to fetch Stripe data for order {OrderId} (PI: {PaymentIntentId})",
-                    order.VendorOrderId, order.StripePaymentIntentId);
+                // Drop the exception arg — these warnings recur every cycle for genuinely
+                // transient Stripe errors and the stack trace adds noise without
+                // diagnostic value. Keep the structured Reason for triage.
+                _logger.LogWarning(
+                    "Failed to fetch Stripe data for order {OrderId} (PI: {PaymentIntentId}): {Reason}",
+                    order.VendorOrderId, trimmedPi, ex.Message);
             }
         }
 

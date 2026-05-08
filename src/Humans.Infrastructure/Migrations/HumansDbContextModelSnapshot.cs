@@ -1880,6 +1880,16 @@ namespace Humans.Infrastructure.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<int>("FinishingWeekendStartOffset")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(-4);
+
+                    b.Property<int>("FirstCrewStartOffset")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(-25);
+
                     b.Property<LocalDate>("GateOpeningDate")
                         .HasColumnType("date");
 
@@ -1892,8 +1902,18 @@ namespace Humans.Infrastructure.Migrations
                     b.Property<bool>("IsShiftBrowsingOpen")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("PreEventWeekStartOffset")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(-9);
+
                     b.Property<int>("ReminderLeadTimeHours")
                         .HasColumnType("integer");
+
+                    b.Property<int>("SetupWeekStartOffset")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(-16);
 
                     b.Property<int>("StrikeEndOffset")
                         .HasColumnType("integer");
@@ -2577,6 +2597,10 @@ namespace Humans.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("State")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Instant>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2894,6 +2918,257 @@ namespace Humans.Infrastructure.Migrations
                             Id = new Guid("00000000-0000-0000-0003-000000000008"),
                             Name = "Feeding and hydrating folks"
                         });
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreInvoice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HoldedDocId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("HoldedDocNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Instant>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("IssuedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestPayload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ResponsePayload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HoldedDocId")
+                        .IsUnique();
+
+                    b.HasIndex("OrderId")
+                        .IsUnique();
+
+                    b.ToTable("store_invoices", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CampSeasonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CounterpartyAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("CounterpartyCountryCode")
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)");
+
+                    b.Property<string>("CounterpartyEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("CounterpartyName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CounterpartyVatId")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("IssuedInvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CampSeasonId");
+
+                    b.HasIndex("State");
+
+                    b.ToTable("store_orders", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreOrderLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("DepositAmountSnapshot")
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Qty")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("UnitPriceSnapshot")
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("VatRateSnapshot")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("store_order_lines", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StorePayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AmountEur")
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("ExternalRef")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RecordedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("StripePaymentIntentId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("StripePaymentIntentId")
+                        .IsUnique()
+                        .HasFilter("\"StripePaymentIntentId\" IS NOT NULL");
+
+                    b.ToTable("store_payments", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreProduct", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("DepositAmountEur")
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<LocalDate>("OrderableUntil")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("UnitPriceEur")
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("VatRatePercent")
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year", "IsActive");
+
+                    b.ToTable("store_products", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreTreasurySyncState", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Instant?>("LastSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SyncStatus")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("store_treasury_sync_state", (string)null);
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.SyncServiceSettings", b =>
@@ -4208,7 +4483,7 @@ namespace Humans.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Humans.Domain.Entities.User", null)
-                        .WithMany("Applications")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4549,7 +4824,7 @@ namespace Humans.Infrastructure.Migrations
             modelBuilder.Entity("Humans.Domain.Entities.CommunicationPreference", b =>
                 {
                     b.HasOne("Humans.Domain.Entities.User", null)
-                        .WithMany("CommunicationPreferences")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4564,7 +4839,7 @@ namespace Humans.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Humans.Domain.Entities.User", "User")
-                        .WithMany("ConsentRecords")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -4818,7 +5093,7 @@ namespace Humans.Infrastructure.Migrations
             modelBuilder.Entity("Humans.Domain.Entities.Profile", b =>
                 {
                     b.HasOne("Humans.Domain.Entities.User", null)
-                        .WithOne("Profile")
+                        .WithOne()
                         .HasForeignKey("Humans.Domain.Entities.Profile", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4844,7 +5119,7 @@ namespace Humans.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Humans.Domain.Entities.User", "User")
-                        .WithMany("RoleAssignments")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -4907,6 +5182,43 @@ namespace Humans.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Shift");
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreInvoice", b =>
+                {
+                    b.HasOne("Humans.Domain.Entities.StoreOrder", null)
+                        .WithOne()
+                        .HasForeignKey("Humans.Domain.Entities.StoreInvoice", "OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StoreOrderLine", b =>
+                {
+                    b.HasOne("Humans.Domain.Entities.StoreOrder", "Order")
+                        .WithMany("Lines")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Humans.Domain.Entities.StoreProduct", null)
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.StorePayment", b =>
+                {
+                    b.HasOne("Humans.Domain.Entities.StoreOrder", "Order")
+                        .WithMany("Payments")
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Order");
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.SyncServiceSettings", b =>
@@ -4983,7 +5295,7 @@ namespace Humans.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("Humans.Domain.Entities.User", "User")
-                        .WithMany("TeamMemberships")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -5313,6 +5625,13 @@ namespace Humans.Infrastructure.Migrations
                     b.Navigation("VolunteerPreferences");
                 });
 
+            modelBuilder.Entity("Humans.Domain.Entities.StoreOrder", b =>
+                {
+                    b.Navigation("Lines");
+
+                    b.Navigation("Payments");
+                });
+
             modelBuilder.Entity("Humans.Domain.Entities.Team", b =>
                 {
                     b.Navigation("ChildTeams");
@@ -5348,19 +5667,7 @@ namespace Humans.Infrastructure.Migrations
 
             modelBuilder.Entity("Humans.Domain.Entities.User", b =>
                 {
-                    b.Navigation("Applications");
-
-                    b.Navigation("CommunicationPreferences");
-
-                    b.Navigation("ConsentRecords");
-
                     b.Navigation("EventParticipations");
-
-                    b.Navigation("Profile");
-
-                    b.Navigation("RoleAssignments");
-
-                    b.Navigation("TeamMemberships");
 
                     b.Navigation("UserEmails");
                 });

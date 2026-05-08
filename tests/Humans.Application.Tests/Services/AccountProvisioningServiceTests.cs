@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Humans.Application.DTOs;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Services.Users;
@@ -170,6 +171,9 @@ public class AccountProvisioningServiceTests
         public Task<IReadOnlyList<EventParticipation>> GetAllParticipationsForYearAsync(
             int year, CancellationToken ct = default) =>
             throw new NotSupportedException();
+        public Task<IReadOnlyList<EventParticipation>> GetEventParticipationsByUserIdAsync(
+            Guid userId, CancellationToken ct = default) =>
+            throw new NotSupportedException();
         public Task<EventParticipation?> UpsertParticipationAsync(
             Guid userId, int year, ParticipationStatus status,
             ParticipationSource source, Instant? declaredAt, CancellationToken ct = default) =>
@@ -304,7 +308,7 @@ public class AccountProvisioningServiceTests
             throw new NotSupportedException();
         public Task<bool> RewriteLinkedEmailAsync(Guid userId, string newEmail, CancellationToken ct = default) =>
             throw new NotSupportedException();
-        public Task<bool> RewriteEmailAddressAsync(
+        public Task<RewriteEmailAddressOutcome> RewriteEmailAddressAsync(
             Guid userId, string oldEmail, string newEmail, Instant now, CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<IReadOnlyList<UserEmail>> FindAllByProviderKeyAsync(
@@ -347,6 +351,7 @@ public class AccountProvisioningServiceTests
         _service = new AccountProvisioningService(
             _userRepo,
             _userEmailRepo,
+            Substitute.For<Humans.Application.Interfaces.Profiles.IProfileService>(),
             _userManager,
             new StubAuditLog(),
             _clock,

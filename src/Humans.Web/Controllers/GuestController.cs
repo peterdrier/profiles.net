@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Humans.Application.Extensions;
 using Humans.Application.Interfaces.Gdpr;
+using Humans.Application.Interfaces.Onboarding;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Models;
@@ -23,6 +24,7 @@ public class GuestController : HumansControllerBase
     private readonly IProfileService _profileService;
     private readonly ITicketQueryService _ticketQueryService;
     private readonly IGdprExportService _gdprExportService;
+    private readonly IOnboardingWidgetState _widgetState;
     private readonly IClock _clock;
     private readonly ILogger<GuestController> _logger;
 
@@ -39,6 +41,7 @@ public class GuestController : HumansControllerBase
         IProfileService profileService,
         ITicketQueryService ticketQueryService,
         IGdprExportService gdprExportService,
+        IOnboardingWidgetState widgetState,
         IClock clock,
         ILogger<GuestController> logger)
         : base(userManager)
@@ -47,16 +50,24 @@ public class GuestController : HumansControllerBase
         _profileService = profileService;
         _ticketQueryService = ticketQueryService;
         _gdprExportService = gdprExportService;
+        _widgetState = widgetState;
         _clock = clock;
         _logger = logger;
     }
 
-    public async Task<IActionResult> Index()
+    public async Task<IActionResult> Index(CancellationToken cancellationToken)
     {
         var user = await GetCurrentUserAsync();
         if (user is null)
         {
             return Challenge();
+        }
+
+        // Route through the onboarding widget until the user has completed every required step.
+        var step = await _widgetState.GetCurrentStepAsync(user.Id, cancellationToken);
+        if (step != OnboardingWidgetStep.Complete)
+        {
+            return RedirectToAction("Index", "OnboardingWidget");
         }
 
         try
@@ -82,12 +93,13 @@ public class GuestController : HumansControllerBase
     {
         try
         {
-            var userId = await ResolveUserIdOrTokenAsync(utoken);
+            var (userId, tokenCategory, _) = await ResolveUserIdOrTokenAsync(utoken);
             if (userId is null)
                 return Challenge();
 
             var model = await BuildCommunicationPreferencesViewModelAsync(userId.Value);
             model.UnsubscribeToken = utoken;
+            model.HighlightCategory = tokenCategory;
             return View(model);
         }
         catch (Exception ex)
@@ -107,15 +119,18 @@ public class GuestController : HumansControllerBase
     {
         try
         {
-            var userId = await ResolveUserIdOrTokenAsync(utoken);
+            var (userId, _, fromToken) = await ResolveUserIdOrTokenAsync(utoken);
             if (userId is null)
                 return Unauthorized();
 
             if (category.IsAlwaysOn())
                 return BadRequest("Cannot change always-on categories.");
 
+            // Anonymous token-driven updates are attributed to "MagicLink"; session-driven to "Guest".
+            var source = fromToken ? "MagicLink" : "Guest";
+
             await _commPrefService.UpdatePreferenceAsync(
-                userId.Value, category, optedOut: !emailEnabled, inboxEnabled: alertEnabled, "Guest");
+                userId.Value, category, optedOut: !emailEnabled, inboxEnabled: alertEnabled, source);
 
             return Ok();
         }
@@ -301,26 +316,32 @@ public class GuestController : HumansControllerBase
 
     /// <summary>
     /// Resolves the user ID from the current session, or falls back to an unsubscribe token.
-    /// Returns null if neither is available.
+    /// Returns <c>UserId = null</c> if neither is available. <c>FromToken</c> is true only
+    /// when the resolution came from a valid <paramref name="utoken"/>; callers use this to
+    /// distinguish anonymous magic-link-driven updates (<c>UpdateSource = "MagicLink"</c>) from
+    /// session-driven ones (<c>UpdateSource = "Guest"</c>). <c>TokenCategory</c> carries the
+    /// category encoded in the token so the GET path can pre-focus that row.
     /// </summary>
-    private async Task<Guid?> ResolveUserIdOrTokenAsync(string? utoken)
+    private async Task<(Guid? UserId, MessageCategory? TokenCategory, bool FromToken)> ResolveUserIdOrTokenAsync(string? utoken)
     {
         // Prefer authenticated session
         var user = await GetCurrentUserAsync();
         if (user is not null)
-            return user.Id;
+            return (user.Id, null, false);
 
         // Fall back to unsubscribe token
         if (string.IsNullOrEmpty(utoken))
-            return null;
+            return (null, null, false);
 
         var result = _commPrefService.ValidateUnsubscribeToken(utoken);
         if (result.Status != TokenValidationStatus.Valid)
-            return null;
+            return (null, null, false);
 
         // Verify user still exists
         var exists = await FindUserByIdAsync(result.UserId);
-        return exists is not null ? result.UserId : null;
+        return exists is not null
+            ? (result.UserId, result.Category, true)
+            : (null, null, false);
     }
 
     private async Task<CommunicationPreferencesViewModel> BuildCommunicationPreferencesViewModelAsync(Guid userId)

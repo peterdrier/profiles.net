@@ -1347,6 +1347,8 @@
   <data name="Emails_ManageEmails" xml:space="preserve"><value>Indirizzi e-mail</value></data>
   <data name="Emails_ManageEmailsHelp" xml:space="preserve"><value>Aggiungi indirizzi e-mail aggiuntivi, gestisci le notifiche e imposta la visibilità del profilo.</value></data>
   <data name="Emails_ManageLater" xml:space="preserve"><value>Puoi aggiungere e gestire indirizzi e-mail aggiuntivi dal tuo profilo dopo aver completato la configurazione.</value></data>
+  <data name="Emails_MergeWarningBody" xml:space="preserve"><value>L'unione degli account serve a combinare due account che appartengono alla stessa persona (per esempio, una vecchia e una nuova e-mail, entrambe tue). Non è un modo per condividere o trasferire biglietti, prenotazioni o altri elementi tra due persone diverse. Il trasferimento di biglietti tra umani è una funzionalità separata, in arrivo a breve.</value></data>
+  <data name="Emails_MergeWarningTitle" xml:space="preserve"><value>Unire account?</value></data>
   <data name="Emails_ResendCooldown" xml:space="preserve"><value>Puoi richiedere una nuova e-mail di verifica tra {0} minuto/i.</value></data>
   <data name="Emails_SendVerification" xml:space="preserve"><value>Invia e-mail di verifica</value></data>
   <data name="Emails_Title" xml:space="preserve"><value>Indirizzi e-mail</value></data>
@@ -1650,6 +1652,10 @@
   <data name="CommPrefs_Alert" xml:space="preserve"><value>Avviso</value></data>
   <data name="CommPrefs_BackToProfile" xml:space="preserve"><value>Torna al profilo</value></data>
   <data name="CommPrefs_BackToDashboard" xml:space="preserve"><value>Torna alla dashboard</value></data>
+  <data name="CommPrefs_OneClick_Prompt" xml:space="preserve"><value>Hai cliccato su un link di disiscrizione dalle email di {0}.</value></data>
+  <data name="CommPrefs_OneClick_Hint" xml:space="preserve"><value>Disiscriviti con un clic, oppure regola i dettagli nella matrice qui sotto.</value></data>
+  <data name="CommPrefs_OneClick_Button" xml:space="preserve"><value>Disiscriviti da {0}</value></data>
+  <data name="CommPrefs_OneClick_Done" xml:space="preserve"><value>Disiscritto. Puoi riattivare qualsiasi categoria qui sotto.</value></data>
 
   <data name="Emails_Header_Email" xml:space="preserve"><value>E-mail</value></data>
   <data name="Emails_Header_Status" xml:space="preserve"><value>Stato</value></data>
@@ -1767,6 +1773,17 @@
   <data name="Shifts_SaveAvailability" xml:space="preserve"><value>Salva disponibilità</value></data>
   <data name="Shifts_DaysSelected" xml:space="preserve"><value>giorni selezionati</value></data>
   <data name="Shifts_SlotsFull" xml:space="preserve"><value>Alcuni giorni hanno ancora bisogno di aiuto, ma tutti i posti disponibili sono al completo. Riprova più tardi nel caso si liberino dei posti.</value></data>
+  <data name="Shifts_ConfirmSignup_Title" xml:space="preserve"><value>Conferma la tua iscrizione al {0}</value></data>
+  <data name="Shifts_ConfirmSignup_Phase" xml:space="preserve"><value>Ti stai iscrivendo a {0} (fase di {1}).</value></data>
+  <data name="Shifts_ConfirmSignup_Range" xml:space="preserve"><value>Dal {0} al {1} ({2} giorni).</value></data>
+  <data name="Shifts_ConfirmSignup_Range_Single" xml:space="preserve"><value>Per il {0} (1 giorno).</value></data>
+  <data name="Shifts_ConfirmSignup_ArriveBy" xml:space="preserve"><value>Ti aspettiamo sul posto entro il {0}.</value></data>
+  <data name="Shifts_ConfirmSignup_Prompt" xml:space="preserve"><value>È questo il periodo per cui volevi iscriverti?</value></data>
+  <data name="Shifts_ConfirmSignup_Confirm" xml:space="preserve"><value>Conferma iscrizione</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Heading" xml:space="preserve"><value>Alcuni giorni di questo intervallo sono in conflitto con turni a cui sei già iscritto/a:</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_Row" xml:space="preserve"><value>{0} — già iscritto/a a {1} ({2}–{3})</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_PartialNote" xml:space="preserve"><value>Sei già iscritto/a in alcuni di questi giorni, quindi aggiungeremo solo quelli liberi.</value></data>
+  <data name="Shifts_ConfirmSignup_Conflicts_AllBlocked" xml:space="preserve"><value>Sembra che tu abbia già un turno prenotato per ogni giorno di questo intervallo, quindi non possiamo aggiungerne nessuno.</value></data>
 
   <data name="ShiftDash_Title" xml:space="preserve"><value>Dashboard turni</value></data>
   <data name="ShiftDash_ShiftsCount" xml:space="preserve"><value>{0} turni</value><comment>{0} = count</comment></data>
@@ -1868,10 +1885,6 @@
   <data name="Privacy_ComplaintBody" xml:space="preserve"><value>Se non sei soddisfatto della nostra risposta, hai il diritto di presentare un reclamo all'Agenzia Spagnola per la Protezione dei Dati (AEPD) a {0}.</value><comment>{0} = AEPD URL</comment></data>
 
   <!-- Agent Widget -->
-  <data name="Agent_ConsentPrompt" xml:space="preserve"><value>Prima di usare l'assistente, accetta le condizioni.</value></data>
-  <data name="Agent_ConsentReviewButton" xml:space="preserve"><value>Vedi le condizioni</value></data>
-  <data name="Agent_HistoryActions" xml:space="preserve"><value>Azioni</value></data>
-  <data name="Agent_HistoryDelete" xml:space="preserve"><value>Elimina</value></data>
   <data name="Agent_HistoryEmpty" xml:space="preserve"><value>Nessuna conversazione.</value></data>
   <data name="Agent_HistoryLastMessage" xml:space="preserve"><value>Ultimo messaggio</value></data>
   <data name="Agent_HistoryMessages" xml:space="preserve"><value>Messaggi</value></data>
@@ -1879,9 +1892,14 @@
   <data name="Agent_HistoryTitle" xml:space="preserve"><value>Assistente — Le mie conversazioni</value></data>
   <data name="Agent_InputPlaceholder" xml:space="preserve"><value>Chiedi come funziona il sistema…</value></data>
   <data name="Agent_PanelTitle" xml:space="preserve"><value>Assistente</value></data>
+  <data name="Agent_TermsLink" xml:space="preserve"><value>Condizioni IA</value></data>
   <data name="Agent_ViewHistory" xml:space="preserve"><value>Cronologia</value></data>
   <data name="Agent_Send" xml:space="preserve"><value>Invia</value></data>
   <data name="Agent_WidgetButton" xml:space="preserve"><value>Apri l'assistente</value></data>
+  <data name="Help_WidgetButton" xml:space="preserve"><value>Aiuto</value></data>
+  <data name="Help_Menu_TalkWithAgent" xml:space="preserve"><value>Parla con l'Assistente</value></data>
+  <data name="Help_Menu_CreateIssue" xml:space="preserve"><value>Crea segnalazione</value></data>
+  <data name="Help_Agent_IssueProposed" xml:space="preserve"><value>Non posso rispondere a questo da solo. Ho preparato una segnalazione per il team — controllala e inviala, per favore.</value></data>
   <data name="Nav_Agent" xml:space="preserve"><value>Assistente</value></data>
 
 
@@ -2041,5 +2059,46 @@
   <data name="Issue_Assignee_Updated" xml:space="preserve"><value>Assegnataria aggiornata.</value></data>
   <data name="Issue_Section_Updated" xml:space="preserve"><value>Sezione aggiornata.</value></data>
   <data name="Issue_GitHub_Linked" xml:space="preserve"><value>Collegata a GitHub.</value></data>
+
+  <data name="Welcome_Title" xml:space="preserve"><value>Benvenuto/a</value></data>
+  <data name="Welcome_Heading" xml:space="preserve"><value>Ci sei.</value></data>
+  <data name="Welcome_Subtitle" xml:space="preserve"><value>Il tuo biglietto per Elsewhere 2026 è confermato.</value></data>
+  <data name="Welcome_ShiftsTitle" xml:space="preserve"><value>Ora facciamo succedere tutto insieme.</value></data>
+  <data name="Welcome_ShiftsBody" xml:space="preserve"><value>Elsewhere non è un festival a cui partecipi — è uno che aiuti a costruire. Ogni human sceglie i turni: allestimento prima, operazione durante e smontaggio dopo.</value></data>
+  <data name="Welcome_ShiftsBody2" xml:space="preserve"><value>Per vedere i turni e iscriverti, ti serve un account Humans. Ci vogliono solo un paio di minuti.</value></data>
+  <data name="Welcome_CTA" xml:space="preserve"><value>Accedi o crea un account</value></data>
+  <data name="Welcome_Footer" xml:space="preserve"><value>Hai già un account? Stesso pulsante — accedi e arrivi direttamente ai turni.</value></data>
+  <data name="Welcome_Contact" xml:space="preserve"><value>Domande? Scrivici a</value></data>
+
+  <!-- Google sync removal notifications (issue peterdrier/Humans#639) -->
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Subject" xml:space="preserve"><value>Sei stato rimosso dal gruppo {0}</value><comment>{0} = group email</comment></data>
+  <data name="Email_GoogleGroupRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Accesso al gruppo rimosso&lt;/h2&gt;
+&lt;p&gt;Ciao {0},&lt;/p&gt;
+&lt;p&gt;Il tuo accesso al Gruppo Google &lt;strong&gt;{1}&lt;/strong&gt; (&lt;code&gt;{2}&lt;/code&gt;) è stato rimosso.&lt;/p&gt;
+&lt;p&gt;Questa è stata un'azione automatica basata sui tuoi attuali team e ruoli in Nobodies. Non riceverai più i messaggi inviati a questo gruppo.&lt;/p&gt;
+&lt;p&gt;Se pensi che si tratti di un errore, contatta la persona coordinatrice del tuo team.&lt;/p&gt;
+&lt;p&gt;Il team di Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = group display name, {2} = group email</comment></data>
+
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Subject" xml:space="preserve"><value>Il tuo accesso a {0} è stato rimosso</value><comment>{0} = folder name</comment></data>
+  <data name="Email_GoogleDriveRemoval_LossOfAccess_Body" xml:space="preserve"><value>&lt;h2&gt;Accesso a Drive rimosso&lt;/h2&gt;
+&lt;p&gt;Ciao {0},&lt;/p&gt;
+&lt;p&gt;Il tuo accesso alla cartella condivisa &lt;strong&gt;{1}&lt;/strong&gt; è stato rimosso.&lt;/p&gt;
+&lt;p&gt;Questa è stata un'azione automatica basata sui tuoi attuali team e ruoli in Nobodies.&lt;/p&gt;
+&lt;p&gt;Se pensi che si tratti di un errore, contatta la persona coordinatrice del tuo team.&lt;/p&gt;
+&lt;p&gt;Il team di Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = folder name</comment></data>
+
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Subject" xml:space="preserve"><value>{0} non ha più accesso ai gruppi di Nobodies</value><comment>{0} = removed email</comment></data>
+  <data name="Email_GoogleAccessRemoval_SecondaryCleanup_Body" xml:space="preserve"><value>&lt;h2&gt;Email secondaria ripulita&lt;/h2&gt;
+&lt;p&gt;Ciao {0},&lt;/p&gt;
+&lt;p&gt;L'indirizzo &lt;strong&gt;{1}&lt;/strong&gt; è stato rimosso dai gruppi e dalle cartelle condivise di Nobodies.&lt;/p&gt;
+&lt;p&gt;Il tuo indirizzo principale di Nobodies ora è &lt;strong&gt;{2}&lt;/strong&gt;, e il tuo accesso ai gruppi e alle cartelle condivise tramite quell'indirizzo è invariato. Questo messaggio serve solo a darti traccia dell'indirizzo che è stato ripulito.&lt;/p&gt;
+&lt;p&gt;Se pensi che {1} dovesse ancora avere accesso, contatta la persona coordinatrice del tuo team.&lt;/p&gt;
+&lt;p&gt;Il team di Humans&lt;/p&gt;</value><comment>{0} = user name, {1} = removed email, {2} = current Google email</comment></data>
+
+  <!-- ======================== -->
+  <!-- Onboarding Widget Banner -->
+  <!-- ======================== -->
+  <data name="OnboardingBanner_Text" xml:space="preserve"><value>Finish setting up your account to access shifts and team features.</value><comment>TODO: translate</comment></data>
+  <data name="OnboardingBanner_Cta" xml:space="preserve"><value>Continue setup →</value><comment>TODO: translate</comment></data>
 
 </root>

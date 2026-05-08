@@ -92,7 +92,8 @@ A contact is identified by `ContactSource != null && LastLoginAt == null`. When 
 | ContributionInterests | string? | null | Skills / availability statement (publicly visible on profile). |
 | BoardNotes | string? | null | Notes from the human intended for the Board (self + Board only). |
 | AdminNotes | string? (4000) | null | Admin-only notes (not visible to the human). |
-| IsSuspended | bool | false | Manually suspended; hides profile from regular humans. |
+| IsSuspended | bool | false | **`[Obsolete]`** (issue #635 §15i, diagnostic id `HUM_PROFILE_ISSUSPENDED`). New writes go through `State` (`ProfileState.Suspended`); the column stays in the schema until a follow-up PR drops it after prod soak. Legacy readers and the dual-writers (`ProfileService.SetSuspendedAsync`, `ProfileRepository.SuspendManyAsync`) are pinned by `Profile_IsSuspended_HasNoNewWriters`. |
+| State | ProfileState? | null | **Issue #635 (§15i):** lifecycle marker — `Stub` / `Active` / `Suspended`. Nullable while existing rows are lazily populated by `CachingProfileService` on read (computed from `IsSuspended` + required-field presence). New rows always start as `Stub`. The column is later promoted to `NOT NULL` in a separate schema change after every row is populated. |
 | IsApproved | bool | false | Set automatically when consent check is cleared. |
 | MembershipTier | MembershipTier | Volunteer | Current tier — tracked on Profile, not as RoleAssignment. |
 | ConsentCheckStatus | ConsentCheckStatus? | null | Consent check gate status (null until all consents signed). |
@@ -172,11 +173,12 @@ Per-user email addresses (login, verified, notifications). Cross-domain nav `Use
 | UserId | Guid | FK → User (Cascade) — **FK only**, no nav |
 | Email | string (256) | Required |
 | IsVerified | bool | Required |
-| IsOAuth | bool | True for the OAuth login email; cannot be deleted |
-| IsNotificationTarget | bool | Exactly one verified email per user is the system-notification target |
+| Provider | string? (50) | OAuth provider that owns this row when the user signed in via OIDC ("Google" today; future Apple/Microsoft). Null when no OAuth identity is linked. Single-row-per-(Provider, ProviderKey) is service-enforced |
+| ProviderKey | string? (256) | OAuth subject/key (OIDC `sub`) for the linked identity. Stable across Google Workspace email renames; OAuth callback updates `Email` when claims diverge. Same-user merge in `UserEmailRepository.RewriteEmailAddressAsync` propagates `Provider`/`ProviderKey` to the surviving row to preserve OAuth linkage |
+| IsGoogle | bool | User-controlled flag for the canonical Google Workspace identity (used by Google sync and Workspace admin). At-most-one-true-per-UserId is service-enforced. **Never auto-derived** — set only via explicit user action in the Profile email grid |
+| IsPrimary | bool | Exactly one verified email per user is the system-notification target. Service-enforced via `EnsurePrimaryInvariantAsync`; column persists under legacy name `IsNotificationTarget` per `no-column-drops-for-decoupling.md` |
 | Visibility | ContactFieldVisibility? | Stored as string (max 50); null hides the email from profile view |
 | VerificationSentAt | Instant? | Last time a verification email was sent (rate limiting) |
-| DisplayOrder | int | Sort order in the UI |
 | CreatedAt / UpdatedAt | Instant | Maintained by `UserEmailService` |
 
 **Indexes:** `UserId`; **unique partial index** on `Email` filtered to `IsVerified = true` (Postgres `"IsVerified" = true`) — prevents email squatting across accounts.
@@ -195,7 +197,7 @@ Per-user, per-category email opt-in/opt-out preferences. One row per user per ca
 | OptedOut | bool | true = user opted out of email for this category |
 | InboxEnabled | bool | Default true; when false, informational in-app notifications for this category are suppressed (actionable notifications always show) |
 | UpdatedAt | Instant | Last change |
-| UpdateSource | string (100) | "Profile", "MagicLink", "OneClick", "Default", "DataMigration" |
+| UpdateSource | string (100) | "Profile" (signed-in profile UI), "Guest" (signed-in Guest dashboard, profileless), "MagicLink" (anonymous unsubscribe-token endpoints), "OneClick" (RFC 8058 List-Unsubscribe), "Default" (lazy seed), "DataMigration" |
 
 **Unique constraint:** `(UserId, Category)`. **Indexes:** `UserId`.
 
@@ -302,6 +304,9 @@ All profile-related functionality lives under `/Profile`:
 | `/Profile/Me` | View own profile |
 | `/Profile/Me/Edit` | Edit own profile |
 | `/Profile/Me/Emails` | Email management |
+| `/Profile/Me/Emails/ClearGoogle`, `/Profile/Me/Emails/ClearPrimary` | Self-recovery — drop a single row's `IsGoogle`/`IsPrimary` flag (only surfaced in UI on N>1 violation; auth is self-or-admin) |
+| `/Profile/{id}/Admin/Emails/ClearGoogle`, `/Profile/{id}/Admin/Emails/ClearPrimary` | Admin remediation — drop a single row's flag without auto-promoting a successor |
+| `/Profile/{id}/Admin/Emails/Verify` | Admin manual verification (`PolicyNames.AdminOnly`) — marks a pending plain UserEmail row verified without consuming a token; creates a merge request when the address is already verified on another account |
 | `/Profile/Me/ShiftInfo` | Shift preferences |
 | `/Profile/Me/CommunicationPreferences` | Per-category email/in-app communication preferences |
 | `/Profile/Me/Notifications` | Permanent redirect to `/Profile/Me/CommunicationPreferences` |
@@ -359,6 +364,7 @@ Admin-only flows for the section's cross-account hygiene:
 - Duplicate account detection applies gmail/googlemail equivalence when scanning for address collisions.
 - `AccountMergeService` writes and `DuplicateAccountService` reads go through the Profile section's repositories and `IUserService` — never through cross-section `DbSet` reads.
 - `AccountMergeService.AcceptAsync` is the **fold-into-target** orchestrator: it re-FKs every owning section's user-scoped rows from source to target via per-section `Reassign…ToUserAsync` methods, then tombstones the source User row (sets `MergedToUserId` + `MergedAt` via `IUserService.AnonymizeForMergeAsync`) — it does NOT delete or wipe the source. Append-only history (audit log, consent records, budget audit log) stays at source by design and is surfaced via chain-follow reads.
+- The preferred-language flag (rendered next to a person's name on `ProfileCard` and `_HumanPopover`) is visible only to `HumanAdmin` / `Board` / `Admin` viewers — general active humans see other people's profile cards and popovers without it. Self-view is unaffected (the flag isn't shown there in the first place; preferred language is editable on `/Profile/Me/Edit`).
 
 ## Negative Access Rules
 
@@ -397,6 +403,9 @@ Admin-only flows for the section's cross-account hygiene:
 - Services live in `Humans.Application.Services.Profile/` and never import `Microsoft.EntityFrameworkCore`.
 - `IProfileRepository`, `IUserEmailRepository`, `IContactFieldRepository`, `ICommunicationPreferenceRepository` (impls in `Humans.Infrastructure/Repositories/`) are the only code paths that touch this section's tables via `DbContext`. Repositories are Singleton, using `IDbContextFactory<HumansDbContext>` and short-lived contexts per method.
 - **Decorator decision — caching decorator.** `CachingProfileService` is a Singleton owning `ConcurrentDictionary<Guid, FullProfile> _byUserId`. Warmup via `FullProfileWarmupHostedService`. See design-rules §15d.
+- **`FullProfile` is canonical (issue #635 §15i, 2026-05-04).** Three derived properties — `PrimaryEmail`, `AllVerifiedEmails`, `GoogleEmail` — replace the old `User.UserEmails` / `User.GetEffectiveEmail()` / `User.GoogleEmail` reader sites. `CachingProfileService` populates them from already-loaded `UserEmail` rows (no new repo lookups). `FullProfile.NotificationEmail` is kept as a get-only alias for `PrimaryEmail` for backward compat. The lifecycle marker `Profile.State` (Stub/Active/Suspended) flows through `FullProfile.State` and is lazily computed-and-written-back when the persisted value is `null` (see `CachingProfileService.ComputeProfileState`).
+- **Stub Profile invariant (issue #635 §15i).** Every newly created User materializes a `ProfileState.Stub` Profile inline at the User-creation call site (`AccountController.ExternalLoginCallback`/`CompleteSignup`, `AccountProvisioningService.FindOrCreateUserByEmailAsync`). `ProfileService.SaveProfileAsync` promotes the row to `Active` once `BurnerName`/`FirstName`/`LastName` are all populated. Legacy profile-less users (contact imports pre-§15i) are reconciled through the `/Profile/Admin/Backfill` admin tool — idempotent count-and-bulk-create page; no-op when N=0.
+- **`UserEmail.IsPrimary` invariants.** Service-layer guarantee in `UserEmailService.EnsurePrimaryInvariantAsync` (exactly one verified `IsPrimary` per user, recovers from zero/multi states). Account-merge fold preserves target's `IsPrimary` and demotes the source's. No DB unique index — per `memory/architecture/db-enforcement-minimal.md` the service is the contract; a DB partial unique index would push violations to runtime as untyped `DbUpdateException` failures rather than service-layer recovery (column persists under legacy name `IsNotificationTarget` per `no-column-drops-for-decoupling.md`). **`UserEmailService.ClearPrimaryAsync` (issue #650) is the deliberate-bypass admin/self recovery path** — it drops `IsPrimary` from a single row *without* invoking `EnsurePrimaryInvariantAsync`, intentionally leaving the user in a zero-primary state so the operator picks the new primary explicitly. Surface: see `/Profile/{id}/Admin/Emails/ClearPrimary` and (on N>1 violations only) `/Profile/Me/Emails/ClearPrimary`.
 - **Inner service** is `Humans.Application.Services.Profile.ProfileService`, registered as `AddKeyedScoped` under `CachingProfileService.InnerServiceKey` (`"profile-inner"`). The decorator resolves it per-call via `IServiceScopeFactory`.
 - **`IFullProfileInvalidator`** is aliased to the same Singleton `CachingProfileService` instance so external sections' writes (Auth, Onboarding, Teams, Google) can invalidate the cache without touching the dict.
 - **Cross-domain navs stripped:** `Profile.User`, `UserEmail.User`, `CommunicationPreference.User`. Display stitching routes through `IUserService.GetByIdsAsync`.

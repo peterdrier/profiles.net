@@ -9,7 +9,7 @@
   src/Humans.Infrastructure/Services/GoogleWorkspace/**
 -->
 <!-- freshness:flag-on-change
-  Provisioning step ordering, recovery email handling, credentials email template, or admin/HumanAdmin authorization may have changed.
+  Provisioning step ordering, recovery email handling, credentials email template, admin/HumanAdmin authorization, or post-provisioning account management (2FA enrollment status, recovery-email visibility, password reset, combined Reset+2FA recovery flow on `/Google/Accounts`) may have changed.
 -->
 
 # Workspace Account Provisioning
@@ -57,6 +57,74 @@ Nobodies Collective uses Google Workspace for organizational email (@nobodies.te
 - Linking creates a verified `UserEmail` and sets `GoogleEmail` on the user
 - Audit trail recorded (`WorkspaceAccountLinked`)
 - No credentials email sent (user already has access)
+
+### US-32.4: Surface 2FA Enrollment State
+**As an** admin
+**I want to** see which @nobodies.team accounts have completed 2-Step Verification enrollment
+**So that** I can spot broken accounts before the human reports being locked out
+
+**Acceptance Criteria:**
+- `/Google/Accounts` table shows a per-row 2FA chip: green "2FA ready" (enrolled) or red "2FA not set up" (unenrolled)
+- Summary counter at the top: "X accounts missing 2FA setup" — counts active unenrolled accounts only (suspended accounts are excluded since they can't sign in anyway)
+- Alert banner + client-side filter toggle to show only the unenrolled set
+- Backed by `WorkspaceUserAccount.IsEnrolledIn2Sv`, sourced from the Directory API `users.get` `isEnrolledIn2Sv` field
+
+### US-32.5: Surface Recovery Email
+**As an** admin
+**I want to** see the personal recovery email Google has on file for each account
+**So that** I can validate the recovery channel before the human is locked out
+
+**Acceptance Criteria:**
+- `/Google/Accounts` table shows a "Recovery Email" column per row
+- Accounts with no recovery email show a yellow "None" badge with explanatory tooltip
+- Backed by `WorkspaceUserAccount.RecoveryEmail`, sourced from the Directory API `users.get` `recoveryEmail` field
+
+### US-32.6: Reset Password (with one-shot delivery)
+**As an** admin
+**I want to** reset the password for a @nobodies.team account and see the new temporary password once
+**So that** I can hand it to a human who's lost access
+
+**Acceptance Criteria:**
+- "Reset Password" button per row, Admin-only, CSRF-protected, hidden for suspended accounts
+- Confirm-before-post explains the password will be shown once
+- Calls Google Admin SDK `users.update` with `password` + `changePasswordAtNextLogin: true`
+- New temp password appears once in a modal with copy-to-clipboard (clipboard format `pw: <password>`) and an "I've delivered these securely" acknowledgement gate
+- Modal text-content is cleared on close so browser back/refresh can't re-expose the password (TempData single-use)
+- Audit trail recorded (`WorkspaceAccountPasswordReset`)
+
+### US-32.7: Reset Password + Get 2FA (combined recovery)
+**As an** admin
+**I want to** reset the password AND grab one fresh backup verification code in a single action
+**So that** I can unblock a locked-out human who has not yet enrolled in 2SV — they can sign in with the password + code, then enroll a real second factor
+
+**Acceptance Criteria:**
+- "Reset + 2FA" button per row, Admin-only, CSRF-protected, hidden for suspended accounts **and for accounts already enrolled in 2-Step Verification** (the combined flow rotates backup codes destructively, so running it against a working 2FA setup would silently break it)
+- Confirm-before-post explains both will be shown once
+- Calls `IGoogleAdminService.ResetPasswordAndGenerate2FaAsync` which composes the existing password-reset + backup-codes flows; only the **first** code from the freshly-issued set is surfaced (the rest are unused — Google rotates the whole set destructively, but the admin only ever needs one)
+- Confirmed (2026-05-04) to work for accounts that have not yet completed 2SV enrollment
+- **Server-side gate**: `ResetPasswordAndGenerate2FaAsync` re-fetches live Directory state at the top of the method and refuses with a clear error when `IsEnrolledIn2Sv` is true. The refusal is independent of the UI — a hand-crafted POST to `Accounts/ResetPasswordAndGenerate2Fa` for an enrolled email also returns the error path (no password reset, no code rotation). Refusals are logged via `WorkspaceAccountResetBlockedFor2Sv` for audit / abuse-pattern detection. If an admin genuinely needs to rotate 2FA for an enrolled human, that's done in the Google Admin console.
+- Both credentials appear once in the same modal as the password-only flow, with copy-to-clipboard formatted as:
+  ```
+  pw: <temp password>
+  2fa: <single backup code>
+  ```
+- Modal text-content is cleared on close so browser back/refresh can't re-expose the secrets
+- Two audit entries recorded on the success path: `WorkspaceAccountPasswordReset` then `WorkspaceAccountBackupCodesGenerated`. The blocked-by-2SV path records `WorkspaceAccountResetBlockedFor2Sv` instead and performs no Workspace mutation.
+- Requires the `admin.directory.user.security` scope on the service account credential
+
+## Account-Management Invariants
+
+### Combined-recovery composition + partial-success handling
+`ResetPasswordAndGenerate2FaAsync` calls the underlying password-reset and backup-code-generation in sequence:
+
+1. **Password-reset failure short-circuits** — if `ResetPasswordAsync` fails, the method returns `Success: false` and never attempts the backup-code call (no point handing out codes for an account the human still can't sign into).
+2. **Partial success on backup-code failure** — if the password reset succeeded but Google rejects the backup-code request, the method still returns `Success: true` with the temp password and `BackupCode: null`. Google rotates passwords destructively just like codes, so dropping the password to retry would lock the human out further. The admin sees "Password reset for X. Backup-code generation failed — deliver the password only and ask the human to re-attempt the 2FA request out-of-band."
+
+### Backup-codes audit-and-delivery ordering
+`GenerateBackupCodesAsync` (used standalone by the combined flow) writes its audit entry **after** Google has rotated the codes and before returning them, with two safety guards:
+
+1. **Empty-list guard** — if Google's `Generate` succeeds but the subsequent `List` returns 0 codes, no audit entry is written and the method returns `Success: false`. We never record "generated 0 codes" in the audit log.
+2. **Audit-failure preservation** — if the audit `LogAsync` throws after Google has issued the new set, the codes are still returned (audit failure is logged at `LogCritical` for out-of-band reconciliation). Google has already invalidated the previously-issued set, so dropping the new codes would lock the human out — account recovery is real-time, audit reconciliation is operational.
 
 ## Provisioning Flow
 
@@ -118,6 +186,9 @@ Ambiguous characters (0, O, l, 1, I) are excluded for readability.
 |--------|---------------|
 | Provision account | HumanAdmin, Admin |
 | Link existing account | Admin |
+| View `/Google/Accounts` (2FA status, recovery email, etc.) | Admin |
+| Reset password (one-shot delivery) | Admin |
+| Reset password + get 2FA backup code (combined recovery) | Admin |
 
 ## Routes
 
@@ -125,7 +196,9 @@ Ambiguous characters (0, O, l, 1, I) are excluded for readability.
 |-------|--------|--------|
 | `/Human/{id}/Admin` | GET | Human admin page (shows provisioning form) |
 | `/Human/{id}/Admin/ProvisionEmail` | POST | Provision and link @nobodies.team account |
-| `/Admin/Email` | GET | List all @nobodies.team accounts, link orphans |
+| `/Google/Accounts` | GET | List all @nobodies.team accounts with 2FA status, recovery email, link orphans (replaces the legacy `/Admin/Email` route) |
+| `/Google/Accounts/ResetPassword` | POST | Reset password — temp password shown once in a modal |
+| `/Google/Accounts/ResetPasswordAndGenerate2Fa` | POST | Reset password + issue one backup verification code — both shown once in the same modal |
 
 ## Service Interfaces
 
@@ -144,8 +217,18 @@ Task<WorkspaceUserAccount?> GetAccountAsync(string email, CancellationToken ct);
 
 // Suspend/restore accounts
 Task SuspendAccountAsync(string email, CancellationToken ct);
-Task RestoreAccountAsync(string email, CancellationToken ct);
+Task ReactivateAccountAsync(string email, CancellationToken ct);
+
+// Reset password (admin-initiated)
+Task ResetPasswordAsync(string email, string newPassword, CancellationToken ct);
+
+// Backup verification codes (post-provisioning recovery surface)
+// Combined recovery composes ResetPasswordAsync + GenerateBackupCodesAsync
+// at the IGoogleAdminService layer (ResetPasswordAndGenerate2FaAsync).
+Task<IReadOnlyList<string>> GenerateBackupCodesAsync(string email, CancellationToken ct);
 ```
+
+`WorkspaceUserAccount` carries the post-provisioning visibility fields used by the admin surface: `IsEnrolledIn2Sv` (from Directory API `isEnrolledIn2Sv`) and `RecoveryEmail` (from `recoveryEmail`).
 
 ### IEmailService (credentials notification)
 ```csharp

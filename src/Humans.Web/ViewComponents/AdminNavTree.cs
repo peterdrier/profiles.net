@@ -28,7 +28,8 @@ public static class AdminNavTree
         }),
         new("Money", new AdminNavItem[]
         {
-            new("Finance", "Finance", "Index", null, null, "fa-solid fa-coins", PolicyNames.FinanceAdminOrAdmin),
+            new("Finance",        "Finance",      "Index",   null, null, "fa-solid fa-coins",     PolicyNames.FinanceAdminOrAdmin),
+            new("Store catalog",  "StoreAdmin",   "Catalog", null, null, "fa-solid fa-tags",      PolicyNames.StoreCatalogAdmin),
         }),
         new("Governance", new AdminNavItem[]
         {
@@ -43,11 +44,12 @@ public static class AdminNavTree
             new("Email outbox",       "Email",  "EmailOutbox",  null, null, "fa-solid fa-inbox",     PolicyNames.AdminOnly),
             new("Campaigns",          "Campaign", "Index",      null, null, "fa-solid fa-bullhorn",  PolicyNames.AdminOnly),
             new("Workspace accounts", "Google",  "Accounts",    null, null, "fa-solid fa-at",        PolicyNames.AdminOnly),
+            new("Email flag violations", "Google", "EmailFlagViolations", null, null, "fa-solid fa-triangle-exclamation", PolicyNames.AdminOnly),
         }),
         new("Agent", new AdminNavItem[]
         {
             new("Agent Config",  "AdminAgent", "Settings",      null, null, "fa-solid fa-robot",    PolicyNames.AdminOnly),
-            new("Agent History", "AdminAgent", "Conversations", null, null, "fa-solid fa-comments", PolicyNames.AdminOnly),
+            new("Agent History", "Agent",      "Conversations", null, null, "fa-solid fa-comments", PolicyNames.AdminOnly),
         }),
         new("People data", new AdminNavItem[]
         {
@@ -56,6 +58,7 @@ public static class AdminNavTree
             new("Audience segmentation", "Admin", "AudienceSegmentation",   null, null, "fa-solid fa-chart-pie",  PolicyNames.AdminOnly),
             new("Legal documents",       "AdminLegalDocuments", "LegalDocuments", null, null, "fa-solid fa-scale-balanced", PolicyNames.AdminOnly),
             new("Backfill Provider/IsGoogle", "Admin", "BackfillUserEmailProviders", null, null, "fa-solid fa-key", PolicyNames.AdminOnly),
+            new("Stub Profile Backfill",      "ProfileBackfillAdmin", "Index",       null, null, "fa-solid fa-user-plus", PolicyNames.AdminOnly),
         }),
         new("Diagnostics", new AdminNavItem[]
         {

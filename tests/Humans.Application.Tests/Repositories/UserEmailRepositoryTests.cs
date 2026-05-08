@@ -6,6 +6,7 @@ using Humans.Infrastructure.Repositories.Profiles;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.InMemory.Internal;
+using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using Xunit;
 
@@ -26,7 +27,9 @@ public sealed class UserEmailRepositoryTests : IDisposable
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
             .Options;
         _dbContext = new HumansDbContext(options);
-        _repo = new UserEmailRepository(new TestDbContextFactory(options));
+        _repo = new UserEmailRepository(
+            new TestDbContextFactory(options),
+            NullLogger<UserEmailRepository>.Instance);
     }
 
     public void Dispose()
@@ -61,6 +64,16 @@ public sealed class UserEmailRepositoryTests : IDisposable
         reloadedB.UpdatedAt.Should().Be(updatedAt);
         reloadedC.UpdatedAt.Should().Be(SeedInstant);
     }
+
+    // Note: RewriteEmailAddressAsync is not unit-tested at the repository level —
+    // its conflict-detection branches use EF.Functions.ILike which is a
+    // Npgsql-specific translation and does not evaluate against the InMemory
+    // provider (see UserRepositoryTests note for GetByEmailOrAlternateAsync).
+    // The three branches (no-conflict, same-user, cross-user) are covered at
+    // the service layer in UserEmailServiceTests via a substitute repo, plus
+    // the controller-level CrossUserConflict path in
+    // AccountControllerOAuthRenameDetectionTests. End-to-end behavior against
+    // Postgres is verified in preview/QA.
 
     private static readonly Instant SeedInstant = Instant.FromUtc(2026, 3, 1, 12, 0);
 

@@ -493,6 +493,16 @@ public sealed class UserRepository : IUserRepository
         var userEmails = await ctx.UserEmails.Where(e => e.UserId == userId).ToListAsync(ct);
         ctx.UserEmails.RemoveRange(userEmails);
 
+        // Remove AspNetUserLogins so a returning external-login user (e.g.
+        // Google) is not bound to this tombstoned User. Without this the
+        // orphan login row drives ExternalLoginSignInAsync into the
+        // lockedout branch and blocks the create-new-user path.
+        // See nobodies-collective/Humans#661.
+        var logins = await ctx.Set<IdentityUserLogin<Guid>>()
+            .Where(l => l.UserId == userId)
+            .ToListAsync(ct);
+        ctx.Set<IdentityUserLogin<Guid>>().RemoveRange(logins);
+
         user.DisplayName = $"Purged ({displayName})";
 
         // Lock out the account permanently
@@ -545,7 +555,7 @@ public sealed class UserRepository : IUserRepository
         if (user is null)
             return null;
 
-        var originalEmail = user.GetEffectiveEmail();
+        var originalEmail = user.Email;
         var originalDisplayName = user.DisplayName;
         var preferredLanguage = user.PreferredLanguage;
 
@@ -559,6 +569,16 @@ public sealed class UserRepository : IUserRepository
         // reusing the same addresses and so the anonymized row cannot be
         // discovered by email lookup.
         ctx.UserEmails.RemoveRange(user.UserEmails);
+
+        // Remove AspNetUserLogins for the same reason we drop UserEmails:
+        // a returning external-login user (e.g. Google) must not be bound
+        // to this tombstoned User, or ExternalLoginSignInAsync will route
+        // into the lockedout branch and block the create-new-user path.
+        // See nobodies-collective/Humans#661.
+        var logins = await ctx.Set<IdentityUserLogin<Guid>>()
+            .Where(l => l.UserId == userId)
+            .ToListAsync(ct);
+        ctx.Set<IdentityUserLogin<Guid>>().RemoveRange(logins);
 
         // Clear deletion request fields (deletion is now complete).
         user.DeletionRequestedAt = null;
@@ -598,6 +618,16 @@ public sealed class UserRepository : IUserRepository
         return await ctx.EventParticipations
             .AsNoTracking()
             .Where(ep => ep.Year == year)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<EventParticipation>> GetEventParticipationsByUserIdAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync(ct);
+        return await ctx.EventParticipations
+            .AsNoTracking()
+            .Where(ep => ep.UserId == userId)
             .ToListAsync(ct);
     }
 

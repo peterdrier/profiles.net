@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Shifts;
@@ -7,6 +8,7 @@ using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Authorization;
 using Humans.Web.Models;
+using Humans.Web.Models.Shifts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -64,6 +66,8 @@ public class ShiftsController : HumansControllerBase
 
         var userSignups = await _signupService.GetByUserAsync(user.Id, es.Id);
         var hasSignups = userSignups.Count > 0;
+
+        var userActiveSignupsForUi = await LoadUserActiveSignupsForUiAsync(user.Id);
 
         if (!es.IsShiftBrowsingOpen && !isPrivileged && !hasSignups)
             return View("BrowsingClosed");
@@ -142,47 +146,8 @@ public class ShiftsController : HumansControllerBase
         var shiftTeamIds = filteredShifts.Select(u => u.Shift.Rota.TeamId).Distinct().ToList();
         var teamLookup = await _teamService.GetByIdsWithParentsAsync(shiftTeamIds);
 
-        // Map UrgentShift → ShiftDisplayItem (shared by both sort modes)
-        ShiftDisplayItem MapToDisplayItem(UrgentShift u)
-        {
-            var (start, end, shiftPeriod) = _shiftMgmt.ResolveShiftTimes(u.Shift, es);
-            return new ShiftDisplayItem
-            {
-                Shift = u.Shift,
-                AbsoluteStart = start,
-                AbsoluteEnd = end,
-                Period = shiftPeriod,
-                ConfirmedCount = u.ConfirmedCount,
-                RemainingSlots = u.RemainingSlots,
-                UrgencyScore = u.UrgencyScore,
-                Signups = u.Signups
-                    .Select(s => new ShiftSignupInfo(
-                        s.UserId, s.DisplayName, s.Status,
-                        s.HasProfilePicture ? $"/Profile/Picture?id={s.UserId}" : null))
-                    .ToList()
-            };
-        }
-
-        RotaShiftGroup BuildRotaGroup(IGrouping<Guid, UrgentShift> rotaGroup, string? deptName = null, string? deptSlug = null)
-        {
-            var rota = rotaGroup.OrderBy(x => x.Shift.Id).First().Shift.Rota;
-            var shifts = rotaGroup
-                .Select(MapToDisplayItem)
-                .OrderBy(s => s.AbsoluteStart)
-                .ToList();
-            return new RotaShiftGroup
-            {
-                Rota = rota,
-                Shifts = shifts,
-                DepartmentName = deptName,
-                DepartmentSlug = deptSlug,
-                MaxUrgencyScore = shifts.Count > 0 ? shifts.Max(s => s.UrgencyScore) : 0,
-                TotalConfirmed = shifts.Sum(s => s.ConfirmedCount),
-                TotalSlots = shifts.Sum(s => s.Shift.MaxVolunteers)
-            };
-        }
-
-        // Group by department → rota → shift
+        // Group by department → rota → shift. Per-shift / per-rota mapping is shared
+        // with the onboarding widget via ShiftBrowseMapper.
         var departments = filteredShifts
             .GroupBy(u => u.Shift.Rota.TeamId)
             .Select(deptGroup =>
@@ -199,7 +164,7 @@ public class ShiftsController : HumansControllerBase
                     TeamSlug = deptSlug,
                     Rotas = deptGroup
                         .GroupBy(u => u.Shift.RotaId)
-                        .Select(rg => BuildRotaGroup(rg, deptName, deptSlug))
+                        .Select(rg => ShiftBrowseMapper.BuildRotaGroup(rg, es, deptName, deptSlug))
                         .OrderBy(r => r.Rota.Name, StringComparer.Ordinal)
                         .ToList()
                 };
@@ -256,7 +221,8 @@ public class ShiftsController : HumansControllerBase
             AllTags = allTags.ToList(),
             FilterTagIds = activeTagFilter,
             UserPreferredTagIds = userPreferredTags.Select(t => t.Id).ToHashSet(),
-            MySignupCount = userSignups.Count(s => s.Status is SignupStatus.Confirmed or SignupStatus.Pending)
+            MySignupCount = userSignups.Count(s => s.Status is SignupStatus.Confirmed or SignupStatus.Pending),
+            UserActiveSignups = userActiveSignupsForUi
         };
 
         return View(model);
@@ -299,7 +265,7 @@ public class ShiftsController : HumansControllerBase
         }
 
         var privileged = ShiftRoleChecks.IsPrivilegedSignupApprover(User);
-        var result = await _signupService.SignUpRangeAsync(user.Id, rotaId, startDayOffset, endDayOffset, isPrivileged: privileged);
+        var result = await _signupService.SignUpRangeAsync(user.Id, rotaId, startDayOffset, endDayOffset, isPrivileged: privileged, skipConflicts: true);
 
         if (!result.Success)
         {
@@ -515,32 +481,34 @@ public class ShiftsController : HumansControllerBase
     public async Task<IActionResult> Settings()
     {
         var es = await _shiftMgmt.GetActiveAsync();
-        var model = new EventSettingsViewModel();
-
-        if (es is not null)
-        {
-            model.Id = es.Id;
-            model.EventName = es.EventName;
-            model.TimeZoneId = es.TimeZoneId;
-            model.GateOpeningDate = LocalDatePattern.Iso.Format(es.GateOpeningDate);
-            model.BuildStartOffset = es.BuildStartOffset;
-            model.EventEndOffset = es.EventEndOffset;
-            model.StrikeEndOffset = es.StrikeEndOffset;
-            model.EarlyEntryCapacityJson = JsonSerializer.Serialize(es.EarlyEntryCapacity);
-            model.BarriosEarlyEntryAllocationJson = es.BarriosEarlyEntryAllocation is not null
-                ? JsonSerializer.Serialize(es.BarriosEarlyEntryAllocation)
-                : null;
-            model.EarlyEntryClose = es.EarlyEntryClose.HasValue
-                ? InstantPattern.General.Format(es.EarlyEntryClose.Value)
-                : null;
-            model.IsShiftBrowsingOpen = es.IsShiftBrowsingOpen;
-            model.GlobalVolunteerCap = es.GlobalVolunteerCap;
-            model.ReminderLeadTimeHours = es.ReminderLeadTimeHours;
-            model.IsActive = es.IsActive;
-        }
-
-        return View(model);
+        return View(es is null ? new EventSettingsViewModel() : MapEventSettingsToViewModel(es));
     }
+
+    private static EventSettingsViewModel MapEventSettingsToViewModel(EventSettings es) => new()
+    {
+        Id = es.Id,
+        EventName = es.EventName,
+        TimeZoneId = es.TimeZoneId,
+        GateOpeningDate = LocalDatePattern.Iso.Format(es.GateOpeningDate),
+        BuildStartOffset = es.BuildStartOffset,
+        EventEndOffset = es.EventEndOffset,
+        StrikeEndOffset = es.StrikeEndOffset,
+        FirstCrewStartOffset = es.FirstCrewStartOffset,
+        SetupWeekStartOffset = es.SetupWeekStartOffset,
+        PreEventWeekStartOffset = es.PreEventWeekStartOffset,
+        FinishingWeekendStartOffset = es.FinishingWeekendStartOffset,
+        EarlyEntryCapacityJson = JsonSerializer.Serialize(es.EarlyEntryCapacity),
+        BarriosEarlyEntryAllocationJson = es.BarriosEarlyEntryAllocation is not null
+            ? JsonSerializer.Serialize(es.BarriosEarlyEntryAllocation)
+            : null,
+        EarlyEntryClose = es.EarlyEntryClose.HasValue
+            ? InstantPattern.General.Format(es.EarlyEntryClose.Value)
+            : null,
+        IsShiftBrowsingOpen = es.IsShiftBrowsingOpen,
+        GlobalVolunteerCap = es.GlobalVolunteerCap,
+        ReminderLeadTimeHours = es.ReminderLeadTimeHours,
+        IsActive = es.IsActive,
+    };
 
     [HttpPost("Settings")]
     [ValidateAntiForgeryToken]
@@ -596,6 +564,10 @@ public class ShiftsController : HumansControllerBase
             existing.BuildStartOffset = model.BuildStartOffset;
             existing.EventEndOffset = model.EventEndOffset;
             existing.StrikeEndOffset = model.StrikeEndOffset;
+            existing.FirstCrewStartOffset = model.FirstCrewStartOffset;
+            existing.SetupWeekStartOffset = model.SetupWeekStartOffset;
+            existing.PreEventWeekStartOffset = model.PreEventWeekStartOffset;
+            existing.FinishingWeekendStartOffset = model.FinishingWeekendStartOffset;
             existing.EarlyEntryCapacity = eeCapacity;
             existing.BarriosEarlyEntryAllocation = barriosAllocation;
             existing.EarlyEntryClose = earlyEntryClose;
@@ -617,6 +589,10 @@ public class ShiftsController : HumansControllerBase
                 BuildStartOffset = model.BuildStartOffset,
                 EventEndOffset = model.EventEndOffset,
                 StrikeEndOffset = model.StrikeEndOffset,
+                FirstCrewStartOffset = model.FirstCrewStartOffset,
+                SetupWeekStartOffset = model.SetupWeekStartOffset,
+                PreEventWeekStartOffset = model.PreEventWeekStartOffset,
+                FinishingWeekendStartOffset = model.FinishingWeekendStartOffset,
                 EarlyEntryCapacity = eeCapacity,
                 BarriosEarlyEntryAllocation = barriosAllocation,
                 EarlyEntryClose = earlyEntryClose,
@@ -633,6 +609,30 @@ public class ShiftsController : HumansControllerBase
 
         SetSuccess("Event settings saved.");
         return RedirectToAction(nameof(Settings));
+    }
+
+    private async Task<IReadOnlyList<UserSignupConflictItem>> LoadUserActiveSignupsForUiAsync(Guid userId)
+    {
+        var allActiveSignups = await _signupService.GetActiveSignupsForUserAsync(userId);
+        return allActiveSignups
+            .Where(s => s.Shift?.Rota?.EventSettings is not null)
+            .Select(s =>
+            {
+                var sEs = s.Shift!.Rota!.EventSettings!;
+                var absStart = s.Shift.GetAbsoluteStart(sEs);
+                var absEnd = s.Shift.GetAbsoluteEnd(sEs);
+                var tz = DateTimeZoneProviders.Tzdb[sEs.TimeZoneId];
+                var localStart = absStart.InZone(tz).LocalDateTime;
+                var localEnd = absEnd.InZone(tz).LocalDateTime;
+                return new UserSignupConflictItem(
+                    Date: localStart.Date,
+                    RotaName: s.Shift.Rota.Name,
+                    AbsoluteStart: absStart,
+                    AbsoluteEnd: absEnd,
+                    DisplayStart: localStart.TimeOfDay.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    DisplayEnd: localEnd.TimeOfDay.ToString("HH:mm", CultureInfo.InvariantCulture));
+            })
+            .ToList();
     }
 
     private static (LocalDate From, LocalDate To) GetPeriodDateRange(EventSettings es, ShiftPeriod period)

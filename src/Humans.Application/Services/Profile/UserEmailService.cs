@@ -156,27 +156,26 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
             TokenOptions.DefaultEmailProvider,
             $"{EmailVerificationTokenPurpose}:{userEmail.Id}");
 
-        return new AddEmailResult(token, isConflict);
+        return new AddEmailResult(userEmail.Id, token, isConflict);
     }
 
     public async Task<VerifyEmailResult> VerifyEmailAsync(
-        Guid userId, string token, CancellationToken cancellationToken = default)
+        Guid userId, Guid emailId, string token, CancellationToken cancellationToken = default)
     {
         var user = await _userService.GetByIdAsync(userId, cancellationToken)
             ?? throw new InvalidOperationException("User not found.");
 
-        var userEmails = await _repository.GetByUserIdForMutationAsync(userId, cancellationToken);
-        // TODO(nobodies-collective#611): VerifyEmailAsync uses FirstOrDefault on
-        // (!IsVerified && Provider == null), which is ambiguous when multiple pending
-        // plain rows exist for the same user. The token IS bound to a specific row Id
-        // (purpose = "{EmailVerificationTokenPurpose}:{pendingEmail.Id}"), so a row
-        // mismatch causes token validation to fail against the wrong row, surfacing as
-        // a confusing user error even when the token is valid for ANOTHER pending row.
-        // Surfaced during PR 4 review (peterdrier/Humans#376) — AdminAddEmail amplifies
-        // the multi-pending-row scenario. Fix: load the row by the Id embedded in the
-        // token's purpose suffix, not via FirstOrDefault.
-        var pendingEmail = userEmails.FirstOrDefault(e => !e.IsVerified && e.Provider == null)
-            ?? throw new ValidationException("No email pending verification.");
+        // Issue nobodies-collective/Humans#611: load the specific pending row
+        // the verification link was issued for, not "any non-verified plain
+        // row". The token is bound to this row's Id via the purpose suffix
+        // ("{EmailVerificationTokenPurpose}:{emailId}"), so picking a
+        // different row would cause token validation to fail against the
+        // wrong row even when the token is valid.
+        var pendingEmail = await _repository.GetByIdAndUserIdAsync(emailId, userId, cancellationToken);
+        if (pendingEmail is null || pendingEmail.IsVerified || pendingEmail.Provider is not null)
+        {
+            throw new ValidationException("No email pending verification.");
+        }
 
         var isValid = await _userManager.VerifyUserTokenAsync(
             user,
@@ -222,6 +221,64 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
 
         await TryBackfillGoogleEmailAsync(userId, cancellationToken);
         await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
+
+        return new VerifyEmailResult(pendingEmail.Email, MergeRequestCreated: false);
+    }
+
+    public async Task<VerifyEmailResult> AdminMarkVerifiedAsync(
+        Guid userId, Guid emailId, Guid actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var pendingEmail = await _repository.GetByIdAndUserIdAsync(emailId, userId, cancellationToken);
+        if (pendingEmail is null || pendingEmail.IsVerified || pendingEmail.Provider is not null)
+        {
+            throw new ValidationException("No email pending verification.");
+        }
+
+        // Mirror VerifyEmailAsync's duplicate-handling: if the address is
+        // already verified on another account, create a merge request rather
+        // than silently completing verification — the duplicate-account flow
+        // owns reconciliation.
+        var normalizedPendingEmail = EmailNormalization.NormalizeForComparison(pendingEmail.Email);
+        var alternatePendingEmail = GetAlternateComparableEmail(normalizedPendingEmail);
+        var conflictingEmail = await _repository.GetConflictingVerifiedEmailAsync(
+            pendingEmail.Id, normalizedPendingEmail, alternatePendingEmail, cancellationToken);
+
+        if (conflictingEmail is not null)
+        {
+            if (!await MergeService.HasPendingForEmailIdAsync(pendingEmail.Id, cancellationToken))
+            {
+                var now = _clock.GetCurrentInstant();
+                var mergeRequest = new AccountMergeRequest
+                {
+                    Id = Guid.NewGuid(),
+                    TargetUserId = userId,
+                    SourceUserId = conflictingEmail.UserId,
+                    Email = pendingEmail.Email,
+                    PendingEmailId = pendingEmail.Id,
+                    Status = AccountMergeRequestStatus.Pending,
+                    CreatedAt = now
+                };
+
+                await MergeService.CreateAsync(mergeRequest, cancellationToken);
+            }
+
+            return new VerifyEmailResult(pendingEmail.Email, MergeRequestCreated: true);
+        }
+
+        pendingEmail.IsVerified = true;
+        pendingEmail.UpdatedAt = _clock.GetCurrentInstant();
+        await _repository.UpdateAsync(pendingEmail, cancellationToken);
+
+        await TryBackfillGoogleEmailAsync(userId, cancellationToken);
+        await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
+
+        await _auditLogService.LogAsync(
+            AuditAction.UserEmailManuallyVerified,
+            nameof(User), userId,
+            $"Admin manually verified email {pendingEmail.Email}",
+            actorUserId,
+            relatedEntityId: pendingEmail.Id, relatedEntityType: nameof(UserEmail));
 
         return new VerifyEmailResult(pendingEmail.Email, MergeRequestCreated: false);
     }
@@ -288,10 +345,11 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
         }
 
         // Preserve at least one verified UserEmail. An OAuth-only account can still
-        // sign in but cannot receive system notifications (GetEffectiveEmail falls
-        // back to User.Email, which is null post email-decoupling), so blocking the
-        // last-verified-row delete is preferable to silently dropping notifications.
-        // Unverified rows aren't notification targets, so deleting one is safe.
+        // sign in but cannot receive system notifications (the User.Email override
+        // falls back to base.Email when no verified UserEmails are loaded, and
+        // base.Email is null post email-decoupling), so blocking the last-verified-row
+        // delete is preferable to silently dropping notifications. Unverified rows
+        // aren't notification targets, so deleting one is safe.
         if (email.IsVerified)
         {
             var allEmails = await _repository.GetByUserIdForMutationAsync(userId, cancellationToken);
@@ -485,6 +543,24 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
             .ToList();
     }
 
+    public async Task<IReadOnlyList<UserEmail>> GetEntitiesByUserIdAsync(
+        Guid userId, CancellationToken cancellationToken = default) =>
+        await _repository.GetByUserIdReadOnlyAsync(userId, cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<UserEmail>>> GetEntitiesByUserIdsAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        if (userIds.Count == 0)
+            return new Dictionary<Guid, IReadOnlyList<UserEmail>>();
+
+        var allEmails = await _repository.GetAllAsync(cancellationToken);
+        var idSet = new HashSet<Guid>(userIds);
+        return allEmails
+            .Where(e => idSet.Contains(e.UserId))
+            .GroupBy(e => e.UserId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyList<UserEmail>)g.ToList());
+    }
+
     public async Task<IReadOnlyDictionary<Guid, string>> GetNotificationEmailsByUserIdsAsync(
         IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
     {
@@ -509,12 +585,36 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
         string email, CancellationToken cancellationToken = default) =>
         _repository.AnyWithEmailAsync(email, cancellationToken);
 
-    public async Task RewriteEmailAddressAsync(
+    public async Task<RewriteEmailAddressOutcome> RewriteEmailAddressAsync(
         Guid userId, string oldEmail, string newEmail,
         CancellationToken cancellationToken = default)
     {
-        await _repository.RewriteEmailAddressAsync(
+        var outcome = await _repository.RewriteEmailAddressAsync(
             userId, oldEmail, newEmail, _clock.GetCurrentInstant(), cancellationToken);
+
+        if (outcome == RewriteEmailAddressOutcome.CrossUserConflict)
+        {
+            // Surface the cross-user collision via the prod log viewer at
+            // Warning (no exception object — there's no exception to attach;
+            // this is a known, classified outcome). Caller-neutral wording —
+            // this method is called from both AccountController (OAuth rename
+            // detector) and GoogleAdminService (admin fix flow). The
+            // duplicate-account detection flow will pick the conflict up on
+            // its next sweep.
+            _logger.LogWarning(
+                "Email rewrite collision: user {UserId} attempted to rewrite {OldEmail} to {NewEmail}, but the new address already belongs to user {ConflictUserId}. Stale row left in place; duplicate-account detection will surface this to admins.",
+                userId, oldEmail, newEmail, await _repository.GetOtherUserIdHavingEmailAsync(newEmail, userId, cancellationToken));
+        }
+
+        // Both Rewritten (UPDATE) and MergedIntoExistingRowForSameUser (DELETE +
+        // mark-verified) mutate user_emails rows that FullProfile derives
+        // PrimaryEmail / AllVerifiedEmails / GoogleEmail from — invalidate so
+        // the cache doesn't serve stale values until the next warmup. The
+        // no-mutation outcomes (SourceRowNotFound / CrossUserConflict) make
+        // this a harmless no-op invalidate.
+        await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
+
+        return outcome;
     }
 
     public async Task<IReadOnlyList<UserEmailMatch>> MatchByEmailsAsync(
@@ -658,6 +758,100 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
     }
 
     /// <inheritdoc />
+    public async Task<bool> ClearGoogleAsync(
+        Guid userId, Guid userEmailId, Guid actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await _repository.GetByIdAndUserIdAsync(userEmailId, userId, cancellationToken);
+        if (row is null || !row.IsGoogle) return false;
+
+        row.IsGoogle = false;
+        row.UpdatedAt = _clock.GetCurrentInstant();
+        await _repository.UpdateAsync(row, cancellationToken);
+        await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
+
+        await _auditLogService.LogAsync(
+            AuditAction.UserEmailGoogleCleared,
+            nameof(User), userId,
+            $"Cleared Google identity flag from {row.Email}",
+            actorUserId,
+            relatedEntityId: row.Id, relatedEntityType: nameof(UserEmail));
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ClearPrimaryAsync(
+        Guid userId, Guid userEmailId, Guid actorUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var row = await _repository.GetByIdAndUserIdAsync(userEmailId, userId, cancellationToken);
+        if (row is null || !row.IsPrimary) return false;
+
+        row.IsPrimary = false;
+        row.UpdatedAt = _clock.GetCurrentInstant();
+        await _repository.UpdateAsync(row, cancellationToken);
+        // Don't auto-promote a successor — the admin is using this path
+        // specifically to recover from a duplicate-IsPrimary state and may
+        // want to pick the new primary deliberately.
+        await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
+
+        await _auditLogService.LogAsync(
+            AuditAction.UserEmailPrimaryCleared,
+            nameof(User), userId,
+            $"Cleared primary flag from {row.Email}",
+            actorUserId,
+            relatedEntityId: row.Id, relatedEntityType: nameof(UserEmail));
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserEmailFlagViolation>> GetEmailFlagViolationsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var allEmails = await _repository.GetAllAsync(cancellationToken);
+
+        var perUser = allEmails
+            .GroupBy(e => e.UserId)
+            .Select(g =>
+            {
+                var verified = g.Where(e => e.IsVerified).ToList();
+                var isGoogleCount = g.Count(e => e.IsGoogle);
+                var verifiedPrimaryCount = verified.Count(e => e.IsPrimary);
+                var hasMultipleGoogle = isGoogleCount > 1;
+                var hasPrimaryProblem = verified.Count > 0 && verifiedPrimaryCount != 1;
+                return (
+                    UserId: g.Key,
+                    IsGoogleCount: isGoogleCount,
+                    VerifiedCount: verified.Count,
+                    VerifiedPrimaryCount: verifiedPrimaryCount,
+                    HasMultipleGoogle: hasMultipleGoogle,
+                    HasPrimaryProblem: hasPrimaryProblem);
+            })
+            .Where(x => x.HasMultipleGoogle || x.HasPrimaryProblem)
+            .ToList();
+
+        if (perUser.Count == 0)
+            return [];
+
+        var users = await _userService.GetByIdsAsync(
+            perUser.Select(x => x.UserId).ToList(),
+            cancellationToken);
+
+        return perUser
+            .Select(x => new UserEmailFlagViolation(
+                x.UserId,
+                users.TryGetValue(x.UserId, out var user) ? user.DisplayName : null,
+                x.IsGoogleCount,
+                x.VerifiedCount,
+                x.VerifiedPrimaryCount,
+                x.HasMultipleGoogle,
+                x.HasPrimaryProblem))
+            .ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<bool> LinkAsync(
         Guid userId, string provider, string providerKey, string email, Guid actorUserId,
         CancellationToken cancellationToken = default)
@@ -714,8 +908,8 @@ public sealed class UserEmailService : IUserEmailService, IUserMerge
             description = $"Linked {provider} `{fresh.Email}` to user (new row)";
         }
 
-        // First OAuth sign-in: promote the just-added row to primary so
-        // GetEffectiveEmail() / NotificationEmail derivation has a target.
+        // First OAuth sign-in: promote the just-added row to primary so the
+        // User.Email override / FullProfile.PrimaryEmail derivation has a target.
         await EnsurePrimaryInvariantAsync(userId, cancellationToken);
 
         await _fullProfileInvalidator.InvalidateAsync(userId, cancellationToken);
