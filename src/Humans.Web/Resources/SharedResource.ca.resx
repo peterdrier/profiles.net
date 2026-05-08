@@ -39,6 +39,8 @@
   <data name="Common_Status" xml:space="preserve"><value>Estat</value></data>
   <data name="Common_EditProfile" xml:space="preserve"><value>Edita el perfil</value></data>
   <data name="Common_Cancel" xml:space="preserve"><value>Cancel·la</value></data>
+  <data name="Common_Close" xml:space="preserve"><value>Tanca</value></data>
+  <data name="Common_General" xml:space="preserve"><value>General</value></data>
   <data name="Common_Save" xml:space="preserve"><value>Desa els canvis</value></data>
   <data name="Common_Edit" xml:space="preserve"><value>Edita</value></data>
   <data name="Common_Add" xml:space="preserve"><value>Afegeix</value></data>
@@ -1579,15 +1581,20 @@
   <data name="Container_Empty" xml:space="preserve"><value>Encara no hi ha contenidors registrats per a aquesta temporada.</value></data>
   <data name="Container_AddModal_Title" xml:space="preserve"><value>Afegir Contenidor</value></data>
   <data name="Container_EditModal_Title" xml:space="preserve"><value>Editar Contenidor</value></data>
-  <data name="Container_UploadImageModal_Title" xml:space="preserve"><value>Pujar Imatge — {0}</value></data>
   <data name="Container_FieldName" xml:space="preserve"><value>Nom</value></data>
   <data name="Container_FieldDescription" xml:space="preserve"><value>Descripció</value></data>
   <data name="Container_NamePlaceholder" xml:space="preserve"><value>p.ex. Contenidor #1</value></data>
   <data name="Container_DescPlaceholder" xml:space="preserve"><value>Mida, tipus, requisits especials…</value></data>
-  <data name="Container_ImageFileLabel" xml:space="preserve"><value>Fitxer d'imatge (JPEG, PNG o WebP — màx. 10 MB)</value></data>
-  <data name="Container_UploadImageTitle" xml:space="preserve"><value>Pujar imatge</value></data>
-  <data name="Container_RemoveImageTitle" xml:space="preserve"><value>Eliminar imatge</value></data>
-  <data name="Container_RemoveImageConfirm" xml:space="preserve"><value>Eliminar la imatge de {0}?</value></data>
+  <data name="Container_FieldMainImage" xml:space="preserve"><value>Imatge principal (JPEG, PNG o WebP — màx. 10 MB)</value></data>
+  <data name="Container_FieldPlacementImage" xml:space="preserve"><value>Croquis de col·locació (JPEG, PNG o WebP — màx. 10 MB)</value></data>
+  <data name="Container_RemoveMainImage_Label" xml:space="preserve"><value>Eliminar imatge principal</value></data>
+  <data name="Container_UploadMainImageModal_Title" xml:space="preserve"><value>Imatge principal — {0}</value></data>
+  <data name="Container_RemoveMainImageConfirm" xml:space="preserve"><value>Eliminar la imatge principal de {0}?</value></data>
+  <data name="Container_RemovePlacementImage_Label" xml:space="preserve"><value>Eliminar imatge de col·locació</value></data>
+  <data name="Container_FieldPlacementNotes" xml:space="preserve"><value>Notes de col·locació</value></data>
+  <data name="Container_PlacementNotesPlaceholder" xml:space="preserve"><value>Restriccions, requisits d'accés, orientació…</value></data>
+  <data name="Container_PlacementNotes_ButtonLabel" xml:space="preserve"><value>Notes de col·locació</value></data>
+  <data name="Container_PlacementNotes_Title" xml:space="preserve"><value>Notes de col·locació</value></data>
   <data name="Container_DeleteConfirm" xml:space="preserve"><value>Eliminar el contenidor {0}?</value></data>
   <data name="ContainerMap_Unplaced" xml:space="preserve"><value>Sense col·locar</value></data>
   <data name="ContainerMap_Placed" xml:space="preserve"><value>Col·locats</value></data>

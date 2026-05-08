@@ -16,6 +16,10 @@ public class Container
     public string? ImageContentType { get; set; }
     public string? ImageFileName { get; set; }
     public string? LocationGeoJson { get; set; }
+    public string? PlacementNotes { get; set; }
+    public string? PlacementImageStoragePath { get; set; }
+    public string? PlacementImageContentType { get; set; }
+    public string? PlacementImageFileName { get; set; }
     public Instant CreatedAt { get; init; }
     public Instant UpdatedAt { get; set; }
 }

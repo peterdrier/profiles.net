@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using Humans.Application.Interfaces.Containers;
+using Microsoft.AspNetCore.Http;
 
 namespace Humans.Web.Models;
 
@@ -22,6 +24,10 @@ public class ContainerViewModel
     public string? ImageUrl { get; set; }
     public string? ImageFileName { get; set; }
     public bool IsPlaced { get; set; }
+    public string? PlacementNotes { get; set; }
+    public string? PlacementImageUrl { get; set; }
+    public string? PlacementImageFileName { get; set; }
+    public bool HasPlacementInfo => !string.IsNullOrEmpty(PlacementNotes) || PlacementImageUrl is not null;
 }
 
 public class ContainerFormModel
@@ -32,6 +38,27 @@ public class ContainerFormModel
 
     [StringLength(2000)]
     public string? Description { get; set; }
+
+    public string? PlacementNotes { get; set; }
+    public IFormFile? MainImage { get; set; }
+    public IFormFile? PlacementImage { get; set; }
+    public bool RemoveMainImage { get; set; }
+    public bool RemovePlacementImage { get; set; }
+
+    public ContainerData ToContainerData(Guid? campSeasonId, int year) => new(
+        CampSeasonId: campSeasonId,
+        Year: year,
+        Name: Name,
+        Description: Description,
+        PlacementNotes: PlacementNotes,
+        MainImage: MainImage is { Length: > 0 }
+            ? new ContainerImageUpload(MainImage.OpenReadStream(), MainImage.ContentType, MainImage.FileName, MainImage.Length)
+            : null,
+        PlacementImage: PlacementImage is { Length: > 0 }
+            ? new ContainerImageUpload(PlacementImage.OpenReadStream(), PlacementImage.ContentType, PlacementImage.FileName, PlacementImage.Length)
+            : null,
+        RemoveMainImage: RemoveMainImage,
+        RemovePlacementImage: RemovePlacementImage);
 }
 
 public class OrgContainerIndexViewModel

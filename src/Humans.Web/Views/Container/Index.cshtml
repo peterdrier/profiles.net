@@ -1,6 +1,22 @@
 @model Humans.Web.Models.ContainerIndexViewModel
 @{
     ViewData["Title"] = $"Containers — {Model.CampName} {Model.Year}";
+
+    var routeValues = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        ["slug"] = Model.CampSlug,
+        ["year"] = Model.Year.ToString(),
+    };
+
+    Humans.Web.Models.ContainerCardModel CardFor(Humans.Web.Models.ContainerViewModel c) => new()
+    {
+        Container = c,
+        CanManage = Model.CanManage,
+        FormController = "Container",
+        EditAction = "Edit",
+        DeleteAction = "Delete",
+        ExtraRouteValues = routeValues,
+    };
 }
 
 <nav aria-label="breadcrumb">
@@ -47,70 +63,7 @@ else
     <ul class="list-group">
         @foreach (var c in Model.Containers.OrderBy(x => x.Name))
         {
-            <li class="list-group-item d-flex align-items-center gap-3 py-2">
-                <div style="width:48px;height:48px;flex-shrink:0;" class="d-flex align-items-center justify-content-center">
-                    @if (c.ImageUrl is not null)
-                    {
-                        <img src="@c.ImageUrl" alt="@c.Name"
-                             style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;"
-                             data-bs-toggle="modal" data-bs-target="#lightboxModal-@c.Id" />
-                    }
-                    else
-                    {
-                        <i class="fa-solid fa-box text-muted fa-lg"></i>
-                    }
-                </div>
-                <div class="flex-grow-1 min-width-0">
-                    <div class="fw-semibold d-flex align-items-center gap-2">
-                        @c.Name
-                        @if (c.IsPlaced)
-                        {
-                            <span class="badge bg-success fw-normal" style="font-size:10px;">@Localizer["ContainerMap_Placed"]</span>
-                        }
-                    </div>
-                    @if (!string.IsNullOrEmpty(c.Description))
-                    {
-                        <div class="text-muted small">@c.Description</div>
-                    }
-                </div>
-                @if (Model.CanManage)
-                {
-                    <div class="d-flex gap-1 flex-shrink-0">
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                data-bs-toggle="modal" data-bs-target="#editModal-@c.Id"
-                                title="@Localizer["Common_Edit"]">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        @if (c.ImageUrl is null)
-                        {
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                    data-bs-toggle="modal" data-bs-target="#imageModal-@c.Id"
-                                    title="@Localizer["Container_UploadImageTitle"]">
-                                <i class="fa-solid fa-image"></i>
-                            </button>
-                        }
-                        else
-                        {
-                            <form asp-action="DeleteImage" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year" asp-route-id="@c.Id" method="post" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-outline-warning btn-sm"
-                                        data-confirm="@string.Format(Localizer["Container_RemoveImageConfirm"], c.Name)"
-                                        title="@Localizer["Container_RemoveImageTitle"]">
-                                    <i class="fa-solid fa-image"></i>
-                                </button>
-                            </form>
-                        }
-                        <form asp-action="Delete" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year" asp-route-id="@c.Id" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-outline-danger btn-sm"
-                                    data-confirm="@string.Format(Localizer["Container_DeleteConfirm"], c.Name)"
-                                    title="@Localizer["Common_Delete"]">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                }
-            </li>
+            <partial name="_ContainerCardRow" model="@CardFor(c)" />
         }
     </ul>
 }
@@ -120,23 +73,17 @@ else
 @if (Model.CanManage)
 {
     <div class="modal fade" id="addContainerModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">@Localizer["Container_AddModal_Title"]</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form asp-action="Create" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year" method="post">
+                <form asp-action="Create" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year"
+                      method="post" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldName"] <span class="text-danger">*</span></label>
-                            <input name="Name" class="form-control" maxlength="256" required placeholder="@Localizer["Container_NamePlaceholder"]" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldDescription"]</label>
-                            <textarea name="Description" class="form-control" rows="3" maxlength="2000" placeholder="@Localizer["Container_DescPlaceholder"]"></textarea>
-                        </div>
+                        <partial name="_ContainerFormFields" model="@((Humans.Web.Models.ContainerViewModel?)null)" />
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
@@ -150,79 +97,5 @@ else
 
 @foreach (var c in Model.Containers)
 {
-    @if (c.ImageUrl is not null)
-    {
-        <div class="modal fade" id="lightboxModal-@c.Id" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">@c.Name</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-0 text-center">
-                        <img src="@c.ImageUrl" alt="@c.Name" class="img-fluid" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-
-    @if (Model.CanManage)
-    {
-        <div class="modal fade" id="editModal-@c.Id" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">@Localizer["Container_EditModal_Title"]</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <form asp-action="Edit" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year" asp-route-id="@c.Id" method="post">
-                        @Html.AntiForgeryToken()
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label">@Localizer["Container_FieldName"] <span class="text-danger">*</span></label>
-                                <input name="Name" class="form-control" value="@c.Name" maxlength="256" required />
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">@Localizer["Container_FieldDescription"]</label>
-                                <textarea name="Description" class="form-control" rows="3" maxlength="2000">@c.Description</textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
-                            <button type="submit" class="btn btn-primary">@Localizer["Common_Save"]</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        @if (c.ImageUrl is null)
-        {
-            <div class="modal fade" id="imageModal-@c.Id" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">@string.Format(Localizer["Container_UploadImageModal_Title"], c.Name)</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <form asp-action="UploadImage" asp-route-slug="@Model.CampSlug" asp-route-year="@Model.Year" asp-route-id="@c.Id"
-                              method="post" enctype="multipart/form-data">
-                            @Html.AntiForgeryToken()
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label class="form-label">@Localizer["Container_ImageFileLabel"]</label>
-                                    <input type="file" name="file" class="form-control" accept="image/jpeg,image/png,image/webp" required />
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
-                                <button type="submit" class="btn btn-primary">@Localizer["CityPlanning_Admin_Upload"]</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        }
-    }
+    <partial name="_ContainerCardModals" model="@CardFor(c)" />
 }

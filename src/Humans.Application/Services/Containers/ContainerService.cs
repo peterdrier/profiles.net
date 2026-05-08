@@ -50,17 +50,35 @@ public sealed class ContainerService : IContainerService
 
     public async Task<ContainerDto> CreateAsync(ContainerData data, CancellationToken ct = default)
     {
+        ValidateImages(data.MainImage, data.PlacementImage);
+
         var now = _clock.GetCurrentInstant();
+        var id = Guid.NewGuid();
         var container = new Container
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             CampSeasonId = data.CampSeasonId,
             Year = data.Year,
             Name = data.Name,
             Description = data.Description,
+            PlacementNotes = data.PlacementNotes,
             CreatedAt = now,
             UpdatedAt = now
         };
+
+        if (data.MainImage is not null)
+        {
+            container.ImageStoragePath = await _imageStorage.SaveImageAsync(id, data.MainImage.Content, data.MainImage.ContentType, ContainerImageKind.Main, ct);
+            container.ImageContentType = data.MainImage.ContentType;
+            container.ImageFileName = data.MainImage.FileName;
+        }
+
+        if (data.PlacementImage is not null)
+        {
+            container.PlacementImageStoragePath = await _imageStorage.SaveImageAsync(id, data.PlacementImage.Content, data.PlacementImage.ContentType, ContainerImageKind.Placement, ct);
+            container.PlacementImageContentType = data.PlacementImage.ContentType;
+            container.PlacementImageFileName = data.PlacementImage.FileName;
+        }
 
         var created = await _repo.AddAsync(container, ct);
         return ToDto(created);
@@ -68,12 +86,47 @@ public sealed class ContainerService : IContainerService
 
     public async Task<ContainerDto> UpdateAsync(Guid id, ContainerData data, CancellationToken ct = default)
     {
+        ValidateImages(data.MainImage, data.PlacementImage);
+
         var container = await _repo.GetByIdAsync(id, ct)
             ?? throw new InvalidOperationException("Container not found.");
 
         container.Name = data.Name;
         container.Description = data.Description;
+        container.PlacementNotes = data.PlacementNotes;
         container.UpdatedAt = _clock.GetCurrentInstant();
+
+        if (data.RemoveMainImage && container.ImageStoragePath is not null)
+        {
+            _imageStorage.DeleteImage(container.ImageStoragePath);
+            container.ImageStoragePath = null;
+            container.ImageContentType = null;
+            container.ImageFileName = null;
+        }
+        else if (data.MainImage is not null)
+        {
+            if (container.ImageStoragePath is not null)
+                _imageStorage.DeleteImage(container.ImageStoragePath);
+            container.ImageStoragePath = await _imageStorage.SaveImageAsync(id, data.MainImage.Content, data.MainImage.ContentType, ContainerImageKind.Main, ct);
+            container.ImageContentType = data.MainImage.ContentType;
+            container.ImageFileName = data.MainImage.FileName;
+        }
+
+        if (data.RemovePlacementImage && container.PlacementImageStoragePath is not null)
+        {
+            _imageStorage.DeleteImage(container.PlacementImageStoragePath);
+            container.PlacementImageStoragePath = null;
+            container.PlacementImageContentType = null;
+            container.PlacementImageFileName = null;
+        }
+        else if (data.PlacementImage is not null)
+        {
+            if (container.PlacementImageStoragePath is not null)
+                _imageStorage.DeleteImage(container.PlacementImageStoragePath);
+            container.PlacementImageStoragePath = await _imageStorage.SaveImageAsync(id, data.PlacementImage.Content, data.PlacementImage.ContentType, ContainerImageKind.Placement, ct);
+            container.PlacementImageContentType = data.PlacementImage.ContentType;
+            container.PlacementImageFileName = data.PlacementImage.FileName;
+        }
 
         var updated = await _repo.UpdateAsync(container, ct);
         return ToDto(updated);
@@ -85,61 +138,12 @@ public sealed class ContainerService : IContainerService
             ?? throw new InvalidOperationException("Container not found.");
 
         if (container.ImageStoragePath is not null)
-        {
             _imageStorage.DeleteImage(container.ImageStoragePath);
-        }
+
+        if (container.PlacementImageStoragePath is not null)
+            _imageStorage.DeleteImage(container.PlacementImageStoragePath);
 
         await _repo.DeleteAsync(id, ct);
-    }
-
-    public async Task UploadImageAsync(
-        Guid id, Stream stream, string fileName, string contentType, long length,
-        CancellationToken ct = default)
-    {
-        if (!AllowedContentTypes.Contains(contentType))
-        {
-            throw new InvalidOperationException("Only JPEG, PNG, and WebP images are allowed.");
-        }
-
-        if (length > MaxImageBytes)
-        {
-            throw new InvalidOperationException("Image must be under 10 MB.");
-        }
-
-        var container = await _repo.GetByIdAsync(id, ct)
-            ?? throw new InvalidOperationException("Container not found.");
-
-        if (container.ImageStoragePath is not null)
-        {
-            _imageStorage.DeleteImage(container.ImageStoragePath);
-        }
-
-        var storagePath = await _imageStorage.SaveImageAsync(id, stream, contentType, ct);
-        container.ImageStoragePath = storagePath;
-        container.ImageContentType = contentType;
-        container.ImageFileName = fileName;
-        container.UpdatedAt = _clock.GetCurrentInstant();
-
-        await _repo.UpdateAsync(container, ct);
-    }
-
-    public async Task DeleteImageAsync(Guid id, CancellationToken ct = default)
-    {
-        var container = await _repo.GetByIdAsync(id, ct)
-            ?? throw new InvalidOperationException("Container not found.");
-
-        if (container.ImageStoragePath is null)
-        {
-            return;
-        }
-
-        _imageStorage.DeleteImage(container.ImageStoragePath);
-        container.ImageStoragePath = null;
-        container.ImageContentType = null;
-        container.ImageFileName = null;
-        container.UpdatedAt = _clock.GetCurrentInstant();
-
-        await _repo.UpdateAsync(container, ct);
     }
 
     public async Task<ContainerDto> SavePlacementAsync(Guid id, string geoJson, CancellationToken ct = default)
@@ -170,6 +174,18 @@ public sealed class ContainerService : IContainerService
         await _repo.UpdateAsync(container, ct);
     }
 
+    private static void ValidateImages(ContainerImageUpload? mainImage, ContainerImageUpload? placementImage)
+    {
+        if (mainImage is not null && !AllowedContentTypes.Contains(mainImage.ContentType))
+            throw new InvalidOperationException("Only JPEG, PNG, and WebP images are allowed.");
+        if (mainImage is not null && mainImage.Length > MaxImageBytes)
+            throw new InvalidOperationException("Image must be under 10 MB.");
+        if (placementImage is not null && !AllowedContentTypes.Contains(placementImage.ContentType))
+            throw new InvalidOperationException("Only JPEG, PNG, and WebP images are allowed.");
+        if (placementImage is not null && placementImage.Length > MaxImageBytes)
+            throw new InvalidOperationException("Image must be under 10 MB.");
+    }
+
     private static ContainerDto ToDto(Container c) => new(
         c.Id,
         c.CampSeasonId,
@@ -180,6 +196,10 @@ public sealed class ContainerService : IContainerService
         c.ImageContentType,
         c.ImageFileName,
         c.LocationGeoJson,
+        c.PlacementNotes,
+        c.PlacementImageStoragePath is not null ? $"/{c.PlacementImageStoragePath}" : null,
+        c.PlacementImageContentType,
+        c.PlacementImageFileName,
         c.CreatedAt,
         c.UpdatedAt);
 }

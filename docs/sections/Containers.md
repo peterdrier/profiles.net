@@ -40,6 +40,10 @@ Physical shipping containers managed per-barrio or at org level, placed on the C
 | ImageContentType | string? | max 64 |
 | ImageFileName | string? | max 256; original upload filename |
 | LocationGeoJson | text? | GeoJSON Feature; null = unplaced |
+| PlacementNotes | text? | Free-form placement constraints; no length cap |
+| PlacementImageStoragePath | string? | max 512; relative path from `wwwroot/` |
+| PlacementImageContentType | string? | max 64 |
+| PlacementImageFileName | string? | max 256; original upload filename |
 | CreatedAt | Instant | Set on create |
 | UpdatedAt | Instant | Updated on every write |
 
@@ -54,7 +58,7 @@ Physical shipping containers managed per-barrio or at org level, placed on the C
 | Actor | Capabilities |
 |-------|--------------|
 | Any authenticated human | View containers on the map overview (`/CityPlanning/`) |
-| Camp lead (own camp, placement phase open) | Create, edit, delete, and place their own barrio's containers; upload/delete images |
+| Camp lead (own camp, placement phase open) | Create, edit, delete, and place their own barrio's containers; manage images and placement notes via Add/Edit form |
 | CampAdmin role | All camp lead capabilities on all barrio containers. All org-level container management. Placement phase toggle |
 | City-planning team member (team slug: `city-planning`) | Same as CampAdmin on containers |
 
@@ -63,7 +67,8 @@ Physical shipping containers managed per-barrio or at org level, placed on the C
 - A container with `CampSeasonId == null` is org-level; only Map Admins (CampAdmin or city-planning team) may create, edit, delete, or manage images for it.
 - A container with `CampSeasonId` set belongs to a specific season; the owning camp's leads and Map Admins may manage it.
 - Write access for barrio leads is gated by `CityPlanningSettings.IsContainerPlacementOpen`. Map Admins are never gated (enforced in `ContainerController.CheckPlacementPhaseAsync` and `CityPlanningApiController`).
-- Image storage uses `IContainerImageStorage`; files are written to `wwwroot/uploads/containers/{containerId}/`. One image per container; uploading a second image replaces the first.
+- Image storage uses `IContainerImageStorage`; files are written to `wwwroot/uploads/containers/{containerId}/`. Each container has up to two images (Main and Placement), distinguished by the filename prefix `main-{guid}.{ext}` / `placement-{guid}.{ext}`. Uploading a new image of a given kind deletes the prior file of that kind only.
+- Image management (both kinds) is part of the Create/Edit operation — there is no separate upload action. The standalone `UploadImage`/`DeleteImage` controller actions were removed in favour of inline handling in `Create`/`Edit`.
 - Resource-based authorization per design-rules §11: `ContainerAuthorizationHandler` + `ContainerOperationRequirement` gate barrio container writes. Org-level container writes in `CityPlanningController` use inline `IsMapAdminAsync` checks (no resource object needed — org containers have no camp owner to verify).
 - `CampSeason.CampSeason` nav is declared on `Container` but is never read by this section's code (design-rules §15i).
 
@@ -78,9 +83,9 @@ Physical shipping containers managed per-barrio or at org level, placed on the C
 
 ## Triggers
 
-- When a container image is uploaded, the previous image file is deleted from disk before writing the new one; `ImageStoragePath`, `ImageContentType`, and `ImageFileName` are updated. Storage path pattern: `uploads/containers/{containerId}/{guid}.{ext}`.
-- When a container image is deleted, the image file is removed from disk and the three image fields are set to null.
-- When a container is deleted (`DeleteAsync`), its image (if any) is removed from disk as part of `IContainerService.DeleteAsync`.
+- When a Main or Placement image is uploaded during Create/Edit, the previous file of that same kind is deleted from disk before writing the new one. Storage path pattern: `uploads/containers/{containerId}/{kind}-{guid}.{ext}` (e.g. `main-abc.jpg`, `placement-def.webp`).
+- When an image is removed via the "Remove image" checkbox in the Edit form, the file is deleted from disk and the corresponding three fields are set to null.
+- When a container is deleted (`DeleteAsync`), both the Main and Placement image files (if any) are removed from disk.
 - Placement save updates `LocationGeoJson` and `UpdatedAt` only; no other side effects.
 - Placement clear sets `LocationGeoJson` to null.
 

@@ -97,6 +97,9 @@ public class ContainerController : HumansControllerBase
                 ImageUrl = c.ImageStoragePath,
                 ImageFileName = c.ImageFileName,
                 IsPlaced = c.LocationGeoJson is not null,
+                PlacementNotes = c.PlacementNotes,
+                PlacementImageUrl = c.PlacementImageStoragePath,
+                PlacementImageFileName = c.PlacementImageFileName,
             }).ToList()
         };
 
@@ -127,11 +130,15 @@ public class ContainerController : HumansControllerBase
             return RedirectToAction(nameof(Index), new { slug, year });
         }
 
-        await _containerService.CreateAsync(new ContainerData(
-            CampSeasonId: season.Id,
-            Year: year,
-            Name: model.Name,
-            Description: model.Description), ct);
+        try
+        {
+            await _containerService.CreateAsync(model.ToContainerData(season.Id, year), ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetError(ex.Message);
+            return RedirectToAction(nameof(Index), new { slug, year });
+        }
 
         SetSuccess("Container added.");
         return RedirectToAction(nameof(Index), new { slug, year });
@@ -159,11 +166,15 @@ public class ContainerController : HumansControllerBase
             return RedirectToAction(nameof(Index), new { slug, year });
         }
 
-        await _containerService.UpdateAsync(id, new ContainerData(
-            CampSeasonId: entity.CampSeasonId,
-            Year: entity.Year,
-            Name: model.Name,
-            Description: model.Description), ct);
+        try
+        {
+            await _containerService.UpdateAsync(id, model.ToContainerData(entity.CampSeasonId, entity.Year), ct);
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetError(ex.Message);
+            return RedirectToAction(nameof(Index), new { slug, year });
+        }
 
         SetSuccess("Container updated.");
         return RedirectToAction(nameof(Index), new { slug, year });
@@ -187,62 +198,6 @@ public class ContainerController : HumansControllerBase
 
         await _containerService.DeleteAsync(id, ct);
         SetSuccess("Container deleted.");
-        return RedirectToAction(nameof(Index), new { slug, year });
-    }
-
-    [HttpPost("{id}/Image/Upload")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> UploadImage(string slug, int year, Guid id, IFormFile? file, CancellationToken ct)
-    {
-        var entity = await GetContainerEntityAsync(id, ct);
-        if (entity is null) return NotFound();
-
-        var (userError, user) = await RequireCurrentUserAsync();
-        if (userError is not null) return userError;
-
-        var authResult = await _authorizationService.AuthorizeAsync(User, entity, ContainerOperationRequirement.Manage);
-        if (!authResult.Succeeded) return Forbid();
-
-        var (blocked, blockResult) = await CheckPlacementPhaseAsync(user.Id, slug, year, ct);
-        if (blocked) return blockResult!;
-
-        if (file is null || file.Length == 0)
-        {
-            SetError("Please select a file to upload.");
-            return RedirectToAction(nameof(Index), new { slug, year });
-        }
-
-        try
-        {
-            await _containerService.UploadImageAsync(id, file.OpenReadStream(), file.FileName, file.ContentType, file.Length, ct);
-            SetSuccess("Image uploaded.");
-        }
-        catch (InvalidOperationException ex)
-        {
-            SetError(ex.Message);
-        }
-
-        return RedirectToAction(nameof(Index), new { slug, year });
-    }
-
-    [HttpPost("{id}/Image/Delete")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> DeleteImage(string slug, int year, Guid id, CancellationToken ct)
-    {
-        var entity = await GetContainerEntityAsync(id, ct);
-        if (entity is null) return NotFound();
-
-        var (userError, user) = await RequireCurrentUserAsync();
-        if (userError is not null) return userError;
-
-        var authResult = await _authorizationService.AuthorizeAsync(User, entity, ContainerOperationRequirement.Manage);
-        if (!authResult.Succeeded) return Forbid();
-
-        var (blocked, blockResult) = await CheckPlacementPhaseAsync(user.Id, slug, year, ct);
-        if (blocked) return blockResult!;
-
-        await _containerService.DeleteImageAsync(id, ct);
-        SetSuccess("Image removed.");
         return RedirectToAction(nameof(Index), new { slug, year });
     }
 

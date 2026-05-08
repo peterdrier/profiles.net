@@ -1,6 +1,16 @@
 @model Humans.Web.Models.OrgContainerIndexViewModel
 @{
     ViewData["Title"] = $"{Localizer["Container_Breadcrumb"]} {Model.Year}";
+
+    Humans.Web.Models.ContainerCardModel CardFor(Humans.Web.Models.ContainerViewModel c) => new()
+    {
+        Container = c,
+        CanManage = true,
+        FormController = "CityPlanning",
+        EditAction = "EditOrgContainer",
+        DeleteAction = "DeleteOrgContainer",
+        ExtraRouteValues = new Dictionary<string, string>(StringComparer.Ordinal),
+    };
 }
 
 <nav aria-label="breadcrumb">
@@ -73,67 +83,7 @@ else
     <ul class="list-group mb-4">
         @foreach (var c in Model.OrgContainers)
         {
-            <li class="list-group-item d-flex align-items-center gap-3 py-2">
-                <div style="width:48px;height:48px;flex-shrink:0;" class="d-flex align-items-center justify-content-center">
-                    @if (c.ImageUrl is not null)
-                    {
-                        <img src="@c.ImageUrl" alt="@c.Name"
-                             style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;"
-                             data-bs-toggle="modal" data-bs-target="#lightboxModal-@c.Id" />
-                    }
-                    else
-                    {
-                        <i class="fa-solid fa-box text-muted fa-lg"></i>
-                    }
-                </div>
-                <div class="flex-grow-1 min-width-0">
-                    <div class="fw-semibold d-flex align-items-center gap-2">
-                        @c.Name
-                        @if (c.IsPlaced)
-                        {
-                            <span class="badge bg-success fw-normal" style="font-size:10px;">@Localizer["ContainerMap_Placed"]</span>
-                        }
-                    </div>
-                    @if (!string.IsNullOrEmpty(c.Description))
-                    {
-                        <div class="text-muted small">@c.Description</div>
-                    }
-                </div>
-                <div class="d-flex gap-1 flex-shrink-0">
-                    <button type="button" class="btn btn-outline-secondary btn-sm"
-                            data-bs-toggle="modal" data-bs-target="#editModal-@c.Id"
-                            title="@Localizer["Common_Edit"]">
-                        <i class="fa-solid fa-pen"></i>
-                    </button>
-                    @if (c.ImageUrl is null)
-                    {
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                data-bs-toggle="modal" data-bs-target="#imageModal-@c.Id"
-                                title="@Localizer["Container_UploadImageTitle"]">
-                            <i class="fa-solid fa-image"></i>
-                        </button>
-                    }
-                    else
-                    {
-                        <form asp-action="DeleteOrgContainerImage" asp-route-id="@c.Id" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-outline-warning btn-sm"
-                                    data-confirm="@string.Format(Localizer["Container_RemoveImageConfirm"], c.Name)"
-                                    title="@Localizer["Container_RemoveImageTitle"]">
-                                <i class="fa-solid fa-image"></i>
-                            </button>
-                        </form>
-                    }
-                    <form asp-action="DeleteOrgContainer" asp-route-id="@c.Id" method="post" class="d-inline">
-                        @Html.AntiForgeryToken()
-                        <button type="submit" class="btn btn-outline-danger btn-sm"
-                                data-confirm="@string.Format(Localizer["Container_DeleteConfirm"], c.Name)"
-                                title="@Localizer["Common_Delete"]">
-                            <i class="fa-solid fa-trash"></i>
-                        </button>
-                    </form>
-                </div>
-            </li>
+            <partial name="_ContainerCardRow" model="@CardFor(c)" />
         }
     </ul>
 }
@@ -159,67 +109,7 @@ else
         <ul class="list-group mb-3">
             @foreach (var c in group.Containers)
             {
-                <li class="list-group-item d-flex align-items-center gap-3 py-2">
-                    <div style="width:48px;height:48px;flex-shrink:0;" class="d-flex align-items-center justify-content-center">
-                        @if (c.ImageUrl is not null)
-                        {
-                            <img src="@c.ImageUrl" alt="@c.Name"
-                                 style="width:48px;height:48px;object-fit:cover;border-radius:4px;cursor:pointer;"
-                                 data-bs-toggle="modal" data-bs-target="#lightboxModal-@c.Id" />
-                        }
-                        else
-                        {
-                            <i class="fa-solid fa-box text-muted fa-lg"></i>
-                        }
-                    </div>
-                    <div class="flex-grow-1 min-width-0">
-                        <div class="fw-semibold d-flex align-items-center gap-2">
-                            @c.Name
-                            @if (c.IsPlaced)
-                            {
-                                <span class="badge bg-success fw-normal" style="font-size:10px;">@Localizer["ContainerMap_Placed"]</span>
-                            }
-                        </div>
-                        @if (!string.IsNullOrEmpty(c.Description))
-                        {
-                            <div class="text-muted small">@c.Description</div>
-                        }
-                    </div>
-                    <div class="d-flex gap-1 flex-shrink-0">
-                        <button type="button" class="btn btn-outline-secondary btn-sm"
-                                data-bs-toggle="modal" data-bs-target="#editModal-@c.Id"
-                                title="@Localizer["Common_Edit"]">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-                        @if (c.ImageUrl is null)
-                        {
-                            <button type="button" class="btn btn-outline-secondary btn-sm"
-                                    data-bs-toggle="modal" data-bs-target="#imageModal-@c.Id"
-                                    title="@Localizer["Container_UploadImageTitle"]">
-                                <i class="fa-solid fa-image"></i>
-                            </button>
-                        }
-                        else
-                        {
-                            <form asp-action="DeleteOrgContainerImage" asp-route-id="@c.Id" method="post" class="d-inline">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-outline-warning btn-sm"
-                                        data-confirm="@string.Format(Localizer["Container_RemoveImageConfirm"], c.Name)"
-                                        title="@Localizer["Container_RemoveImageTitle"]">
-                                    <i class="fa-solid fa-image"></i>
-                                </button>
-                            </form>
-                        }
-                        <form asp-action="DeleteOrgContainer" asp-route-id="@c.Id" method="post" class="d-inline">
-                            @Html.AntiForgeryToken()
-                            <button type="submit" class="btn btn-outline-danger btn-sm"
-                                    data-confirm="@string.Format(Localizer["Container_DeleteConfirm"], c.Name)"
-                                    title="@Localizer["Common_Delete"]">
-                                <i class="fa-solid fa-trash"></i>
-                            </button>
-                        </form>
-                    </div>
-                </li>
+                <partial name="_ContainerCardRow" model="@CardFor(c)" />
             }
         </ul>
     }
@@ -228,23 +118,17 @@ else
 @* ── Modals ──────────────────────────────────────────────────────────── *@
 
 <div class="modal fade" id="addOrgModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">@Localizer["CityPlanning_Admin_AddOrgContainer"]</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form asp-action="CreateOrgContainer" asp-route-year="@Model.Year" method="post">
+            <form asp-action="CreateOrgContainer" asp-route-year="@Model.Year"
+                  method="post" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label">@Localizer["Container_FieldName"] <span class="text-danger">*</span></label>
-                        <input name="Name" class="form-control" maxlength="256" required placeholder="@Localizer["CityPlanning_Admin_OrgContainerNamePlaceholder"]" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">@Localizer["Container_FieldDescription"]</label>
-                        <textarea name="Description" class="form-control" rows="3" maxlength="2000" placeholder="@Localizer["CityPlanning_Admin_OrgContainerDescPlaceholder"]"></textarea>
-                    </div>
+                    <partial name="_ContainerFormFields" model="@((Humans.Web.Models.ContainerViewModel?)null)" />
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
@@ -258,23 +142,17 @@ else
 @foreach (var group in Model.BarrioGroups)
 {
     <div class="modal fade" id="addBarrioModal-@group.SeasonId" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">@string.Format(Localizer["CityPlanning_Admin_AddBarrioContainer"], group.CampName)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <form asp-action="CreateBarrioContainer" asp-route-year="@Model.Year" asp-route-seasonId="@group.SeasonId" method="post">
+                <form asp-action="CreateBarrioContainer" asp-route-year="@Model.Year" asp-route-seasonId="@group.SeasonId"
+                      method="post" enctype="multipart/form-data">
                     @Html.AntiForgeryToken()
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldName"] <span class="text-danger">*</span></label>
-                            <input name="Name" class="form-control" maxlength="256" required placeholder="@Localizer["Container_NamePlaceholder"]" />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldDescription"]</label>
-                            <textarea name="Description" class="form-control" rows="3" maxlength="2000" placeholder="@Localizer["CityPlanning_Admin_OrgContainerDescPlaceholder"]"></textarea>
-                        </div>
+                        <partial name="_ContainerFormFields" model="@((Humans.Web.Models.ContainerViewModel?)null)" />
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
@@ -288,76 +166,5 @@ else
 
 @foreach (var c in Model.OrgContainers.Concat(Model.BarrioGroups.SelectMany(g => g.Containers)))
 {
-    @if (c.ImageUrl is not null)
-    {
-        <div class="modal fade" id="lightboxModal-@c.Id" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">@c.Name</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body p-0 text-center">
-                        <img src="@c.ImageUrl" alt="@c.Name" class="img-fluid" />
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-
-    <div class="modal fade" id="editModal-@c.Id" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">@Localizer["Container_EditModal_Title"]</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form asp-action="EditOrgContainer" asp-route-id="@c.Id" method="post">
-                    @Html.AntiForgeryToken()
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldName"] <span class="text-danger">*</span></label>
-                            <input name="Name" class="form-control" value="@c.Name" maxlength="256" required />
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">@Localizer["Container_FieldDescription"]</label>
-                            <textarea name="Description" class="form-control" rows="3" maxlength="2000" placeholder="@Localizer["CityPlanning_Admin_OrgContainerDescPlaceholder"]">@c.Description</textarea>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
-                        <button type="submit" class="btn btn-primary">@Localizer["Common_Save"]</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    @if (c.ImageUrl is null)
-    {
-        <div class="modal fade" id="imageModal-@c.Id" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">@string.Format(Localizer["Container_UploadImageModal_Title"], c.Name)</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <form asp-action="UploadOrgContainerImage" asp-route-id="@c.Id"
-                          method="post" enctype="multipart/form-data">
-                        @Html.AntiForgeryToken()
-                        <div class="modal-body">
-                            <div class="mb-3">
-                                <label class="form-label">@Localizer["Container_ImageFileLabel"]</label>
-                                <input type="file" name="file" class="form-control" accept="image/jpeg,image/png,image/webp" required />
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">@Localizer["Common_Cancel"]</button>
-                            <button type="submit" class="btn btn-primary">@Localizer["CityPlanning_Admin_Upload"]</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    }
+    <partial name="_ContainerCardModals" model="@CardFor(c)" />
 }

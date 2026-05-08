@@ -10,6 +10,7 @@ public sealed class ContainerImageStorage : IContainerImageStorage
         Guid containerId,
         Stream fileStream,
         string contentType,
+        ContainerImageKind kind,
         CancellationToken ct = default)
     {
         var ext = contentType switch
@@ -20,7 +21,14 @@ public sealed class ContainerImageStorage : IContainerImageStorage
             _ => throw new InvalidOperationException("Unsupported content type.")
         };
 
-        var storedFileName = $"{Guid.NewGuid()}{ext}";
+        var prefix = kind switch
+        {
+            ContainerImageKind.Main => "main",
+            ContainerImageKind.Placement => "placement",
+            _ => throw new InvalidOperationException("Unknown image kind.")
+        };
+
+        var storedFileName = $"{prefix}-{Guid.NewGuid()}{ext}";
         var relativePath = Path.Combine("uploads", "containers", containerId.ToString(), storedFileName);
         var fullPath = Path.Combine(Root, relativePath);
 

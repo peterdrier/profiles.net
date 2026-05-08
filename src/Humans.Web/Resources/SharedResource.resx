@@ -39,6 +39,8 @@
   <data name="Common_Status" xml:space="preserve"><value>Status</value></data>
   <data name="Common_EditProfile" xml:space="preserve"><value>Edit Profile</value></data>
   <data name="Common_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="Common_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Common_General" xml:space="preserve"><value>General</value></data>
   <data name="Common_Save" xml:space="preserve"><value>Save Changes</value></data>
   <data name="Common_Edit" xml:space="preserve"><value>Edit</value></data>
   <data name="Common_Add" xml:space="preserve"><value>Add</value></data>
@@ -1614,15 +1616,20 @@
   <data name="Container_Empty" xml:space="preserve"><value>No containers registered for this season yet.</value></data>
   <data name="Container_AddModal_Title" xml:space="preserve"><value>Add Container</value></data>
   <data name="Container_EditModal_Title" xml:space="preserve"><value>Edit Container</value></data>
-  <data name="Container_UploadImageModal_Title" xml:space="preserve"><value>Upload Image — {0}</value><comment>{0} = container name</comment></data>
   <data name="Container_FieldName" xml:space="preserve"><value>Name</value></data>
   <data name="Container_FieldDescription" xml:space="preserve"><value>Description</value></data>
   <data name="Container_NamePlaceholder" xml:space="preserve"><value>e.g. Shipping Container #1</value></data>
   <data name="Container_DescPlaceholder" xml:space="preserve"><value>Size, type, special requirements…</value></data>
-  <data name="Container_ImageFileLabel" xml:space="preserve"><value>Image file (JPEG, PNG, or WebP — max 10 MB)</value></data>
-  <data name="Container_UploadImageTitle" xml:space="preserve"><value>Upload image</value></data>
-  <data name="Container_RemoveImageTitle" xml:space="preserve"><value>Remove image</value></data>
-  <data name="Container_RemoveImageConfirm" xml:space="preserve"><value>Remove image from {0}?</value><comment>{0} = container name</comment></data>
+  <data name="Container_FieldMainImage" xml:space="preserve"><value>Main image (JPEG, PNG, or WebP — max 10 MB)</value></data>
+  <data name="Container_FieldPlacementImage" xml:space="preserve"><value>Placement sketch (JPEG, PNG, or WebP — max 10 MB)</value></data>
+  <data name="Container_RemoveMainImage_Label" xml:space="preserve"><value>Remove main image</value></data>
+  <data name="Container_UploadMainImageModal_Title" xml:space="preserve"><value>Main image — {0}</value><comment>{0} = container name</comment></data>
+  <data name="Container_RemoveMainImageConfirm" xml:space="preserve"><value>Remove main image from {0}?</value><comment>{0} = container name</comment></data>
+  <data name="Container_RemovePlacementImage_Label" xml:space="preserve"><value>Remove placement image</value></data>
+  <data name="Container_FieldPlacementNotes" xml:space="preserve"><value>Placement notes</value></data>
+  <data name="Container_PlacementNotesPlaceholder" xml:space="preserve"><value>Constraints, access requirements, orientation…</value></data>
+  <data name="Container_PlacementNotes_ButtonLabel" xml:space="preserve"><value>Placement notes</value></data>
+  <data name="Container_PlacementNotes_Title" xml:space="preserve"><value>Placement notes</value></data>
   <data name="Container_DeleteConfirm" xml:space="preserve"><value>Delete container {0}?</value><comment>{0} = container name</comment></data>
   <data name="ContainerMap_Unplaced" xml:space="preserve"><value>Unplaced</value></data>
   <data name="ContainerMap_Placed" xml:space="preserve"><value>Placed</value></data>
