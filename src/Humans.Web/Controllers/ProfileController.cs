@@ -1896,10 +1896,33 @@ public class ProfileController : HumansControllerBase
     {
         try
         {
-            var profile = await _profileService.GetProfileAsync(id, ct);
-            if (profile is null) return NotFound();
+            var userTask = _userService.GetByIdAsync(id, ct);
+            var profileTask = _profileService.GetProfileAsync(id, ct);
+            await Task.WhenAll(userTask, profileTask);
+            var popoverUser = await userTask;
+            if (popoverUser is null) return NotFound();
 
-            var popoverUser = await _userService.GetByIdAsync(id, ct);
+            var profile = await profileTask;
+            if (profile is null)
+            {
+                // popoverUser.Email is unsafe here — User.Email SILENT-FALLBACK FOOTGUN.
+                var userEmails = await _userEmailService.GetUserEmailsAsync(id, ct);
+                var fallbackEmail = userEmails.FirstOrDefault(e => e.IsVerified && e.IsPrimary)?.Email
+                    ?? userEmails.FirstOrDefault(e => e.IsVerified)?.Email;
+
+                var fallbackVm = new ProfileSummaryViewModel
+                {
+                    UserId = id,
+                    DisplayName = popoverUser.DisplayName,
+                    Email = fallbackEmail,
+                    ProfilePictureUrl = popoverUser.ProfilePictureUrl,
+                    PreferredLanguage = popoverUser.PreferredLanguage,
+                    HasProfile = false,
+                };
+
+                return PartialView("_HumanPopover", fallbackVm);
+            }
+
             var teams = (await _teamService.GetActiveTeamMembershipsForUserAsync(id, ct))
                 .OrderBy(m => m.TeamName, StringComparer.OrdinalIgnoreCase)
                 .Select(m => m.TeamName)
@@ -1909,15 +1932,15 @@ public class ProfileController : HumansControllerBase
             var effectivePictureUrl = profile.HasCustomProfilePicture
                 ? Url.Action(nameof(Picture), "Profile",
                     new { id = profile.Id, v = profile.UpdatedAt.ToUnixTimeTicks() })
-                : popoverUser?.ProfilePictureUrl;
+                : popoverUser.ProfilePictureUrl;
 
             var vm = new ProfileSummaryViewModel
             {
                 UserId = id,
-                DisplayName = popoverUser?.DisplayName ?? "Unknown",
-                Email = popoverUser?.Email,
+                DisplayName = popoverUser.DisplayName,
+                Email = popoverUser.Email,
                 ProfilePictureUrl = effectivePictureUrl,
-                PreferredLanguage = popoverUser?.PreferredLanguage,
+                PreferredLanguage = popoverUser.PreferredLanguage,
                 MembershipTier = profile.MembershipTier.ToString(),
                 MembershipStatus = profile.IsSuspended ? "Suspended"
                     : profile.IsApproved ? "Active" : "Pending",
