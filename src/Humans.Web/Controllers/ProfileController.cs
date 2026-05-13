@@ -39,6 +39,7 @@ using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Services.Profiles;
+using Humans.Domain.Helpers;
 
 // RoleAssignment cross-domain nav properties (User, CreatedByUser) are [Obsolete] —
 // RoleAssignmentService stitches them in memory from IUserService so controllers can
@@ -313,6 +314,16 @@ public class ProfileController : HumansControllerBase
             ? await _profileService.GetProfileLanguagesAsync(profile.Id, ct)
             : (IReadOnlyList<ProfileLanguage>)[];
 
+        // Shift tag preferences — surfaced on Edit Profile so users can pick what
+        // kinds of volunteer work they want without bouncing to /Shifts. Without
+        // this surface the profile completion bar sticks at 95%.
+        // Sort at presentation layer (memory/architecture/display-sort-in-controllers.md);
+        // GetTagsAsync returns DB-insertion order.
+        var allShiftTags = (await _shiftMgmt.GetTagsAsync())
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var preferredShiftTags = await _shiftMgmt.GetVolunteerTagPreferencesAsync(user.Id);
+
         var hasCustomPicture = profile?.HasCustomProfilePicture == true;
 
         // Initial setup = no profile or not yet approved (onboarding)
@@ -391,7 +402,9 @@ public class ProfileController : HumansControllerBase
                 Id = pl.Id,
                 LanguageCode = pl.LanguageCode,
                 Proficiency = pl.Proficiency
-            }).ToList()
+            }).ToList(),
+            AllShiftTags = allShiftTags,
+            EditableShiftTagIds = preferredShiftTags.Select(t => t.Id).ToList()
         };
 
         ViewData["GoogleMapsApiKey"] = _configuration.GetRequiredSetting(_configRegistry, "GoogleMaps:ApiKey", "Google Maps", isSensitive: true);
@@ -402,6 +415,12 @@ public class ProfileController : HumansControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(ProfileViewModel model)
     {
+        // Shift-tag catalog isn't posted back — repopulate up front so every
+        // validation-failure `View(model)` path in this action still renders the picker.
+        model.AllShiftTags = (await _shiftMgmt.GetTagsAsync())
+            .OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         if (!ModelState.IsValid)
         {
             ViewData["GoogleMapsApiKey"] = _configuration.GetRequiredSetting(_configRegistry, "GoogleMaps:ApiKey", "Google Maps", isSensitive: true);
@@ -671,6 +690,8 @@ public class ProfileController : HumansControllerBase
             .ToList();
 
         await _profileService.SaveProfileLanguagesAsync(profileId, newLanguages);
+
+        await _shiftMgmt.SetVolunteerTagPreferencesAsync(user.Id, model.EditableShiftTagIds);
 
         SetSuccess(_localizer["Profile_Updated"].Value);
         return RedirectToAction(nameof(Me));
@@ -1323,42 +1344,61 @@ public class ProfileController : HumansControllerBase
         }
 
         var actor = await GetCurrentUserAsync();
+        var targetUser = await FindUserByIdAsync(id);
+
+        return await AdminAddVerifiedEmailAsync(id, email.Trim(), actor, targetUser, ct);
+    }
+
+    private async Task<IActionResult> AdminAddVerifiedEmailAsync(
+        Guid userId,
+        string email,
+        User? actor,
+        User? targetUser,
+        CancellationToken ct)
+    {
         if (actor is null)
             return Forbid();
 
-        var targetUser = await FindUserByIdAsync(id);
         if (targetUser is null)
             return NotFound();
 
         try
         {
-            var inserted = await _userEmailService.AddVerifiedEmailAsync(id, email.Trim(), ct);
-            if (inserted)
-            {
-                _cache.InvalidateNobodiesTeamEmails();
-
-                await _auditLogService.LogAsync(
-                    AuditAction.UserEmailAdded,
-                    nameof(User), id,
-                    $"Admin added pre-verified email {email.Trim()} for user {id} (no verification flow)",
-                    actor.Id);
-
-                SetSuccess($"Verified email {email.Trim()} added.");
-            }
-            else
-            {
-                SetInfo($"Email {email.Trim()} already exists on this user — no change.");
-            }
+            var inserted = await _userEmailService.AddVerifiedEmailAsync(userId, email, ct);
+            await ReportVerifiedEmailAddAsync(inserted, userId, email, actor.Id);
         }
         catch (Exception ex) when (ex is ValidationException or InvalidOperationException)
         {
             _logger.LogWarning(
                 "Admin failed to add verified email for user {UserId} ({Email}): {Reason}",
-                id, email, ex.Message);
+                userId, email, ex.Message);
             SetError(ex.Message);
         }
 
-        return RedirectToAction(nameof(AdminEmails), new { id });
+        return RedirectToAction(nameof(AdminEmails), new { id = userId });
+    }
+
+    private async Task ReportVerifiedEmailAddAsync(
+        bool inserted,
+        Guid userId,
+        string email,
+        Guid actorUserId)
+    {
+        if (!inserted)
+        {
+            SetInfo($"Email {email} already exists on this user — no change.");
+            return;
+        }
+
+        _cache.InvalidateNobodiesTeamEmails();
+
+        await _auditLogService.LogAsync(
+            AuditAction.UserEmailAdded,
+            nameof(User), userId,
+            $"Admin added pre-verified email {email} for user {userId} (no verification flow)",
+            actorUserId);
+
+        SetSuccess($"Verified email {email} added.");
     }
 
     [HttpPost("{id:guid}/Admin/Emails/Verify")]
@@ -1977,10 +2017,11 @@ public class ProfileController : HumansControllerBase
                 return PartialView("_HumanPopover", fallbackVm);
             }
 
-            var teams = (await _teamService.GetActiveTeamMembershipsForUserAsync(id, ct))
+            var memberships = (await _teamService.GetActiveTeamMembershipsForUserAsync(id, ct))
                 .OrderBy(m => m.TeamName, StringComparer.OrdinalIgnoreCase)
-                .Select(m => m.TeamName)
                 .ToList();
+            var publicTeams = memberships.Where(m => !m.IsHidden).Select(m => m.TeamName).ToList();
+            var hiddenTeams = memberships.Where(m => m.IsHidden).Select(m => m.TeamName).ToList();
             var profileLanguages = await _profileService.GetProfileLanguagesAsync(profile.Id, ct);
 
             var effectivePictureUrl = profile.HasCustomProfilePicture
@@ -2001,7 +2042,8 @@ public class ProfileController : HumansControllerBase
                 City = profile.City,
                 CountryCode = profile.CountryCode,
                 IsSuspended = profile.IsSuspended,
-                Teams = teams.ToList(),
+                Teams = publicTeams,
+                HiddenTeams = hiddenTeams,
                 Languages = profileLanguages.Select(pl => new ProfileLanguageDisplayViewModel
                 {
                     LanguageCode = pl.LanguageCode,
@@ -2323,7 +2365,43 @@ public class ProfileController : HumansControllerBase
 
         // nobodies.team email is now resolved by NobodiesEmailBadgeViewComponent in the view
 
+        // Payment details — masked by default; unmasked only for one load after RevealIban POST
+        viewModel.MaskedIban = string.IsNullOrEmpty(profile?.Iban)
+            ? null
+            : IbanFormatter.Mask(profile.Iban);
+        if (TempData.TryGetValue("RevealedIban", out var revealed) && revealed is string revealedStr)
+            viewModel.RevealedIban = revealedStr;
+
         return View("AdminDetail", viewModel);
+    }
+
+    /// <summary>
+    /// Reveals the unmasked IBAN for one page load (TempData), and writes an audit entry.
+    /// Admin-only: only users in the Admin role may reveal raw IBANs on the admin user page.
+    /// </summary>
+    [Authorize(Policy = PolicyNames.AdminOnly)]
+    [HttpPost("{id:guid}/Admin/RevealIban")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RevealIban(Guid id, CancellationToken ct)
+    {
+        var actor = await GetCurrentUserAsync();
+        if (actor is null) return Forbid();
+        return await RevealIbanCoreAsync(id, actor.Id, ct);
+    }
+
+    private async Task<IActionResult> RevealIbanCoreAsync(Guid id, Guid actorId, CancellationToken ct)
+    {
+        var profile = await _profileService.GetProfileAsync(id, ct);
+        if (profile?.Iban is null)
+        {
+            SetError("No IBAN on record for this user.");
+            return RedirectToAction(nameof(AdminDetail), new { id });
+        }
+        await _auditLogService.LogAsync(
+            AuditAction.IbanReveal, "User", id,
+            $"Admin revealed IBAN for user {id}", actorId);
+        TempData["RevealedIban"] = profile.Iban;
+        return RedirectToAction(nameof(AdminDetail), new { id });
     }
 
     [Authorize(Policy = PolicyNames.HumanAdminBoardOrAdmin)]

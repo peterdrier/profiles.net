@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using Humans.Application.DTOs;
 using Humans.Application.Extensions;
 using Humans.Application.Interfaces.Repositories;
+using Humans.Application.Interfaces.Tickets;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
@@ -384,6 +385,50 @@ public sealed class TicketRepository : ITicketRepository
             .Select(o => o.MatchedUserId!.Value)
             .Distinct()
             .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetMatchedOrderUserIdsInWindowAsync(
+        Instant fromInclusive, Instant toExclusive, CancellationToken ct = default)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync(ct);
+        return await ctx.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.MatchedUserId != null &&
+                        o.PurchasedAt >= fromInclusive &&
+                        o.PurchasedAt < toExclusive)
+            .Select(o => o.MatchedUserId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetMatchedAttendeeUserIdsInWindowAsync(
+        Instant fromInclusive, Instant toExclusive, CancellationToken ct = default)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync(ct);
+        return await ctx.TicketAttendees
+            .AsNoTracking()
+            .Where(a => a.MatchedUserId != null &&
+                        a.TicketOrder.PurchasedAt >= fromInclusive &&
+                        a.TicketOrder.PurchasedAt < toExclusive)
+            .Select(a => a.MatchedUserId!.Value)
+            .Distinct()
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<int>> GetMatchedOrderYearsAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync(ct);
+        var purchasedAt = await ctx.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.MatchedUserId != null)
+            .Select(o => o.PurchasedAt)
+            .ToListAsync(ct);
+
+        return purchasedAt
+            .Select(i => i.ToDateTimeUtc().Year)
+            .Distinct()
+            .OrderDescending()
+            .ToList();
     }
 
     public async Task<IReadOnlyList<Guid>> GetMatchedUserIdsForPaidOrdersAsync(
@@ -896,6 +941,36 @@ public sealed class TicketRepository : ITicketRepository
 
         ctx.Entry(state).State = EntityState.Detached;
         return state;
+    }
+
+    // ==========================================================================
+    // Admin diagnostics
+    // ==========================================================================
+
+    public async Task<IReadOnlyList<OrderDriftRow>> GetOrderDriftAsync(CancellationToken ct = default)
+    {
+        await using var ctx = await _factory.CreateDbContextAsync(ct);
+        // Filter must run against the source entity, not the projected record:
+        // EF can't translate a Where over a Select-projected DTO's properties
+        // (it tries to re-evaluate the constructor inside SQL and fails). Push
+        // the IssuedCount > ValidCount predicate upstream as a subquery on the
+        // attendee collection.
+        return await ctx.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.PaymentStatus == TicketPaymentStatus.Paid)
+            .Where(o => o.Attendees.Count(a => a.Status == TicketAttendeeStatus.Valid
+                                               || a.Status == TicketAttendeeStatus.CheckedIn)
+                        < o.Attendees.Count())
+            .Select(o => new OrderDriftRow(
+                o.Id,
+                o.VendorOrderId,
+                o.BuyerName,
+                o.Attendees.Count(),
+                o.Attendees.Count(a => a.Status == TicketAttendeeStatus.Valid
+                                       || a.Status == TicketAttendeeStatus.CheckedIn),
+                o.VendorDashboardUrl))
+            .OrderByDescending(r => r.IssuedCount - r.ValidCount) // arch:db-sort-ok — diagnostic prioritisation, not display sort
+            .ToListAsync(ct);
     }
 
     // ==========================================================================

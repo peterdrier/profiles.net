@@ -249,15 +249,16 @@ Each section's service owns these tables. Cross-service access goes through the 
 | **Camps** | `CampService`, `CampContactService` | `camps`, `camp_seasons`, `camp_leads`, `camp_images`, `camp_historical_names`, `camp_settings` |
 | **City Planning** | `CityPlanningService` | `city_planning_settings`, `camp_polygons`, `camp_polygon_histories` |
 | **Calendar** | `CalendarService` | `calendar_events`, `calendar_event_exceptions` |
-| **Shifts** | `ShiftManagementService`, `ShiftSignupService`, `GeneralAvailabilityService` | `rotas`, `shifts`, `shift_signups`, `event_settings`, `general_availabilities`, `volunteer_event_profiles`, `volunteer_build_statuses`, `shift_tags`, `volunteer_tag_preferences` |
+| **Shifts** | `ShiftManagementService`, `ShiftSignupService`, `GeneralAvailabilityService`, `VolunteerTrackingService` | `rotas`, `shifts`, `shift_signups`, `event_settings`, `general_availability`, `volunteer_event_profiles`, `volunteer_build_statuses`, `shift_tags`, `volunteer_tag_preferences`, `rota_shift_tags` |
 | **Budget** | `BudgetService` | `budget_years`, `budget_groups`, `budget_categories`, `budget_line_items`, `budget_audit_logs`, `ticketing_projections` |
 | **Finance** | `HoldedSyncService`, `HoldedTransactionService` | `holded_transactions`, `holded_sync_states` |
 | **Tickets** | `TicketQueryService`, `TicketSyncService`, `TicketingBudgetService`, `TicketTransferService` | `ticket_orders`, `ticket_attendees`, `ticket_sync_states`, `ticket_transfer_requests` |
 | **Store** | `StoreService` | `store_products`, `store_orders`, `store_order_lines`, `store_payments`, `store_invoices`, `store_treasury_sync_state` |
 | **Scanner** | none (phase 1 is presentational) | none |
 | **Campaigns** | `CampaignService` | `campaigns`, `campaign_codes`, `campaign_grants` |
-| **Google Integration** | `GoogleSyncService`, `GoogleAdminService`, `GoogleWorkspaceSyncService`, `GoogleWorkspaceUserService`, `DriveActivityMonitorService`, `SyncSettingsService`, `EmailProvisioningService` | `sync_service_settings`, `google_sync_outbox_events` |
+| **Google Integration** | `GoogleSyncService`, `GoogleAdminService`, `GoogleWorkspaceSyncService`, `GoogleWorkspaceUserService`, `DriveActivityMonitorService`, `SyncSettingsService`, `EmailProvisioningService` | `sync_service_settings`, `google_sync_outbox` |
 | **Email** | `EmailOutboxService`, `OutboxEmailService`, `EmailService` | `email_outbox_messages`; owns `system_settings` key `email_outbox_paused` |
+| **Mailer** | `MailerImportService`, `MailerLiteClient` | _(no owned tables — MailerLite is read-only; classifier writes through other sections' services)_ |
 | **Feedback** | `FeedbackService` | `feedback_reports`, `feedback_messages` |
 | **Issues** | `IssuesService` | `issues`, `issue_comments` |
 | **Notifications** | `NotificationService`, `NotificationInboxService`, `NotificationMeterProvider` | `notifications`, `notification_recipients` |
@@ -373,7 +374,7 @@ Authorization uses **ASP.NET Core resource-based authorization** — one pattern
 
 ### How it works
 
-Controllers call `IAuthorizationService.AuthorizeAsync(User, resource, requirement)`. Authorization handlers contain the logic. Services are auth-free — they trust the caller.
+Controllers call `IAuthorizationService.AuthorizeAsync(User, resource, requirement)`. Authorization handlers contain the logic. Services are auth-free — they trust the caller except for the narrow full-Admin destructive-delete exception below.
 
 ```csharp
 // Controller — authorize, then call service
@@ -397,7 +398,8 @@ await _budgetService.DeleteLineItemAsync(id);
 
 - **No `isPrivileged` booleans.** Don't pass auth decisions as parameters to services. If the controller maps it wrong, the service silently does the wrong thing.
 - **No inline `IsInRole` chains in controllers** for resource-scoped checks. Use the handler. `[Authorize(Roles = ...)]` is still fine for simple route-level role gates.
-- **Services are auth-free.** They don't check roles, don't inject `IHttpContextAccessor`, don't receive boolean privilege flags. Authorization happens before the service is called.
+- **Services are auth-free by default.** They don't check roles, don't inject `IHttpContextAccessor`, don't receive boolean privilege flags. Authorization happens before the service is called.
+- **Exception: full-Admin destructive deletes.** Application services may inject `IAdminAuthorizationService` and call `RequireCurrentUserIsAdminAsync` only for methods whose operation permanently deletes data or performs a destructive reset/delete cleanup, and whose authorization rule is exactly "must hold the full `Admin` role." The controller/action must still carry the matching `[Authorize(Roles = RoleNames.Admin)]` or stricter route-level guard. Do not use this exception for resource-scoped auth, read paths, ordinary edits, privilege flags, or direct `IHttpContextAccessor` access.
 - **New sections need a handler.** When adding a new section with resource-scoped auth, add a `*OperationRequirement` + `*AuthorizationHandler` pair. Don't invent a new pattern.
 
 ## 12. Immutable Entity Rules
@@ -684,7 +686,5 @@ Old names that no longer exist: `CachedProfile`, `IProfileStore`, `ProfileStore`
 - **Email** (PR #266): `IEmailBodyComposer` (Application) renders the message; `IImmediateOutboxProcessor` (Infrastructure) drives MailKit/SMTP. The body-composer is SDK-free so Application-layer services can build messages without pulling MailKit in.
 - **Ticket vendor** (PR #277): `ITicketVendorService` (Application), concrete `TicketTailorService` / `StubTicketVendorService` (Infrastructure). `TicketVendorSettings` lives in `Humans.Application.Configuration` so the Application-layer `TicketSyncService` can read non-sensitive fields without reaching into Infrastructure.
 
-Controllers with direct `DbContext` access (violation of §2a, tracked separately):
-- `AdminController` — admin audience-segmentation / migrations-metadata / Hangfire-lock queries still read `HumansDbContext` directly.
-- `DevLoginController` — dev-only seeding path; low priority.
-- (`ProfileController` and `GoogleController` were cleaned in earlier §15 work — no direct DbContext usage remains.)
+Former controller direct `DbContext` access cleanup status:
+- (`AdminController`, `ProfileController`, and `GoogleController` were cleaned in earlier §15 work — no direct DbContext usage remains. `AdminController` routes database diagnostics through `IAdminDatabaseDiagnosticsService`; audience segmentation composes the owning User/Profile/Tickets services, while infrastructure-only migration metadata and Hangfire lock cleanup stay behind the Infrastructure implementation.)

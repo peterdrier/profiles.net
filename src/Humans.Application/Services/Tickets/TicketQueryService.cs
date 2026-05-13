@@ -144,6 +144,19 @@ public sealed class TicketQueryService : ITicketQueryService, IUserDataContribut
         return fromAttendees.Concat(fromOrders).ToHashSet();
     }
 
+    public async Task<IReadOnlySet<Guid>> GetMatchedUserIdsForYearAsync(int year, CancellationToken ct = default)
+    {
+        var start = Instant.FromUtc(year, 1, 1, 0, 0);
+        var end = Instant.FromUtc(year + 1, 1, 1, 0, 0);
+
+        var fromOrders = await _ticketRepository.GetMatchedOrderUserIdsInWindowAsync(start, end, ct);
+        var fromAttendees = await _ticketRepository.GetMatchedAttendeeUserIdsInWindowAsync(start, end, ct);
+        return fromOrders.Concat(fromAttendees).ToHashSet();
+    }
+
+    public Task<IReadOnlyList<int>> GetMatchedTicketYearsAsync(CancellationToken ct = default) =>
+        _ticketRepository.GetMatchedOrderYearsAsync(ct);
+
     // ==========================================================================
     // Dashboard stats
     // ==========================================================================
@@ -762,6 +775,28 @@ public sealed class TicketQueryService : ITicketQueryService, IUserDataContribut
             o.Currency)).ToList();
     }
 
+    public async Task<UserTicketHoldings> GetUserTicketHoldingsAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        var cacheKey = CacheKeys.UserTicketHoldings(userId);
+        if (_cache.TryGetExistingValue<UserTicketHoldings>(cacheKey, out var cached))
+            return cached;
+
+        var orders = await _ticketRepository.GetOrdersMatchedToUserAsync(userId, ct);
+        var orderCount = orders.Count;
+
+        var attendees = await _ticketRepository.GetAttendeesVisibleToUserAsync(userId, ct);
+        var names = attendees
+            .Where(a => TicketAttendeeOwnership.IsCurrentOwner(a, userId))
+            .OrderBy(a => a.AttendeeName, StringComparer.OrdinalIgnoreCase)
+            .Select(a => a.AttendeeName ?? string.Empty)
+            .ToList();
+
+        var holdings = new UserTicketHoldings(orderCount, names);
+        _cache.Set(cacheKey, holdings, TimeSpan.FromMinutes(5));
+        return holdings;
+    }
+
     public Task<IReadOnlyList<Guid>> GetOpenTicketIdsForUserAsync(Guid userId, CancellationToken ct = default) =>
         _ticketRepository.GetOpenOrderIdsMatchedToUserAsync(userId, ct);
 
@@ -880,9 +915,14 @@ public sealed class TicketQueryService : ITicketQueryService, IUserDataContribut
     {
         _cache.InvalidateTicketCaches();
         _cache.InvalidateUserTicketCount(senderUserId);
+        _cache.Remove(CacheKeys.UserTicketHoldings(senderUserId));
         if (receiverUserId is { } receiver)
         {
             _cache.InvalidateUserTicketCount(receiver);
+            _cache.Remove(CacheKeys.UserTicketHoldings(receiver));
         }
     }
+
+    public Task<IReadOnlyList<OrderDriftRow>> GetOrderDriftAsync(CancellationToken ct = default) =>
+        _ticketRepository.GetOrderDriftAsync(ct);
 }

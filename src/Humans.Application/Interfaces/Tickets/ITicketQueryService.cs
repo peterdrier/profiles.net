@@ -1,4 +1,5 @@
 using Humans.Application.Interfaces;
+using Humans.Application.Architecture;
 using Humans.Application.DTOs;
 using Humans.Domain.Entities;
 using NodaTime;
@@ -10,6 +11,7 @@ namespace Humans.Application.Interfaces.Tickets;
 /// counts matched tickets, and computes aggregate dashboard statistics.
 /// All matching logic (MatchedUserId, email fallback, case-insensitive) lives here.
 /// </summary>
+[SurfaceBudget(27)]
 public interface ITicketQueryService : IApplicationService
 {
     /// <summary>
@@ -34,6 +36,21 @@ public interface ITicketQueryService : IApplicationService
     /// views where any association counts.
     /// </summary>
     Task<HashSet<Guid>> GetAllMatchedUserIdsAsync();
+
+    /// <summary>
+    /// Returns the set of user ids matched to any ticket order or attendee
+    /// whose purchase falls within the given calendar year (UTC). Used by the
+    /// admin audience-segmentation diagnostic so it does not read the ticket
+    /// tables directly (design-rules §9).
+    /// </summary>
+    Task<IReadOnlySet<Guid>> GetMatchedUserIdsForYearAsync(int year, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the distinct calendar years (UTC, descending) in which any
+    /// matched ticket order was purchased. Used by the admin
+    /// audience-segmentation diagnostic to populate the year picker.
+    /// </summary>
+    Task<IReadOnlyList<int>> GetMatchedTicketYearsAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Compute aggregated dashboard statistics: revenue, fees, daily sales,
@@ -180,6 +197,22 @@ public interface ITicketQueryService : IApplicationService
     /// when the Receiver did not gain a local row (vendor reissue half-failed).
     /// </summary>
     void InvalidateAfterTransfer(Guid senderUserId, Guid? receiverUserId);
+
+    /// <summary>
+    /// Snapshot of a user's ticket holdings: count of orders where they're the
+    /// buyer, plus the attendee names of every ticket where they are the
+    /// current owner (per <c>TicketAttendeeOwnership</c>: matched attendee
+    /// wins, falls back to order buyer for unmatched attendees).
+    /// </summary>
+    Task<UserTicketHoldings> GetUserTicketHoldingsAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns paid orders where the number of valid+checked-in attendees is
+    /// less than the total number of attendees on the order. Catches "limbo"
+    /// states from any cause (failed transfer reissue, manual TT-dashboard
+    /// edits without resync, refunds, etc.).
+    /// </summary>
+    Task<IReadOnlyList<OrderDriftRow>> GetOrderDriftAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -220,3 +253,24 @@ public record UserTicketOrderSummary(
     int AttendeeCount,
     decimal TotalAmount,
     string Currency);
+
+/// <summary>
+/// Holdings summary for a single user — orders they bought + attendee names
+/// of the tickets they currently hold (per the ownership cascade). Used by
+/// the &lt;vc:ticket-holdings&gt; profile sidebar and the transfer-review page.
+/// </summary>
+public record UserTicketHoldings(
+    int OrderCount,
+    IReadOnlyList<string> AttendeeNames);
+
+/// <summary>
+/// A single row in the order-drift diagnostic: a paid order whose live
+/// (Valid or CheckedIn) attendee count is less than its total attendee count.
+/// </summary>
+public sealed record OrderDriftRow(
+    Guid OrderId,
+    string VendorOrderId,
+    string BuyerName,
+    int IssuedCount,
+    int ValidCount,
+    string? VendorDashboardUrl);
