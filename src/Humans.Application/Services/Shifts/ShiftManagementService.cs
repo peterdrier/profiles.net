@@ -327,7 +327,10 @@ public sealed class ShiftManagementService : IShiftManagementService, IShiftAuth
         // navigation is cross-domain (design-rules §6) so the repo never
         // navigates it.
         var teamIds = rotas.Select(r => r.TeamId).Distinct().ToList();
-        var teamNames = await TeamService.GetTeamNamesByIdsAsync(teamIds, cancellationToken);
+        var teamsById = await TeamService.GetTeamsAsync(cancellationToken);
+        var teamNames = teamIds
+            .Where(teamsById.ContainsKey)
+            .ToDictionary(id => id, id => teamsById[id].Name);
 
         return rotas
             .Select(r => new RotaSearchHit(
@@ -1336,7 +1339,13 @@ public sealed class ShiftManagementService : IShiftManagementService, IShiftAuth
             }
         }
 
-        var coordsRaw = await TeamService.GetActiveCoordinatorsForTeamsAsync(relevantTeamIds.ToList());
+        var teamsById = await TeamService.GetTeamsAsync();
+        var coordsRaw = relevantTeamIds
+            .Where(teamsById.ContainsKey)
+            .SelectMany(id => teamsById[id].Members
+                .Where(m => m.Role == TeamMemberRole.Coordinator)
+                .Select(m => new TeamCoordinatorRef(id, m.UserId)))
+            .ToList();
         var coordinatorUserIds = coordsRaw.Select(c => c.UserId).Distinct().ToList();
 
         var userLookup = await UserService.GetUserInfosAsync(coordinatorUserIds);
