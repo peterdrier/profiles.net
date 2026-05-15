@@ -299,8 +299,8 @@ public sealed class OnboardingService : IOnboardingService
     public async Task<bool> SetConsentCheckPendingIfEligibleAsync(
         Guid userId, CancellationToken ct = default)
     {
-        var profile = await _profileService.GetProfileAsync(userId, ct);
-        if (profile is null || profile.IsApproved || profile.ConsentCheckStatus is not null)
+        var info = await _userService.GetUserInfoAsync(userId, ct);
+        if (info is null || !info.NeedsConsentReview || info.Profile!.ConsentCheckStatus is not null)
             return false;
 
         var hasAllConsents = await _membershipCalculator.HasAllRequiredConsentsForTeamAsync(

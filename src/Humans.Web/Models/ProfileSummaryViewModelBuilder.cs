@@ -1,46 +1,38 @@
-using Humans.Application.DTOs;
+using Humans.Application;
 using Humans.Application.Models;
-using Humans.Application.Interfaces.Profiles;
-using Humans.Domain.Entities;
-using ProfileEntity = Humans.Domain.Entities.Profile;
 
 namespace Humans.Web.Models;
 
 public static class ProfileSummaryViewModelBuilder
 {
-    public static ProfileSummaryViewModel BuildWithoutProfile(
-        User user,
-        IReadOnlyList<UserEmailEditDto> userEmails)
+    public static ProfileSummaryViewModel BuildWithoutProfile(UserInfo info)
     {
-        ArgumentNullException.ThrowIfNull(user);
-        ArgumentNullException.ThrowIfNull(userEmails);
+        ArgumentNullException.ThrowIfNull(info);
 
-        var fallbackEmail = userEmails.FirstOrDefault(e => e.IsVerified && e.IsPrimary)?.Email
-            ?? userEmails.FirstOrDefault(e => e.IsVerified)?.Email;
-
+        // Email is intentionally NOT populated here — the popover surfaces this
+        // model to any authenticated user, so exposing email (verified or not)
+        // is a GDPR PII leak. Admins who need email use /Profile/{id}/Admin.
         return new ProfileSummaryViewModel
         {
-            UserId = user.Id,
-            DisplayName = user.DisplayName,
-            Email = fallbackEmail,
-            ProfilePictureUrl = user.ProfilePictureUrl,
-            PreferredLanguage = user.PreferredLanguage,
+            UserId = info.Id,
+            DisplayName = info.DisplayName,
+            ProfilePictureUrl = info.ProfilePictureUrl,
+            PreferredLanguage = info.PreferredLanguage,
             HasProfile = false,
         };
     }
 
     public static ProfileSummaryViewModel BuildWithProfile(
-        User user,
-        ProfileEntity profile,
+        UserInfo info,
         IReadOnlyList<TeamMembership> memberships,
-        IReadOnlyList<ProfileLanguageSnapshot> profileLanguages,
-        Func<ProfileEntity, string?> customPictureUrl)
+        Func<ProfileInfo, string?> customPictureUrl)
     {
-        ArgumentNullException.ThrowIfNull(user);
-        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(info);
         ArgumentNullException.ThrowIfNull(memberships);
-        ArgumentNullException.ThrowIfNull(profileLanguages);
         ArgumentNullException.ThrowIfNull(customPictureUrl);
+
+        var profile = info.Profile
+            ?? throw new ArgumentException("UserInfo.Profile must be non-null.", nameof(info));
 
         var orderedMemberships = memberships
             .OrderBy(m => m.TeamName, StringComparer.OrdinalIgnoreCase)
@@ -48,22 +40,22 @@ public static class ProfileSummaryViewModelBuilder
 
         return new ProfileSummaryViewModel
         {
-            UserId = user.Id,
-            DisplayName = user.DisplayName,
-            Email = user.Email,
-            ProfilePictureUrl = profile.HasCustomProfilePicture
+            UserId = info.Id,
+            DisplayName = info.DisplayName,
+            Email = info.Email,
+            ProfilePictureUrl = profile.HasCustomPicture
                 ? customPictureUrl(profile)
-                : user.ProfilePictureUrl,
-            PreferredLanguage = user.PreferredLanguage,
+                : info.ProfilePictureUrl,
+            PreferredLanguage = info.PreferredLanguage,
             MembershipTier = profile.MembershipTier.ToString(),
-            MembershipStatus = profile.IsSuspended ? "Suspended"
+            MembershipStatus = info.IsSuspended ? "Suspended"
                 : profile.IsApproved ? "Active" : "Pending",
             City = profile.City,
             CountryCode = profile.CountryCode,
-            IsSuspended = profile.IsSuspended,
+            IsSuspended = info.IsSuspended,
             Teams = orderedMemberships.Where(m => !m.IsHidden).Select(m => m.TeamName).ToList(),
             HiddenTeams = orderedMemberships.Where(m => m.IsHidden).Select(m => m.TeamName).ToList(),
-            Languages = profileLanguages.Select(pl => new ProfileLanguageDisplayViewModel
+            Languages = profile.Languages.Select(pl => new ProfileLanguageDisplayViewModel
             {
                 LanguageCode = pl.LanguageCode,
                 LanguageName = Helpers.LanguageCatalog.GetDisplayName(pl.LanguageCode),
