@@ -52,16 +52,6 @@ public interface IUserRepository : IRepository
     Task<IReadOnlyList<User>> GetAllAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Returns the language distribution of the given user ids, grouped by
-    /// <see cref="User.PreferredLanguage"/>. Used by the admin dashboard to
-    /// render language stats for approved humans after the caller has
-    /// resolved the approved user id set from the Profile section.
-    /// </summary>
-    Task<IReadOnlyList<(string Language, int Count)>>
-        GetLanguageDistributionForUserIdsAsync(
-            IReadOnlyCollection<Guid> userIds, CancellationToken ct = default);
-
-    /// <summary>
     /// Finds a user whose <c>Email</c> or <c>GoogleEmail</c> matches the given
     /// normalized address (case-insensitive). If <paramref name="alternateEmail"/>
     /// is non-null, also matches users whose email matches the alternate form
@@ -69,14 +59,6 @@ public interface IUserRepository : IRepository
     /// </summary>
     Task<User?> GetByEmailOrAlternateAsync(
         string normalizedEmail, string? alternateEmail, CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the <c>LastLoginAt</c> timestamp of every user whose last login
-    /// falls within the half-open window <c>[fromInclusive, toExclusive)</c>.
-    /// Read-only (AsNoTracking). Used by the shift coordinator dashboard.
-    /// </summary>
-    Task<IReadOnlyList<Instant>> GetLoginTimestampsInWindowAsync(
-        Instant fromInclusive, Instant toExclusive, CancellationToken ct = default);
 
     /// <summary>
     /// Returns the id of any user, other than <paramref name="excludeUserId"/>,
@@ -162,17 +144,6 @@ public interface IUserRepository : IRepository
     Task<bool> AnonymizeForMergeAsync(
         Guid sourceUserId, Guid targetUserId, Instant now,
         CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns every user id whose <c>MergedToUserId</c> equals
-    /// <paramref name="targetUserId"/>. Powers
-    /// <c>IUserService.GetMergedSourceIdsAsync</c>, the canonical chain-follow
-    /// primitive for append-only sections (audit log, consent records, budget
-    /// audit log) so per-user reads can also surface rows attributed to merged
-    /// tombstones. Read-only (AsNoTracking).
-    /// </summary>
-    Task<IReadOnlyList<Guid>> GetMergedSourceIdsAsync(
-        Guid targetUserId, CancellationToken ct = default);
 
     /// <summary>
     /// Returns userIds of users that have at least one row in
@@ -271,19 +242,6 @@ public interface IUserRepository : IRepository
         Guid userId, Instant sentAt, CancellationToken ct = default);
 
     /// <summary>
-    /// Returns the count of users whose <c>GoogleEmailStatus</c> equals
-    /// <see cref="GoogleEmailStatus.Rejected"/>. Used by the admin digest.
-    /// </summary>
-    Task<int> GetRejectedGoogleEmailCountAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the count of users whose <c>ContactSource</c> equals
-    /// <paramref name="source"/>. Used by the admin dashboard to show
-    /// per-source import totals.
-    /// </summary>
-    Task<int> GetCountByContactSourceAsync(ContactSource source, CancellationToken ct = default);
-
-    /// <summary>
     /// Returns the ids of every user whose <c>DeletionScheduledFor</c> is at
     /// or before <paramref name="now"/> and whose <c>DeletionEligibleAfter</c>
     /// is either null or at or before <paramref name="now"/>. Used by the
@@ -316,12 +274,6 @@ public interface IUserRepository : IRepository
     /// </summary>
     Task<EventParticipation?> GetParticipationAsync(
         Guid userId, int year, CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns all participation records for a given year. Read-only (AsNoTracking).
-    /// </summary>
-    Task<IReadOnlyList<EventParticipation>> GetAllParticipationsForYearAsync(
-        int year, CancellationToken ct = default);
 
     /// <summary>
     /// Returns all participation records for a given user (across all years),

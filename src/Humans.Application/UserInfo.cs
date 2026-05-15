@@ -131,7 +131,9 @@ public sealed record ProfileInfo(
     public string EmailGreetingName =>
         !string.IsNullOrWhiteSpace(BurnerName) ? BurnerName :
         !string.IsNullOrWhiteSpace(FirstName) ? FirstName : "there";
+
 }
+
 
 /// <summary>
 /// Unified, immutable read-model spanning the User and Profile sections.
@@ -306,6 +308,50 @@ public sealed record UserInfo(
         p.Year == year &&
         (p.Status == ParticipationStatus.Ticketed ||
          p.Status == ParticipationStatus.Attended));
+
+    /// <summary>
+    /// True when this user should be treated as a Stub profile — no profile row,
+    /// explicit <see cref="ProfileState.Stub"/>, or a legacy <c>null</c> State
+    /// row that has not yet been backfilled by
+    /// <c>CachingProfileService.PopulateStateIfNullAsync</c>. Paranoid /
+    /// defense-in-depth predicate: callers writing consent records or
+    /// admitting the user to flows that require a verified legal name MUST
+    /// block on this.
+    /// </summary>
+    public bool IsStub =>
+        Profile is null || Profile.State is null or ProfileState.Stub;
+
+    /// <summary>
+    /// A regular user of the site: has a profile and hasn't been rejected
+    /// (failed consent check). Does NOT require <see cref="ProfileInfo.IsApproved"/>
+    /// — Consent Coordinator approval is a separate gate on top of this.
+    /// </summary>
+    public bool IsActive =>
+        Profile is not null && Profile.RejectedAt is null;
+
+    /// <summary>
+    /// True when the user has a profile and BurnerName + FirstName + LastName
+    /// are all non-blank. The "has a name" predicate — Consent Coordinator
+    /// review cannot proceed without it. Reads field values directly, ignores
+    /// <see cref="ProfileInfo.State"/> so legacy null-State rows are evaluated
+    /// the same way Active rows are.
+    /// </summary>
+    public bool HasRequiredIdentityFields =>
+        Profile is not null
+        && !string.IsNullOrWhiteSpace(Profile.BurnerName)
+        && !string.IsNullOrWhiteSpace(Profile.FirstName)
+        && !string.IsNullOrWhiteSpace(Profile.LastName);
+
+    /// <summary>
+    /// True when this user belongs in the Consent Coordinator's review queue —
+    /// active (has profile, not rejected), has a legal name, not yet approved.
+    /// CC review cannot happen until the user fills in their name, so
+    /// <see cref="HasRequiredIdentityFields"/> gates queue inclusion. Single
+    /// predicate shared by review-queue and nav-badge call sites so the queue
+    /// list and its count cannot drift.
+    /// </summary>
+    public bool NeedsConsentReview =>
+        IsActive && HasRequiredIdentityFields && !Profile!.IsApproved;
 
     /// <summary>
     /// Builds a <see cref="UserInfo"/> from the 8 contributing tables. Each

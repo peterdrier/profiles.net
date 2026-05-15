@@ -257,7 +257,7 @@ public sealed class NotificationMeterProvider : INotificationMeterProvider
 
     private async Task<MeterCounts> ComputeCountsAsync(CancellationToken cancellationToken)
     {
-        var consentReviewsPending = await _profileService.GetConsentReviewPendingCountAsync(cancellationToken);
+        var consentReviewsPending = _userService.GetAllUserInfos().Count(u => u.NeedsConsentReview);
 
         // Pending deletions derived from the user list — at ~500-user scale,
         // loading the list once per cache window is cheaper than maintaining a
@@ -268,13 +268,9 @@ public sealed class NotificationMeterProvider : INotificationMeterProvider
 
         var failedSyncEvents = await _googleSyncService.GetFailedSyncEventCountAsync(cancellationToken);
 
-        // Onboarding profiles pending excludes consent-review items, matching
-        // the board digest "still onboarding" queue semantics.
-        var totalNotApproved = await _profileService
-            .GetNotApprovedAndNotSuspendedCountAsync(cancellationToken);
-        var onboardingPending = totalNotApproved - consentReviewsPending;
-        if (onboardingPending < 0)
-            onboardingPending = 0;
+        // Board / VolunteerCoordinator see the same review queue under a
+        // different label — same predicate as consentReviewsPending.
+        var onboardingPending = consentReviewsPending;
 
         var teamJoinRequestsPending = await _teamService
             .GetTotalPendingJoinRequestCountAsync(cancellationToken);
