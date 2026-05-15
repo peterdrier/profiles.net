@@ -101,8 +101,8 @@ public sealed class GoogleAdminService : IGoogleAdminService
             // Batch-load users for matched emails
             var matchedUserIds = matchByEmail.Values.Select(m => m.UserId).Distinct().ToList();
             var usersById = matchedUserIds.Count == 0
-                ? new Dictionary<Guid, User>()
-                : (await _userService.GetByIdsAsync(matchedUserIds, ct))
+                ? new Dictionary<Guid, Humans.Application.UserInfo>()
+                : (await _userService.GetUserInfosAsync(matchedUserIds, ct))
                     .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
             var accountInfos = new List<WorkspaceAccountInfo>();
@@ -705,7 +705,7 @@ public sealed class GoogleAdminService : IGoogleAdminService
             // service (design-rules §2c) instead of traversing user.UserEmails
             // cross-domain. The service returns row snapshots so this caller
             // can read per-row IsVerified / IsGoogle / Provider flags.
-            var allUsers = await _userService.GetAllUsersAsync(ct);
+            var allUsers = _userService.GetAllUserInfos();
             var allUserIds = allUsers.Select(u => u.Id).ToList();
             var emailsByUserId = await _userEmailService.GetEntitiesByUserIdsAsync(allUserIds, ct);
 

@@ -41,6 +41,20 @@ public interface IUserService : IApplicationService, IUserMerge
     IReadOnlyCollection<UserInfo> GetAllUserInfos();
 
     /// <summary>
+    /// Batched <see cref="UserInfo"/> lookup. Returns a dictionary keyed by
+    /// user id; ids without a corresponding user are absent. Served from the
+    /// caching decorator's in-memory dict for any id already cached; missing
+    /// ids are refilled through the same per-user load path used by
+    /// <see cref="GetUserInfoAsync"/>. The canonical replacement for
+    /// <c>GetByIdsAsync</c> / <c>GetByIdsWithEmailsAsync</c> at reader call
+    /// sites — those still exist for the rare consumer that needs a real
+    /// <see cref="User"/> entity (Identity machinery, in-place mutations).
+    /// </summary>
+    ValueTask<IReadOnlyDictionary<Guid, UserInfo>> GetUserInfosAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Single canonical person-search method. Matches <paramref name="query"/>
     /// against the buckets named by <paramref name="fields"/> over the cached
     /// <see cref="UserInfo"/> snapshot and returns up to <paramref name="limit"/>

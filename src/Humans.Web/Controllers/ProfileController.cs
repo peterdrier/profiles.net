@@ -191,7 +191,7 @@ public class ProfileController : HumansControllerBase
     private async Task<IReadOnlyList<AdminHumanRow>> BuildAdminHumansAsync(
         string? search, string? statusFilter, CancellationToken ct)
     {
-        var allUsers = await _userService.GetAllUsersAsync(ct);
+        var allUsers = _userService.GetAllUserInfos();
         var allUserIds = allUsers.Select(u => u.Id).ToList();
         var profilesByUserId = await _profileService.GetByUserIdsAsync(allUserIds, ct);
         var notificationEmails =
@@ -1865,8 +1865,8 @@ public class ProfileController : HumansControllerBase
             .Distinct()
             .ToList();
         var reviewers = reviewerIds.Count == 0
-            ? (IReadOnlyDictionary<Guid, User>)new Dictionary<Guid, User>()
-            : await _userService.GetByIdsAsync(reviewerIds, ct);
+            ? (IReadOnlyDictionary<Guid, UserInfo>)new Dictionary<Guid, UserInfo>()
+            : await _userService.GetUserInfosAsync(reviewerIds, ct);
 
         return (true, noShows.Select(s =>
         {
@@ -1952,7 +1952,7 @@ public class ProfileController : HumansControllerBase
         // Issue #635 (§15i): bulk-fetch sender + recipient with UserEmails
         // hydrated through the section-owned service instead of a raw
         // `.Include(u => u.UserEmails)` over the cross-domain nav.
-        var participants = await _userService.GetByIdsWithEmailsAsync(
+        var participants = await _userService.GetUserInfosAsync(
             new[] { id, currentUser.Id });
         if (!participants.TryGetValue(id, out var targetUser))
             return NotFound();
