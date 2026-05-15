@@ -6,7 +6,6 @@ using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Shifts;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
-using Humans.Testing;
 using Humans.Web.Controllers;
 using Humans.Web.Models.OnboardingWidget;
 using Microsoft.AspNetCore.Http;

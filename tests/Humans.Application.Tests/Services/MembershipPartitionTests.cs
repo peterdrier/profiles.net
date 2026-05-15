@@ -6,8 +6,6 @@ using Humans.Application.Services.Governance;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Constants;
 using Humans.Domain.Entities;
-using Humans.Domain.Enums;
-using Xunit;
 using Humans.Application.Interfaces.Consent;
 using Humans.Application.Interfaces.Legal;
 using Humans.Application.Interfaces.Users;

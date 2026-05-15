@@ -1,11 +1,9 @@
 using AwesomeAssertions;
 using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Teams;
-using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Enums;
 using NodaTime;
 using NSubstitute;
-using Xunit;
 using NotificationRecipientResolver = Humans.Application.Services.Notifications.NotificationRecipientResolver;
 
 namespace Humans.Application.Tests.Notifications;

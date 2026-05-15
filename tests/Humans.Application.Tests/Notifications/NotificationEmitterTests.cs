@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 using NotificationEmitter = Humans.Application.Services.Notifications.NotificationEmitter;
 
 namespace Humans.Application.Tests.Notifications;

@@ -5,12 +5,10 @@ using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Controllers;
 using Humans.Web.Models;
-using Humans.Testing;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Web.Tests.Controllers;
 

@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using AwesomeAssertions;
-using Humans.Application.Authorization.UserEmail;
 using Humans.Application.Configuration;
 using Humans.Domain.Enums;
 using Humans.Application.Interfaces.AuditLog;
@@ -18,7 +17,6 @@ using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Tickets;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
-using Humans.Testing;
 using Humans.Web;
 using Humans.Web.Controllers;
 using Microsoft.AspNetCore.Authentication;
@@ -36,7 +34,6 @@ using Microsoft.Extensions.Options;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Controllers;
 

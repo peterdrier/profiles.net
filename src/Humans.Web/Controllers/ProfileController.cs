@@ -14,14 +14,11 @@ using Microsoft.Extensions.Localization;
 using Humans.Application;
 using Humans.Application.DTOs;
 using Humans.Application.Interfaces.Gdpr;
-using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using MemberApplication = Humans.Domain.Entities.Application;
 using Humans.Web.Authorization;
 using Humans.Web.Extensions;
 using Humans.Web.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using NodaTime;
@@ -39,7 +36,6 @@ using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Services.Profiles;
-using Humans.Domain.Helpers;
 
 // RoleAssignment cross-domain nav properties (User, CreatedByUser) are [Obsolete] —
 // RoleAssignmentService stitches them in memory from IUserService so controllers can

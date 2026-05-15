@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using Humans.Application;
 using Humans.Application.DTOs;
 using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.Repositories;
@@ -9,7 +8,6 @@ using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using NodaTime;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Services.Dashboard;
 

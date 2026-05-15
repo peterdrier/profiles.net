@@ -23,7 +23,6 @@ using Humans.Application.Configuration;
 using Humans.Application.Interfaces;
 using Humans.Domain.Entities;
 using Humans.Web.Extensions;
-using Humans.Web.Extensions.Sections;
 using Microsoft.Extensions.Caching.Memory;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Services;

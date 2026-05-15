@@ -7,7 +7,6 @@ using Humans.Infrastructure.Repositories.Camps;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using NodaTime.Testing;
-using Xunit;
 
 namespace Humans.Application.Tests.Repositories;
 

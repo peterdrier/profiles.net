@@ -15,12 +15,8 @@ using ProfileService = Humans.Application.Services.Profiles.ProfileService;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Interfaces.Onboarding;
-using Humans.Application.Interfaces.Auth;
-using Humans.Application.Interfaces.Profiles;
-using Humans.Application.Services.Profiles;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Infrastructure.Repositories.Profiles;
-using Humans.Infrastructure.Repositories.Users;
 
 namespace Humans.Application.Tests.Services;
 

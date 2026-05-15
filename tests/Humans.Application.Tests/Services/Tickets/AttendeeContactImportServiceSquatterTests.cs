@@ -3,7 +3,6 @@ using Humans.Application.Interfaces.Tickets.Dtos;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using NSubstitute;
 
 namespace Humans.Application.Tests.Services.Tickets;

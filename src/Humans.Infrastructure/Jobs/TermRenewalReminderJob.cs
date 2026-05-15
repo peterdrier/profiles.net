@@ -2,7 +2,6 @@ using System.Globalization;
 using Hangfire;
 using Microsoft.Extensions.Logging;
 using NodaTime;
-using Humans.Application.Extensions;
 using Humans.Application.Interfaces;
 using Humans.Application.Interfaces.Email;
 using Humans.Application.Interfaces.Governance;

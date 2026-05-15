@@ -3,7 +3,6 @@ using Humans.Application.DTOs;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.GoogleIntegration;
 using Humans.Application.Interfaces.Profiles;
-using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Tests.Infrastructure;
@@ -13,7 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
 using GoogleAdminService = Humans.Application.Services.GoogleIntegration.GoogleAdminService;
 
 namespace Humans.Application.Tests.GoogleIntegration;

@@ -8,7 +8,6 @@ using Humans.Infrastructure.Repositories.Email;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using NodaTime.Testing;
-using Xunit;
 
 namespace Humans.Application.Tests.Repositories;
 

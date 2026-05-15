@@ -7,7 +7,6 @@ using Humans.Infrastructure.Repositories.GoogleIntegration;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using NodaTime.Testing;
-using Xunit;
 
 namespace Humans.Application.Tests.GoogleIntegration;
 

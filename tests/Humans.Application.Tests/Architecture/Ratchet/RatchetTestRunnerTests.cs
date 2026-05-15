@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using Humans.Testing;
 
 namespace Humans.Application.Tests.Architecture.Ratchet;
 

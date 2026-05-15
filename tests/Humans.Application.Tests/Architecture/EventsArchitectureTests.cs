@@ -11,7 +11,6 @@ using Humans.Web.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 using EventService = Humans.Application.Services.Events.EventService;
 
 namespace Humans.Application.Tests.Architecture;

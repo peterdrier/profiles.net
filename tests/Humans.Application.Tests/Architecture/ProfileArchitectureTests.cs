@@ -3,7 +3,6 @@ using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
-using Humans.Infrastructure.Services.Profiles;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using Xunit;

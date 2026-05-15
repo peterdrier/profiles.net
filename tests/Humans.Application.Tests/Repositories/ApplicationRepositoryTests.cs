@@ -5,7 +5,6 @@ using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Infrastructure.Data;
-using Xunit;
 using MemberApplication = Humans.Domain.Entities.Application;
 using Humans.Infrastructure.Repositories.Governance;
 

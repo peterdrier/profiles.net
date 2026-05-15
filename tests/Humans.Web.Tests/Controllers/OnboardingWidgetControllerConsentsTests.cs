@@ -8,7 +8,6 @@ using Humans.Application.Interfaces.Users;
 using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using Humans.Web.Constants;
 using Humans.Web.Controllers;
 using Humans.Web.Models.OnboardingWidget;

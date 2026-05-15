@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 using DriveActivityMonitorService = Humans.Application.Services.GoogleIntegration.DriveActivityMonitorService;
 
 namespace Humans.Application.Tests.GoogleIntegration;

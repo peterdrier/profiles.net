@@ -1,6 +1,5 @@
 using System.Globalization;
 using System.Text.Json;
-using Humans.Application.DTOs;
 using Humans.Application.Interfaces;
 using Humans.Application.Interfaces.Email;
 using Humans.Application.Interfaces.Profiles;

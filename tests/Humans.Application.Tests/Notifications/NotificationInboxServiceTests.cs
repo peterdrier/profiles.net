@@ -10,7 +10,6 @@ using Microsoft.Extensions.Caching.Memory;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 using NotificationInboxService = Humans.Application.Services.Notifications.NotificationInboxService;
 
 namespace Humans.Application.Tests.Notifications;

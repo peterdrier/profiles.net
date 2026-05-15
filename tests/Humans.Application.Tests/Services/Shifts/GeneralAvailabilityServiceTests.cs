@@ -8,7 +8,6 @@ using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 using GeneralAvailabilityService = Humans.Application.Services.Shifts.GeneralAvailabilityService;
 
 namespace Humans.Application.Tests.Services.Shifts;

@@ -10,7 +10,6 @@ using Humans.Infrastructure.Data;
 using Humans.Domain.Entities;
 using Humans.Domain.Constants;
 using NSubstitute;
-using Xunit;
 using RoleAssignmentService = Humans.Application.Services.Auth.RoleAssignmentService;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Users;

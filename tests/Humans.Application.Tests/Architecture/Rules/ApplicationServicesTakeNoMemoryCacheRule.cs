@@ -7,7 +7,6 @@ using Humans.Application.Services.Legal;
 using Humans.Application.Services.Notifications;
 using Humans.Application.Services.Shifts;
 using Humans.Application.Services.Tickets;
-using Humans.Testing;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace Humans.Application.Tests.Architecture.Rules;

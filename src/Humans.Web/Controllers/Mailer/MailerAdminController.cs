@@ -12,7 +12,6 @@ using Humans.Web.Models.Mailer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace Humans.Web.Controllers.Mailer;
 

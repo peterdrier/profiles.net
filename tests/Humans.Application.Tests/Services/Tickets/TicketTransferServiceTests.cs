@@ -1,6 +1,4 @@
 using AwesomeAssertions;
-using Humans.Application;
-using Humans.Application.Configuration;
 using Humans.Application.DTOs;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Profiles;
@@ -17,7 +15,6 @@ using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
 
 namespace Humans.Application.Tests.Services.Tickets;
 

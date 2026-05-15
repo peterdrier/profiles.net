@@ -18,7 +18,6 @@ using Humans.Infrastructure.Jobs;
 using Humans.Infrastructure.Repositories.GoogleIntegration;
 using Humans.Infrastructure.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace Humans.Application.Tests.GoogleIntegration;
 

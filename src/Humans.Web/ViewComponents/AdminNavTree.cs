@@ -1,7 +1,4 @@
-using Humans.Domain.Constants;
 using Humans.Web.Authorization;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace Humans.Web.ViewComponents;
 

@@ -1,4 +1,3 @@
-using Humans.Application.DTOs;
 using Humans.Domain.Enums;
 using MailKit.Net.Smtp;
 using MailKit.Security;

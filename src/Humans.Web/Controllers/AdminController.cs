@@ -8,7 +8,6 @@ using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Caching;
 using Humans.Application.Interfaces.Dashboard;
 using Humans.Application.Interfaces.Feedback;
-using Humans.Application.Interfaces.Onboarding;
 using Humans.Application.Interfaces.Shifts;
 using Humans.Domain.Entities;
 using Humans.Infrastructure.Data;

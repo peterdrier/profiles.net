@@ -22,7 +22,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 using IssuesApplicationService = Humans.Application.Services.Issues.IssuesService;
 
 namespace Humans.Application.Tests.Services;

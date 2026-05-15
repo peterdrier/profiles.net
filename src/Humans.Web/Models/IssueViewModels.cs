@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using NodaTime;
-using Humans.Application.Interfaces.Issues;
 using Humans.Domain.Constants;
 using Humans.Domain.Enums;
 

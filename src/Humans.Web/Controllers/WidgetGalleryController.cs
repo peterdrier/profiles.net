@@ -1,10 +1,8 @@
 using Humans.Application.Interfaces.Shifts;
 using Humans.Application.Interfaces.Teams;
 using Humans.Domain.Entities;
-using Humans.Domain.Enums;
 using Humans.Web.Authorization;
 using Humans.Web.Models;
-using Humans.Web.ViewComponents;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;

@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Humans.Application.Constants;
 using Humans.Application.Models;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Agent;
 

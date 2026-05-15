@@ -1,7 +1,4 @@
-using System.Linq;
-using System.Threading.Tasks;
 using AwesomeAssertions;
-using Humans.Testing;
 
 namespace Humans.Analyzers.Tests;
 

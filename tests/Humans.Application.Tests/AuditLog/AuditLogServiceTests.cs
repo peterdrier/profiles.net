@@ -13,7 +13,6 @@ using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
 using AuditLogService = Humans.Application.Services.AuditLog.AuditLogService;
 
 namespace Humans.Application.Tests.AuditLog;

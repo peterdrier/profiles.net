@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
 using Humans.Application.Interfaces.Containers;
-using Microsoft.AspNetCore.Http;
 
 namespace Humans.Web.Models;
 

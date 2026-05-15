@@ -4,7 +4,6 @@ using Humans.Application.DTOs;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Domain.Entities;
-using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
 
 namespace Humans.Infrastructure.Repositories.Profiles;

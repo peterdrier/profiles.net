@@ -1,10 +1,8 @@
 using AwesomeAssertions;
 using Humans.Infrastructure.Services;
-using Humans.Testing;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Services;
 

@@ -9,7 +9,6 @@ using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
-using Xunit;
 using CampaignServiceImpl = Humans.Application.Services.Campaigns.CampaignService;
 using Humans.Application.Interfaces.Email;
 using Humans.Application.Interfaces.Teams;

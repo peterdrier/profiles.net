@@ -14,7 +14,6 @@ using Humans.Infrastructure.Services.Agent;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Agent;
 

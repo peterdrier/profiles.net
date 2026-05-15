@@ -8,7 +8,6 @@ using Humans.Infrastructure.Repositories.Expenses;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
-using Xunit;
 
 namespace Humans.Application.Tests.Repositories.Expenses;
 

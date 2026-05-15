@@ -10,7 +10,6 @@ using Humans.Application.Services.Tickets;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Serialization.SystemTextJson;

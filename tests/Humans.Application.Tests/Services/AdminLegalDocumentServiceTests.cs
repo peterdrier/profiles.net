@@ -15,8 +15,6 @@ using Humans.Application.Interfaces.Legal;
 using Humans.Application.Interfaces.Teams;
 using Humans.Infrastructure.Repositories.Legal;
 
-using Xunit;
-
 namespace Humans.Application.Tests.Services;
 
 public class AdminLegalDocumentServiceTests : IDisposable

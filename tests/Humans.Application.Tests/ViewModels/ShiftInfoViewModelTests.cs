@@ -1,6 +1,5 @@
 using AwesomeAssertions;
 using Humans.Web.Models;
-using Xunit;
 
 namespace Humans.Application.Tests.ViewModels;
 

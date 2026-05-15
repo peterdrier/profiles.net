@@ -1,8 +1,5 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Threading;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Humans.Application.Configuration;

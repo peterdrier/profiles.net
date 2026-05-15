@@ -5,7 +5,6 @@ using Humans.Application.Extensions;
 using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.Repositories;
-using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Domain.Helpers;
@@ -13,9 +12,7 @@ using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Interfaces.Onboarding;
 using Humans.Application.Interfaces;
-using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Profiles;
-using Humans.Application.Services.Profiles;
 
 namespace Humans.Application.Services.Profiles;
 

@@ -2,8 +2,6 @@ using System.Text.RegularExpressions;
 using AwesomeAssertions;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Tests.Architecture.Ratchet;
-using Humans.Infrastructure.Repositories.AuditLog;
-using Xunit;
 
 namespace Humans.Application.Tests.Architecture;
 

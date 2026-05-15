@@ -1,4 +1,3 @@
-using AwesomeAssertions;
 using Humans.Application.Configuration;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.GoogleIntegration;
@@ -15,7 +14,6 @@ using Microsoft.Extensions.Options;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 // UserEmailMatch lives in the Profiles interface namespace, not DTOs.
 using UserEmailMatch = Humans.Application.Interfaces.Profiles.UserEmailMatch;
 

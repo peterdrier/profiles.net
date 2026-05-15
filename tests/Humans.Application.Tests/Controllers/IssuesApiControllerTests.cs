@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NodaTime;
 using NSubstitute;
-using Xunit;
 
 #pragma warning disable CS0618 // Cross-domain navs are intentional in test fixtures.
 

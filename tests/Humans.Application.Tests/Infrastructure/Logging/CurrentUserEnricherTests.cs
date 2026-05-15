@@ -1,12 +1,10 @@
 using System.Security.Claims;
 using AwesomeAssertions;
 using Humans.Infrastructure.Logging;
-using Humans.Testing;
 using Microsoft.AspNetCore.Http;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Parsing;
-using Xunit;
 
 namespace Humans.Application.Tests.Infrastructure.Logging;
 

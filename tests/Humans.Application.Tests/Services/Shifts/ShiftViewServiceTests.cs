@@ -3,7 +3,6 @@ using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Services.Shifts;
 using Humans.Domain.Entities;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Services.Shifts;
 

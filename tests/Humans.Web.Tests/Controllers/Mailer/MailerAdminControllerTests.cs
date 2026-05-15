@@ -7,7 +7,6 @@ using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using Humans.Web.Controllers.Mailer;
 using Humans.Web.Models.Mailer;
 using Microsoft.AspNetCore.Http;

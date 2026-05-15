@@ -6,11 +6,9 @@ using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Shifts;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Services.Shifts;
 

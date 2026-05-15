@@ -1,9 +1,6 @@
 using AwesomeAssertions;
-using Humans.Application.DTOs;
 using Humans.Application.Interfaces;
-using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Services.Email;
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -12,7 +9,6 @@ using NodaTime.Testing;
 using NSubstitute;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Infrastructure.Data;
-using Xunit;
 using Humans.Application.Interfaces.Email;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Infrastructure.Repositories.Email;

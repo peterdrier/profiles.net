@@ -3,7 +3,6 @@ using Humans.Application.Models;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Services.Agent;
 using NodaTime;
-using Xunit;
 
 namespace Humans.Application.Tests.Agent;
 

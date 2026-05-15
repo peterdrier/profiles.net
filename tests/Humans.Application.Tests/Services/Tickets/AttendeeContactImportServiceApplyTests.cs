@@ -9,7 +9,6 @@ using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Tickets;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Testing;
 using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Testing;

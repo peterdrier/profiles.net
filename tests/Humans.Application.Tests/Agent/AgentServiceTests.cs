@@ -1,9 +1,6 @@
-using System.Collections.Generic;
-using System.Linq;
 using AwesomeAssertions;
 using Humans.Application.Configuration;
 using Humans.Application.Interfaces;
-using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Stores;
 using Humans.Application.Models;
 using Humans.Application.Services.Agent;
@@ -18,7 +15,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NodaTime;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Agent;
 

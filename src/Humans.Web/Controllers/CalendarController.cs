@@ -1,4 +1,3 @@
-using System.ComponentModel.DataAnnotations;
 using Humans.Application.DTOs.Calendar;
 using Humans.Application.Interfaces.Calendar;
 using Humans.Application.Interfaces.Teams;

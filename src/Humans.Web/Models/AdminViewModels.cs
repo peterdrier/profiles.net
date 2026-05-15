@@ -1,4 +1,3 @@
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Application.Interfaces.Campaigns;
 using Humans.Application.Interfaces.Email;

@@ -9,7 +9,6 @@ using Humans.Application.Services.Camps;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
-using Humans.Domain.ValueObjects;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Repositories.Camps;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +17,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using NodaTime;
 using NodaTime.Testing;
 using NSubstitute;
-using Xunit;
 
 namespace Humans.Application.Tests.Services;
 

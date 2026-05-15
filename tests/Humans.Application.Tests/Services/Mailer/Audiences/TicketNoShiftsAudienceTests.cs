@@ -3,7 +3,6 @@ using Humans.Application.Interfaces.Shifts;
 using Humans.Application.Interfaces.Tickets;
 using Humans.Application.Services.Mailer.Audiences;
 using Humans.Domain.Entities;
-using Humans.Domain.Enums;
 using NodaTime;
 using NSubstitute;
 

@@ -1,4 +1,3 @@
-using Humans.Application;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
 using Humans.Infrastructure.Data;
