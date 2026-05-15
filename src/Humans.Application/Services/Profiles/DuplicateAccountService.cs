@@ -11,7 +11,7 @@ using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Users;
 
-namespace Humans.Application.Services.Profile;
+namespace Humans.Application.Services.Profiles;
 
 /// <summary>
 /// Detects and resolves duplicate user accounts where the same email
@@ -20,7 +20,7 @@ namespace Humans.Application.Services.Profile;
 /// </summary>
 /// <remarks>
 /// Moved from <c>Humans.Infrastructure.Services</c> to
-/// <c>Humans.Application.Services.Profile</c> in PR #557. All data access
+/// <c>Humans.Application.Services.Profiles</c> in PR #557. All data access
 /// flows through repository and service interfaces; this type never injects
 /// <c>HumansDbContext</c>.
 /// </remarks>

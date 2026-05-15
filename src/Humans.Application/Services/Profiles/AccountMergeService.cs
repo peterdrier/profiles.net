@@ -13,7 +13,7 @@ using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
 
-namespace Humans.Application.Services.Profile;
+namespace Humans.Application.Services.Profiles;
 
 /// <summary>
 /// Service for managing account merge requests. Business logic only — no
@@ -23,7 +23,7 @@ namespace Humans.Application.Services.Profile;
 /// </summary>
 /// <remarks>
 /// Moved from <c>Humans.Infrastructure.Services</c> to
-/// <c>Humans.Application.Services.Profile</c> in PR #557 as the §15 Part 1
+/// <c>Humans.Application.Services.Profiles</c> in PR #557 as the §15 Part 1
 /// Profile-section cleanup. The owning Identity table
 /// (<c>account_merge_requests</c>) is accessed via
 /// <see cref="IAccountMergeRepository"/>; the UserEmail side uses
