@@ -78,25 +78,6 @@ public sealed class UserRepository : IUserRepository
             .ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<(string Language, int Count)>>
-        GetLanguageDistributionForUserIdsAsync(
-            IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
-    {
-        if (userIds.Count == 0)
-            return [];
-
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        var grouped = await ctx.Users
-            .AsNoTracking()
-            .Where(u => userIds.Contains(u.Id))
-            .GroupBy(u => u.PreferredLanguage)
-            .Select(g => new { Language = g.Key, Count = g.Count() })
-            .OrderByDescending(g => g.Count)
-            .ToListAsync(ct);
-
-        return grouped.Select(g => (g.Language, g.Count)).ToList();
-    }
-
     public async Task<User?> GetByEmailOrAlternateAsync(
         string normalizedEmail, string? alternateEmail, CancellationToken ct = default)
     {
@@ -159,19 +140,6 @@ public sealed class UserRepository : IUserRepository
             .Replace("\\", "\\\\")
             .Replace("%", "\\%")
             .Replace("_", "\\_");
-
-    public async Task<IReadOnlyList<Instant>> GetLoginTimestampsInWindowAsync(
-        Instant fromInclusive, Instant toExclusive, CancellationToken ct = default)
-    {
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        return await ctx.Users
-            .AsNoTracking()
-            .Where(u => u.LastLoginAt != null
-                        && u.LastLoginAt >= fromInclusive
-                        && u.LastLoginAt < toExclusive)
-            .Select(u => u.LastLoginAt!.Value)
-            .ToListAsync(ct);
-    }
 
     public async Task<Guid?> GetOtherUserIdHavingGoogleEmailAsync(
         string email, Guid excludeUserId, CancellationToken ct = default)
@@ -331,17 +299,6 @@ public sealed class UserRepository : IUserRepository
 
         await ctx.SaveChangesAsync(ct);
         return true;
-    }
-
-    public async Task<IReadOnlyList<Guid>> GetMergedSourceIdsAsync(
-        Guid targetUserId, CancellationToken ct = default)
-    {
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        return await ctx.Users
-            .AsNoTracking()
-            .Where(u => u.MergedToUserId == targetUserId)
-            .Select(u => u.Id)
-            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<Guid>> GetUsersWithLoginsButNoEmailsAsync(CancellationToken ct = default)
@@ -588,19 +545,6 @@ public sealed class UserRepository : IUserRepository
         await ctx.SaveChangesAsync(ct);
     }
 
-    public async Task<int> GetRejectedGoogleEmailCountAsync(CancellationToken ct = default)
-    {
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        return await ctx.Users.CountAsync(u => u.GoogleEmailStatus == GoogleEmailStatus.Rejected, ct);
-    }
-
-    public async Task<int> GetCountByContactSourceAsync(ContactSource source, CancellationToken ct = default)
-    {
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        return await ctx.Users.AsNoTracking()
-            .CountAsync(u => u.ContactSource == source, ct);
-    }
-
     public async Task<IReadOnlyList<Guid>> GetAccountsDueForAnonymizationAsync(
         Instant now, CancellationToken ct = default)
     {
@@ -679,16 +623,6 @@ public sealed class UserRepository : IUserRepository
         return await ctx.EventParticipations
             .AsNoTracking()
             .FirstOrDefaultAsync(ep => ep.UserId == userId && ep.Year == year, ct);
-    }
-
-    public async Task<IReadOnlyList<EventParticipation>> GetAllParticipationsForYearAsync(
-        int year, CancellationToken ct = default)
-    {
-        await using var ctx = await _factory.CreateDbContextAsync(ct);
-        return await ctx.EventParticipations
-            .AsNoTracking()
-            .Where(ep => ep.Year == year)
-            .ToListAsync(ct);
     }
 
     public async Task<IReadOnlyList<EventParticipation>> GetEventParticipationsByUserIdAsync(

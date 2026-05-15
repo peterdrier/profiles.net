@@ -14,19 +14,14 @@ namespace Humans.Application.Interfaces.Profiles;
 /// Service for managing profile data and profile-side merge fan-out.
 /// </summary>
 /// <remarks>
-/// Surface-budget recent history (newest first):
+/// Surface-budget recent history (newest first, last 3 only — see memory/code/surface-budget-history-trim.md):
 /// <list type="bullet">
-///   <item>2026-05-13 — 31→32: issue nobodies-collective/Humans#702. Added GetProfilePictureMigrationSnapshotAsync — backs the DB→FS migration verification page (/Profile/Admin/PictureMigration) used to confirm every DB-stored profile picture is on disk before Phase 2 drops the DB column. Profile section owns the FS-key helper, so the snapshot must be assembled inside the service.</item>
-///   <item>2026-05-12 — 30→31: Expenses Phase 6 (PR #491). Added SetIbanAsync — IBAN set/clear on Profile via the expense-report IBAN modal. Profile section owns the write; no expiable substitute (must go through the caching decorator and the audit log, which both require the IProfileService surface). Carried over from the retired InterfaceMethodBudgetTests at the rebase onto origin/main.</item>
-///   <item>2026-05-11 — InterfaceMethodBudgetTests retired; budget migrated to [SurfaceBudget(30)] (issue nobodies-collective/Humans#700).</item>
-///   <item>36→30 — issue nobodies-collective/Humans#685: removed RequestDeletionAsync, CancelDeletionAsync, GetEventHoldDateAsync (deletion orchestration moved to IAccountDeletionService), and GetProfileIndexDataAsync, GetProfileEditDataAsync, GetAdminHumanDetailAsync (Profile-section bundling moved to ProfileController composition).</item>
-///   <item>39→36 — peterdrier#673 person-search consolidation: removed SearchHumansAsync, SearchHumansByNameAsync, SearchApprovedUsersAsync, GetFilteredHumansAsync (4 surfaces accreted across past PRs — each tiny variant). Added SearchProfilesAsync(query, PersonSearchFields, limit) — single bit-flag API. Net -3.</item>
-///   <item>39→39 — §15i swap (issue #635): added EnsureStubProfileAsync to satisfy design-rules §2a/§2c after Claude PR review (#403); removed GetActiveApprovedCountAsync (sole caller AdminController dashboard tile — the existing GetActiveApprovedUserIdsAsync method on the same interface returns the same conceptual data; caller does .Count on the result).</item>
-///   <item>40→39 — barrio-mgmt-fixes audit (peterdrier#390). Net -1 after adding SearchHumansByNameAsync (+1) and merging two pairs of sibling state-setters (-2): ClearConsentCheckAsync + FlagConsentCheckAsync → RecordConsentCheckAsync; SuspendAsync + UnsuspendAsync → SetSuspendedAsync.</item>
-///   <item>41→40 — account-merge fold final consolidation: removed ReassignSubAggregatesToUserAsync from IProfileService (moved to IUserMerge.ReassignAsync, dispatched via fan-out).</item>
+///   <item>27→24 — PR #553 follow-up: dropped 3 cross-section accessors (GetConsentReviewPendingCountAsync, GetNotApprovedAndNotSuspendedCountAsync, GetActiveApprovedUserIdsAsync). Callers now read UserInfo via IUserService.</item>
+///   <item>32→27 — PR #553: drained 5 single-caller DB readers + reimplemented 3 multi-caller readers over the cached UserInfo snapshot. ReviewQueueData retyped to carry UserInfo.</item>
+///   <item>2026-05-13 — 31→32 (issue #702): added GetProfilePictureMigrationSnapshotAsync for the DB→FS picture migration verification page.</item>
 /// </list>
 /// </remarks>
-[SurfaceBudget(32)]
+[SurfaceBudget(24)]
 public interface IProfileService : IApplicationService, IUserMerge
 {
     Task<Profile?> GetProfileAsync(Guid userId, CancellationToken ct = default);
@@ -108,40 +103,8 @@ public interface IProfileService : IApplicationService, IUserMerge
     Task<(bool CanAdd, int MinutesUntilResend, Guid? PendingEmailId)>
         GetEmailCooldownInfoAsync(Guid pendingEmailId, CancellationToken ct = default);
 
-    Task<(int ColaboradorCount, int AsociadoCount)> GetTierCountsAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the user ids of all profiles that are approved and not suspended.
-    /// Used by cross-section notification fan-out (e.g. Legal document sync) that
-    /// needs to target active members without reading the <c>profiles</c> table
-    /// directly.
-    /// </summary>
-    Task<IReadOnlyList<Guid>> GetActiveApprovedUserIdsAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the count of profiles whose <c>ConsentCheckStatus</c> is Pending
-    /// or Flagged and whose <c>RejectedAt</c> is null. Used by the notification
-    /// meter to surface pending consent reviews to Consent Coordinators
-    /// without letting the Notifications section read the <c>profiles</c> table
-    /// directly (design-rules §2c).
-    /// </summary>
-    Task<int> GetConsentReviewPendingCountAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the count of profiles that are neither approved nor suspended.
-    /// Used by the notification meter to compute the "onboarding profiles
-    /// pending" queue (total-not-approved minus consent reviews pending).
-    /// </summary>
-    Task<int> GetNotApprovedAndNotSuspendedCountAsync(CancellationToken ct = default);
-
     Task<IReadOnlyList<(Guid ProfileId, Guid UserId, long UpdatedAtTicks)>>
         GetCustomPictureInfoByUserIdsAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
-
-    Task<IReadOnlyList<BirthdayProfileInfo>>
-        GetBirthdayProfilesAsync(int month, CancellationToken ct = default);
-
-    Task<IReadOnlyList<LocationProfileInfo>>
-        GetApprovedProfilesWithLocationAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Single canonical person-search method. Matches <paramref name="query"/>
@@ -189,19 +152,6 @@ public interface IProfileService : IApplicationService, IUserMerge
     // invalidation (FullProfile refresh, nav-badge, notification meter) so the
     // Onboarding orchestrator has no cache responsibilities (§15i goal).
     // ==========================================================================
-
-    /// <summary>
-    /// Returns the review queue (profiles that are not approved and not
-    /// rejected), ordered by creation time ascending. Used by the onboarding
-    /// review queue for Consent Coordinators.
-    /// </summary>
-    Task<IReadOnlyList<Profile>> GetReviewableProfilesAsync(CancellationToken ct = default);
-
-    /// <summary>
-    /// Returns the count of profiles in the review queue (not approved, not
-    /// rejected). Used by the nav badge for Consent Coordinators.
-    /// </summary>
-    Task<int> GetPendingReviewCountAsync(CancellationToken ct = default);
 
     /// <summary>
     /// Records a reviewer's consent-check decision. <paramref name="result"/>

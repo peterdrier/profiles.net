@@ -1,7 +1,7 @@
 using AwesomeAssertions;
+using Humans.Application;
 using Humans.Application.Configuration;
 using Humans.Application.Interfaces.Camps;
-using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.CityPlanning;
@@ -25,7 +25,6 @@ public class CityPlanningServiceTests : IDisposable
     private readonly FakeClock _clock;
     private readonly ICampService _campService;
     private readonly ITeamService _teamService;
-    private readonly IProfileService _profileService;
     private readonly IUserService _userService;
     private readonly CityPlanningService _sut;
     private readonly CityPlanningOptions _options = new() { CityPlanningTeamSlug = "city-planning" };
@@ -39,13 +38,30 @@ public class CityPlanningServiceTests : IDisposable
         _clock = new FakeClock(Instant.FromUtc(2026, 3, 15, 12, 0, 0));
         _campService = Substitute.For<ICampService>();
         _teamService = Substitute.For<ITeamService>();
-        _profileService = Substitute.For<IProfileService>();
         _userService = Substitute.For<IUserService>();
         var repo = new CityPlanningRepository(new TestDbContextFactory(dbOptions));
         _sut = new CityPlanningService(
             repo, _clock, Options.Create(_options),
-            _campService, _teamService, _profileService, _userService);
+            _campService, _teamService, _userService);
     }
+
+    private static UserInfo WrapInUserInfo(Profile profile) => UserInfo.Create(
+        user: new User
+        {
+            Id = profile.UserId,
+            DisplayName = profile.BurnerName ?? "",
+            PreferredLanguage = "en",
+            CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
+            GoogleEmailStatus = GoogleEmailStatus.Unknown,
+        },
+        userEmails: Array.Empty<UserEmail>(),
+        eventParticipations: Array.Empty<EventParticipation>(),
+        externalLogins: Array.Empty<(string, string)>(),
+        profile: profile,
+        contactFields: Array.Empty<ContactField>(),
+        profileLanguages: Array.Empty<ProfileLanguage>(),
+        volunteerHistory: Array.Empty<VolunteerHistoryEntry>(),
+        communicationPreferences: Array.Empty<CommunicationPreference>());
 
     public void Dispose()
     {
@@ -324,6 +340,7 @@ public class CityPlanningServiceTests : IDisposable
     {
         var season2026Id = Guid.NewGuid();
         var season2027Id = Guid.NewGuid();
+        var camp2026Id = Guid.NewGuid();
         var userId = NewUserId();
 
         await _sut.SaveCampPolygonAsync(season2026Id, """{"type":"Feature"}""", 100, userId);
@@ -332,13 +349,14 @@ public class CityPlanningServiceTests : IDisposable
         _campService.GetCampSeasonDisplayDataForYearAsync(2026, Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, CampSeasonDisplayData>
             {
-                [season2026Id] = new("Test Camp 2026", "test-camp", null, null)
+                [season2026Id] = new("Test Camp 2026", "test-camp", null, null, camp2026Id)
             });
 
         var result = await _sut.GetCampPolygonsAsync(2026);
 
         result.Should().HaveCount(1);
         result[0].CampSeasonId.Should().Be(season2026Id);
+        result[0].CampId.Should().Be(camp2026Id);
     }
 
     [HumansFact]
@@ -353,8 +371,8 @@ public class CityPlanningServiceTests : IDisposable
         _campService.GetCampSeasonDisplayDataForYearAsync(2026, Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, CampSeasonDisplayData>
             {
-                [seasonWithId] = new("Camp With", "camp-with", null, null),
-                [seasonWithoutId] = new("Camp Without", "camp-without", null, null)
+                [seasonWithId] = new("Camp With", "camp-with", null, null, Guid.NewGuid()),
+                [seasonWithoutId] = new("Camp Without", "camp-without", null, null, Guid.NewGuid())
             });
 
         var result = await _sut.GetCampSeasonsWithoutCampPolygonAsync(2026);
@@ -375,7 +393,7 @@ public class CityPlanningServiceTests : IDisposable
         _campService.GetCampSeasonDisplayDataForYearAsync(2026, Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, CampSeasonDisplayData>
             {
-                [campSeasonId] = new("Test Camp", "test-camp", null, null)
+                [campSeasonId] = new("Test Camp", "test-camp", null, null, Guid.NewGuid())
             });
 
         var result = await _sut.ExportAsGeoJsonAsync(2026);
@@ -439,6 +457,7 @@ public class CityPlanningServiceTests : IDisposable
     public async Task GetCampPolygonsAsync_IncludesSoundZone_WhenSet()
     {
         var campSeasonId = Guid.NewGuid();
+        var campId = Guid.NewGuid();
         var userId = NewUserId();
         const string geoJson = """{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[]]}}""";
         await _sut.SaveCampPolygonAsync(campSeasonId, geoJson, 100.0, userId);
@@ -446,7 +465,7 @@ public class CityPlanningServiceTests : IDisposable
         _campService.GetCampSeasonDisplayDataForYearAsync(2026, Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, CampSeasonDisplayData>
             {
-                [campSeasonId] = new("Test Camp", "test-camp", SoundZone.Blue, null)
+                [campSeasonId] = new("Test Camp", "test-camp", SoundZone.Blue, null, campId)
             });
 
         var polygons = await _sut.GetCampPolygonsAsync(2026);
@@ -458,6 +477,7 @@ public class CityPlanningServiceTests : IDisposable
     public async Task GetCampPolygonsAsync_SoundZoneIsNull_WhenNotSet()
     {
         var campSeasonId = Guid.NewGuid();
+        var campId = Guid.NewGuid();
         var userId = NewUserId();
         const string geoJson = """{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[]]}}""";
         await _sut.SaveCampPolygonAsync(campSeasonId, geoJson, 100.0, userId);
@@ -465,7 +485,7 @@ public class CityPlanningServiceTests : IDisposable
         _campService.GetCampSeasonDisplayDataForYearAsync(2026, Arg.Any<CancellationToken>())
             .Returns(new Dictionary<Guid, CampSeasonDisplayData>
             {
-                [campSeasonId] = new("Test Camp", "test-camp", null, null)
+                [campSeasonId] = new("Test Camp", "test-camp", null, null, campId)
             });
 
         var polygons = await _sut.GetCampPolygonsAsync(2026);
@@ -541,8 +561,8 @@ public class CityPlanningServiceTests : IDisposable
     public async Task GetUserDisplayNameAsync_ReturnsProfileBurnerName()
     {
         var userId = Guid.NewGuid();
-        _profileService.GetProfileAsync(userId, Arg.Any<CancellationToken>())
-            .Returns(new Profile { UserId = userId, BurnerName = "Burner Name" });
+        _userService.GetUserInfoAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(WrapInUserInfo(new Profile { UserId = userId, BurnerName = "Burner Name" }));
 
         var result = await _sut.GetUserDisplayNameAsync(userId);
 
@@ -553,8 +573,8 @@ public class CityPlanningServiceTests : IDisposable
     public async Task GetUserDisplayNameAsync_ReturnsNull_WhenNoProfile()
     {
         var userId = Guid.NewGuid();
-        _profileService.GetProfileAsync(userId, Arg.Any<CancellationToken>())
-            .Returns((Profile?)null);
+        _userService.GetUserInfoAsync(userId, Arg.Any<CancellationToken>())
+            .Returns((UserInfo?)null);
 
         var result = await _sut.GetUserDisplayNameAsync(userId);
 

@@ -13,6 +13,7 @@ Atomic rules. Fetch the body when the description's trigger matches your task. S
 - [`caching-transparent`](architecture/caching-transparent.md) — no `Cached*` types in domain surface; `Full<Section>` is the §15 stitched-DTO pattern
 - [`consent-record-immutable`](architecture/consent-record-immutable.md) — `consent_records` table: DB triggers block UPDATE/DELETE, INSERT only
 - [`db-enforcement-minimal`](architecture/db-enforcement-minimal.md) — service is the contract, not the DB; only audit-log immutability is doctrinal
+- [`derived-predicates-on-userinfo`](architecture/derived-predicates-on-userinfo.md) — derived user/profile predicates (IsActive, IsStub, NeedsConsentReview, HasRequiredIdentityFields, etc.) live on `UserInfo`, NOT on `ProfileInfo`. UserInfo is the canonical read surface; ProfileInfo stays a flat field projection.
 - [`display-sort-in-controllers`](architecture/display-sort-in-controllers.md) — display ordering belongs at the presentation layer (controllers / views / view-model assembly), not in services or repositories; repo-layer `OrderBy` allowed only for pagination tie-breakers, top-N, identity-ordered streams (mark with `// arch:db-sort-ok`)
 - [`interface-method-additions-are-debt`](architecture/interface-method-additions-are-debt.md) — every method added to any interface is durable tech debt; default is REUSE, not add. Audit existing methods first; inline a LINQ chain on a list-returning method when picking a field. STOP and ask Peter before adding to any interface, budgeted or not.
 - [`iuserservice-onestop-userinfo`](architecture/iuserservice-onestop-userinfo.md) — long-term direction: `IUserService` is the one-stop-shop for every field in `UserInfo` — reads AND writes. New callers prefer it; sibling services (`IProfileService`, `IUserEmailService`, `ICommunicationPreferenceService`) drain into it opportunistically.
@@ -61,15 +62,18 @@ Atomic rules. Fetch the body when the description's trigger matches your task. S
 - [`no-extensions-for-owned-classes`](code/no-extensions-for-owned-classes.md) — methods/properties go on owned classes; extensions only for BCL/NuGet types
 - [`no-hallucinated-content`](code/no-hallucinated-content.md) — never hardcode invented copy (benefits, policies, pricing); wire to admin-editable fields or ask
 - [`no-magic-strings`](code/no-magic-strings.md) — `nameof()`/constants/enums for code-identifier strings (`RedirectToAction`, role names, audit entity types)
+- [`no-paving-obsolete-fields`](code/no-paving-obsolete-fields.md) — when migrating a read/write, switch to the canonical replacement; never carry the obsolete field/predicate into new code. `Profile.IsSuspended` → `State == Suspended`; `HasRequiredIdentityFields()` → `State == Stub`.
 - [`no-remove-unused-properties`](code/no-remove-unused-properties.md) — properties may be reflection-bound (serialization, change tracking); verify before removing
 - [`no-rename-serialized-fields`](code/no-rename-serialized-fields.md) — never rename properties on JSON-serialized classes; existing data expects current names
 - [`no-system-subfolder`](code/no-system-subfolder.md) — never create `System/` subfolder; shadows BCL `System`. Use `SystemSettings/`/`Platform/`/`Infra/`.
 - [`nodatime-for-dates`](code/nodatime-for-dates.md) — `Instant`/`LocalDate`/`ZonedDateTime` not `DateTime`; server-side ALWAYS UTC
 - [`profiles-section-plural`](code/profiles-section-plural.md) — `Humans.*.Services.Profiles` (plural); singular collides with the `Profile` entity
+- [`razor-script-src-at-escape`](code/razor-script-src-at-escape.md) — in `<script src>` URLs, use `&#64;` for npm scopes (`@turf` etc.); `@@` gets mangled because `NonceTagHelper` claims every `<script>`
 - [`sanitized-markdown-rendering`](code/sanitized-markdown-rendering.md) — `@Html.SanitizedMarkdown(...)`; no inline `HtmlSanitizer`/`Markdig.Markdown.ToHtml`
 - [`search-endpoint-response-shape`](code/search-endpoint-response-shape.md) — search/autocomplete endpoints return typed DTOs/records, not anonymous objects
 - [`string-comparisons-explicit`](code/string-comparisons-explicit.md) — `StringComparison.Ordinal`/`OrdinalIgnoreCase`; user search uses shared `Humans.Web.Extensions` helpers
 - [`stripe-restricted-keys`](code/stripe-restricted-keys.md) — HARD RULE. Production Stripe env vars hold `rk_live_*` RAKs with minimum scopes; never `sk_live_*`. Test mode `sk_test_*` is fine for dev.
+- [`surface-budget-history-trim`](code/surface-budget-history-trim.md) — when bumping `[SurfaceBudget(N)]`, keep ONLY the 3 newest history bullets above the interface; each ≤50 tokens. Older entries dropped (git log is the long-term record).
 - [`time-parsing-standardization`](code/time-parsing-standardization.md) — `TryParseInvariantTimeOnly`/`TryParseInvariantLocalTime` from `TimeParsingExtensions`
 - [`update-source-attribution`](code/update-source-attribution.md) — `CommunicationPreference.UpdateSource` must reflect actor (signed-in/anon) + channel; don't conflate `Guest` (session) with `MagicLink` (token)
 - [`view-components-vs-partials`](code/view-components-vs-partials.md) — View Component when it fetches its own data; Partial View when parent already has the model

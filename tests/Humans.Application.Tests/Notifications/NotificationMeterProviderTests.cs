@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AwesomeAssertions;
+using Humans.Application;
 using Humans.Application.Interfaces.Camps;
 using Humans.Application.Interfaces.GoogleIntegration;
 using Humans.Application.Interfaces.Governance;
@@ -8,8 +9,11 @@ using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Tickets;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Constants;
+using Humans.Domain.Entities;
+using Humans.Domain.Enums;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
+using NodaTime;
 using NSubstitute;
 using Xunit;
 using NotificationMeterProvider = Humans.Application.Services.Notifications.NotificationMeterProvider;
@@ -50,11 +54,9 @@ public class NotificationMeterProviderTests : IDisposable
     }
 
     [HumansFact]
-    public async Task GetMetersForUserAsync_Board_OnboardingMeterExcludesConsentReviewItems()
+    public async Task GetMetersForUserAsync_Board_SeesOnboardingMeterMatchingNeedsConsentReview()
     {
-        // consentReviewsPending = 1, totalNotApproved = 2 → onboardingPending = 1
-        _profileService.GetConsentReviewPendingCountAsync(Arg.Any<CancellationToken>()).Returns(1);
-        _profileService.GetNotApprovedAndNotSuspendedCountAsync(Arg.Any<CancellationToken>()).Returns(2);
+        _userService.GetAllUserInfos().Returns(MakeNeedsConsentReview(1));
         _userService.GetAllUsersAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<Humans.Domain.Entities.User>)Array.Empty<Humans.Domain.Entities.User>());
         _googleSyncService.GetFailedSyncEventCountAsync(Arg.Any<CancellationToken>()).Returns(0);
@@ -73,8 +75,7 @@ public class NotificationMeterProviderTests : IDisposable
     [HumansFact]
     public async Task GetMetersForUserAsync_VolunteerCoordinator_SeesOnboardingMeter()
     {
-        _profileService.GetConsentReviewPendingCountAsync(Arg.Any<CancellationToken>()).Returns(0);
-        _profileService.GetNotApprovedAndNotSuspendedCountAsync(Arg.Any<CancellationToken>()).Returns(1);
+        _userService.GetAllUserInfos().Returns(MakeNeedsConsentReview(1));
         _userService.GetAllUsersAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<Humans.Domain.Entities.User>)Array.Empty<Humans.Domain.Entities.User>());
         _googleSyncService.GetFailedSyncEventCountAsync(Arg.Any<CancellationToken>()).Returns(0);
@@ -91,8 +92,7 @@ public class NotificationMeterProviderTests : IDisposable
     [HumansFact]
     public async Task GetMetersForUserAsync_ConsentCoordinator_SeesConsentReviewsPending()
     {
-        _profileService.GetConsentReviewPendingCountAsync(Arg.Any<CancellationToken>()).Returns(3);
-        _profileService.GetNotApprovedAndNotSuspendedCountAsync(Arg.Any<CancellationToken>()).Returns(3);
+        _userService.GetAllUserInfos().Returns(MakeNeedsConsentReview(3));
         _userService.GetAllUsersAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<Humans.Domain.Entities.User>)Array.Empty<Humans.Domain.Entities.User>());
         _googleSyncService.GetFailedSyncEventCountAsync(Arg.Any<CancellationToken>()).Returns(0);
@@ -109,8 +109,7 @@ public class NotificationMeterProviderTests : IDisposable
     [HumansFact]
     public async Task GetMetersForUserAsync_Admin_SeesFailedSyncAndDeletionsAndTeamsAndTicketError()
     {
-        _profileService.GetConsentReviewPendingCountAsync(Arg.Any<CancellationToken>()).Returns(0);
-        _profileService.GetNotApprovedAndNotSuspendedCountAsync(Arg.Any<CancellationToken>()).Returns(0);
+        _userService.GetAllUserInfos().Returns(Array.Empty<UserInfo>());
         _userService.GetAllUsersAsync(Arg.Any<CancellationToken>()).Returns((IReadOnlyList<Humans.Domain.Entities.User>)new[]
         {
             new Humans.Domain.Entities.User { Id = Guid.NewGuid(), DeletionRequestedAt = NodaTime.Instant.FromUtc(2026, 4, 1, 0, 0) },
@@ -133,8 +132,7 @@ public class NotificationMeterProviderTests : IDisposable
     {
         var boardUserId = Guid.NewGuid();
 
-        _profileService.GetConsentReviewPendingCountAsync(Arg.Any<CancellationToken>()).Returns(0);
-        _profileService.GetNotApprovedAndNotSuspendedCountAsync(Arg.Any<CancellationToken>()).Returns(0);
+        _userService.GetAllUserInfos().Returns(Array.Empty<UserInfo>());
         _userService.GetAllUsersAsync(Arg.Any<CancellationToken>())
             .Returns((IReadOnlyList<Humans.Domain.Entities.User>)Array.Empty<Humans.Domain.Entities.User>());
         _googleSyncService.GetFailedSyncEventCountAsync(Arg.Any<CancellationToken>()).Returns(0);
@@ -164,4 +162,39 @@ public class NotificationMeterProviderTests : IDisposable
         var identity = new ClaimsIdentity(claims, authenticationType: "Test");
         return new ClaimsPrincipal(identity);
     }
+
+    private static IReadOnlyCollection<UserInfo> MakeNeedsConsentReview(int count) =>
+        Enumerable.Range(0, count).Select(_ =>
+        {
+            var userId = Guid.NewGuid();
+            return UserInfo.Create(
+                user: new User
+                {
+                    Id = userId,
+                    DisplayName = "U",
+                    PreferredLanguage = "en",
+                    CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
+                    GoogleEmailStatus = GoogleEmailStatus.Unknown,
+                },
+                userEmails: Array.Empty<UserEmail>(),
+                eventParticipations: Array.Empty<EventParticipation>(),
+                externalLogins: Array.Empty<(string, string)>(),
+                profile: new Profile
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = userId,
+                    BurnerName = "B",
+                    FirstName = "F",
+                    LastName = "L",
+                    State = ProfileState.Active,
+                    IsApproved = false,
+                    RejectedAt = null,
+                    CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
+                    UpdatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
+                },
+                contactFields: Array.Empty<ContactField>(),
+                profileLanguages: Array.Empty<ProfileLanguage>(),
+                volunteerHistory: Array.Empty<VolunteerHistoryEntry>(),
+                communicationPreferences: Array.Empty<CommunicationPreference>());
+        }).ToList();
 }
