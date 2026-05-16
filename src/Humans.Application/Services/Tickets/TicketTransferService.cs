@@ -198,7 +198,7 @@ public sealed class TicketTransferService : ITicketTransferService
             ReceiverUserId = dto.ReceiverUserId,
             ReceiverLegalName = receiverLegalName,
             ReceiverEmail = receiverEmail,
-            SenderReason = dto.Reason ?? string.Empty,
+            SenderReason = dto.Reason,
             Status = TicketTransferStatus.Pending,
             VendorResult = TicketTransferVendorResult.NotAttempted,
             RequestedAt = now,

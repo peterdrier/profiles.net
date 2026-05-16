@@ -332,6 +332,6 @@ public class EventsArchitectureTests
             .Cast<RouteAttribute>()
             .Single();
 
-        return route.Template ?? string.Empty;
+        return route.Template;
     }
 }

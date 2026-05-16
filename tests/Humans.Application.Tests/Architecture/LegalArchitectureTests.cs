@@ -107,6 +107,6 @@ public class LegalArchitectureTests
             .Cast<RouteAttribute>()
             .Single();
 
-        return route.Template ?? string.Empty;
+        return route.Template;
     }
 }

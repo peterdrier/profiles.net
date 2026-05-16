@@ -88,10 +88,10 @@ public class TeamConfiguration : IEntityTypeConfiguration<Team>
             .HasConversion(
                 v => v == null ? null : JsonSerializer.Serialize(v, JsonEnumOptions),
                 v => v == null ? null : JsonSerializer.Deserialize<List<CallToAction>>(v, JsonEnumOptions),
-                new ValueComparer<List<CallToAction>>(
+                new ValueComparer<List<CallToAction>?>(
                     (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
                     v => v == null ? 0 : v.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.Text, item.Url, item.Style)),
-                    v => v == null ? null! : v.Select(c => new CallToAction { Text = c.Text, Url = c.Url, Style = c.Style }).ToList()));
+                    v => v == null ? null : v.Select(c => new CallToAction { Text = c.Text, Url = c.Url, Style = c.Style }).ToList()));
 
         builder.Property(t => t.ParentTeamId);
 
