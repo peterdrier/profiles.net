@@ -32,37 +32,6 @@ public class TicketDashboardViewModel
     public bool IsConfigured { get; set; }
 
     public int WhoHasntBoughtCount { get; set; }
-
-    // Set membership across UserInfo cache for the Venn + UpSet diagrams.
-    // Three subsets: Profile (IsActive), Ticket (active event year),
-    // Shift (active signup in active event). Each user falls into exactly
-    // one of the eight (P, T, S) buckets.
-    public UserSetMembership? SetMembership { get; set; }
-}
-
-/// <summary>
-/// User-set bucketing for the Tickets dashboard Venn + UpSet diagrams. The
-/// cached <c>UserInfo</c> set is the universe; <c>Profile</c>, <c>Ticket</c>,
-/// and <c>Shift</c> are three subsets over it. Each user falls into exactly
-/// one of the eight disjoint buckets defined here.
-/// </summary>
-public sealed record UserSetMembership(
-    int None,            // !P && !T && !S
-    int ProfileOnly,     //  P && !T && !S
-    int TicketOnly,      // !P &&  T && !S
-    int ShiftOnly,       // !P && !T &&  S
-    int ProfileTicket,   //  P &&  T && !S
-    int ProfileShift,    //  P && !T &&  S
-    int TicketShift,     // !P &&  T &&  S
-    int All)             //  P &&  T &&  S
-{
-    public int TotalUsers =>
-        None + ProfileOnly + TicketOnly + ShiftOnly
-        + ProfileTicket + ProfileShift + TicketShift + All;
-
-    public int ProfilesCount => ProfileOnly + ProfileTicket + ProfileShift + All;
-    public int TicketsCount => TicketOnly + ProfileTicket + TicketShift + All;
-    public int ShiftsCount => ShiftOnly + ProfileShift + TicketShift + All;
 }
 
 public class PaymentMethodFeeBreakdown
@@ -94,12 +63,8 @@ public class TicketOrderSummary
     public TicketPaymentStatus PaymentStatus { get; set; }
 }
 
-public class TicketOrdersViewModel : PagedListViewModel
+public class TicketOrdersViewModel() : PagedListViewModel(25)
 {
-    public TicketOrdersViewModel() : base(25)
-    {
-    }
-
     public List<TicketOrderRow> Orders { get; set; } = [];
     public string? Search { get; set; }
     public string SortBy { get; set; } = "date";
@@ -134,12 +99,8 @@ public class TicketOrderRow
     public string? MatchedUserName { get; set; }
 }
 
-public class TicketAttendeesViewModel : PagedListViewModel
+public class TicketAttendeesViewModel() : PagedListViewModel(25)
 {
-    public TicketAttendeesViewModel() : base(25)
-    {
-    }
-
     public List<TicketAttendeeRow> Attendees { get; set; } = [];
     public string? Search { get; set; }
     public string SortBy { get; set; } = "name";
@@ -233,12 +194,8 @@ public class QuarterlySalesRow
     public decimal VipDonations { get; set; }
 }
 
-public class WhoHasntBoughtViewModel : PagedListViewModel
+public class WhoHasntBoughtViewModel() : PagedListViewModel(25)
 {
-    public WhoHasntBoughtViewModel() : base(25)
-    {
-    }
-
     public List<WhoHasntBoughtRow> Humans { get; set; } = [];
     public string? Search { get; set; }
     public string? FilterTeam { get; set; }

@@ -18,22 +18,9 @@ namespace Humans.Web.Controllers;
 [ApiController]
 [Route("api/issues")]
 [ServiceFilter(typeof(IssuesApiKeyAuthFilter))]
-public class IssuesApiController : ControllerBase
+public class IssuesApiController(IIssuesService issues, IUserService users, ILogger<IssuesApiController> logger)
+    : ControllerBase
 {
-    private readonly IIssuesService _issues;
-    private readonly IUserService _users;
-    private readonly ILogger<IssuesApiController> _logger;
-
-    public IssuesApiController(
-        IIssuesService issues,
-        IUserService users,
-        ILogger<IssuesApiController> logger)
-    {
-        _issues = issues;
-        _users = users;
-        _logger = logger;
-    }
-
     [HttpGet]
     public async Task<IActionResult> List(
         [FromQuery] IssueStatus? status,
@@ -53,25 +40,25 @@ public class IssuesApiController : ControllerBase
             SearchText: string.IsNullOrWhiteSpace(search) ? null : search,
             Limit: limit);
 
-        var issues = await _issues.GetIssueListAsync(
+        var issues1 = await issues.GetIssueListAsync(
             filter,
             viewerUserId: Guid.Empty,
             viewerRoles: [],
             viewerIsAdmin: true);
 
-        return Ok(issues.Select(MapList));
+        return Ok(issues1.Select(MapList));
     }
 
     [HttpGet("{id}")]
     public async Task<IActionResult> Get(Guid id)
     {
-        var issue = await _issues.GetIssueByIdAsync(id);
+        var issue = await issues.GetIssueByIdAsync(id);
         if (issue is null) return NotFound();
 
-        var thread = await _issues.GetThreadAsync(id);
+        var thread = await issues.GetThreadAsync(id);
         // ReporterEmail sourced from UserInfo (not User.Email) — keeps shape parity with the list endpoint. See PR 618.
-        var reporter = await _users.GetUserInfoAsync(issue.ReporterUserId);
-        return Ok(MapDetail(issue, thread, reporter));
+        var displayUsers = await GetIssueDisplayUsersAsync(issue);
+        return Ok(MapDetail(issue, thread, displayUsers));
     }
 
     [HttpPost]
@@ -82,7 +69,7 @@ public class IssuesApiController : ControllerBase
 
         try
         {
-            var issue = await _issues.SubmitIssueAsync(
+            var issue = await issues.SubmitIssueAsync(
                 reporterUserId: model.ReporterUserId,
                 category: model.Category,
                 title: model.Title,
@@ -94,12 +81,12 @@ public class IssuesApiController : ControllerBase
                 screenshot: null,
                 dueDate: model.DueDate);
 
-            _logger.LogInformation("Issue {IssueId} created via API for reporter {ReporterId}", issue.Id, model.ReporterUserId);
+            logger.LogInformation("Issue {IssueId} created via API for reporter {ReporterId}", issue.Id, model.ReporterUserId);
             return Ok(new { id = issue.Id });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create issue via API for reporter {ReporterId}", model.ReporterUserId);
+            logger.LogError(ex, "Failed to create issue via API for reporter {ReporterId}", model.ReporterUserId);
             return StatusCode(500, new { error = "Failed to create issue" });
         }
     }
@@ -107,10 +94,10 @@ public class IssuesApiController : ControllerBase
     [HttpGet("{id}/comments")]
     public async Task<IActionResult> GetComments(Guid id)
     {
-        var issue = await _issues.GetIssueByIdAsync(id);
+        var issue = await issues.GetIssueByIdAsync(id);
         if (issue is null) return NotFound();
 
-        var thread = await _issues.GetThreadAsync(id);
+        var thread = await issues.GetThreadAsync(id);
         var comments = thread.OfType<IssueCommentEvent>().Select(c => new
         {
             CommentId = c.CommentId,
@@ -132,13 +119,13 @@ public class IssuesApiController : ControllerBase
 
         try
         {
-            var comment = await _issues.PostCommentAsync(
+            var comment = await issues.PostCommentAsync(
                 issueId: id,
                 senderUserId: null,
                 content: model.Content,
                 senderIsReporter: false);
 
-            _logger.LogInformation("Comment {CommentId} posted on issue {IssueId} via API", comment.Id, id);
+            logger.LogInformation("Comment {CommentId} posted on issue {IssueId} via API", comment.Id, id);
             return Ok(new
             {
                 comment.Id,
@@ -149,12 +136,12 @@ public class IssuesApiController : ControllerBase
         catch (InvalidOperationException)
         {
             // 404 on missing — log Warning per always-log-problems.
-            _logger.LogWarning("Issue {IssueId} not found during API PostComment", id);
+            logger.LogWarning("Issue {IssueId} not found during API PostComment", id);
             return NotFound();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to post comment on issue {IssueId}", id);
+            logger.LogError(ex, "Failed to post comment on issue {IssueId}", id);
             return StatusCode(500, new { error = "Failed to post comment" });
         }
     }
@@ -164,19 +151,19 @@ public class IssuesApiController : ControllerBase
     {
         try
         {
-            await _issues.UpdateStatusAsync(id, model.Status, actorUserId: null);
-            _logger.LogInformation("Issue {IssueId} status changed to {Status} via API", id, model.Status);
+            await issues.UpdateStatusAsync(id, model.Status, actorUserId: null);
+            logger.LogInformation("Issue {IssueId} status changed to {Status} via API", id, model.Status);
             return Ok(new { success = true });
         }
         catch (InvalidOperationException)
         {
             // 404 on missing — log Warning per always-log-problems.
-            _logger.LogWarning("Issue {IssueId} not found during API UpdateStatus", id);
+            logger.LogWarning("Issue {IssueId} not found during API UpdateStatus", id);
             return NotFound();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update issue {IssueId} status", id);
+            logger.LogError(ex, "Failed to update issue {IssueId} status", id);
             return StatusCode(500, new { error = "Failed to update status" });
         }
     }
@@ -186,18 +173,18 @@ public class IssuesApiController : ControllerBase
     {
         try
         {
-            await _issues.UpdateAssigneeAsync(id, model.AssigneeUserId, actorUserId: null);
+            await issues.UpdateAssigneeAsync(id, model.AssigneeUserId, actorUserId: null);
             return Ok(new { success = true });
         }
         catch (InvalidOperationException)
         {
             // 404 on missing — log Warning per always-log-problems.
-            _logger.LogWarning("Issue {IssueId} not found during API UpdateAssignee", id);
+            logger.LogWarning("Issue {IssueId} not found during API UpdateAssignee", id);
             return NotFound();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update assignee on issue {IssueId}", id);
+            logger.LogError(ex, "Failed to update assignee on issue {IssueId}", id);
             return StatusCode(500, new { error = "Failed to update assignee" });
         }
     }
@@ -207,24 +194,24 @@ public class IssuesApiController : ControllerBase
     {
         try
         {
-            await _issues.UpdateSectionAsync(id, model.Section, actorUserId: null);
+            await issues.UpdateSectionAsync(id, model.Section, actorUserId: null);
             return Ok(new { success = true });
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
         {
             // 404 on missing — log Warning per always-log-problems.
-            _logger.LogWarning("Issue {IssueId} not found during API UpdateSection: {Reason}", id, ex.Message);
+            logger.LogWarning("Issue {IssueId} not found during API UpdateSection: {Reason}", id, ex.Message);
             return NotFound();
         }
         catch (InvalidOperationException ex)
         {
             // State-machine violation (terminal status) → 422.
-            _logger.LogWarning("Issue {IssueId} API UpdateSection rejected: {Reason}", id, ex.Message);
+            logger.LogWarning("Issue {IssueId} API UpdateSection rejected: {Reason}", id, ex.Message);
             return UnprocessableEntity(new { error = ex.Message });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to update section on issue {IssueId}", id);
+            logger.LogError(ex, "Failed to update section on issue {IssueId}", id);
             return StatusCode(500, new { error = "Failed to update section" });
         }
     }
@@ -234,23 +221,23 @@ public class IssuesApiController : ControllerBase
     {
         try
         {
-            await _issues.SetGitHubIssueNumberAsync(id, model.GitHubIssueNumber, actorUserId: null);
+            await issues.SetGitHubIssueNumberAsync(id, model.GitHubIssueNumber, actorUserId: null);
             return Ok(new { success = true });
         }
         catch (InvalidOperationException)
         {
             // 404 on missing — log Warning per always-log-problems.
-            _logger.LogWarning("Issue {IssueId} not found during API SetGitHubIssue", id);
+            logger.LogWarning("Issue {IssueId} not found during API SetGitHubIssue", id);
             return NotFound();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to set GitHub issue number on issue {IssueId}", id);
+            logger.LogError(ex, "Failed to set GitHub issue number on issue {IssueId}", id);
             return StatusCode(500, new { error = "Failed to set GitHub issue" });
         }
     }
 
-    private static object MapList(Issue i, UserInfo? reporter = null) => new
+    private static object MapList(Issue i, IReadOnlyDictionary<Guid, UserInfo>? displayUsers = null) => new
     {
         i.Id,
         Status = i.Status.ToString(),
@@ -261,13 +248,15 @@ public class IssuesApiController : ControllerBase
         i.PageUrl,
         i.UserAgent,
         i.AdditionalContext,
-        ReporterName = reporter?.BurnerName ?? i.Reporter?.DisplayName,
+        ReporterName = displayUsers?.GetValueOrDefault(i.ReporterUserId)?.BurnerName,
         // ReporterEmail from UserInfo (not User.Email) for shape parity with list endpoint.
-        ReporterEmail = reporter?.Email,
+        ReporterEmail = displayUsers?.GetValueOrDefault(i.ReporterUserId)?.Email,
         ReporterUserId = i.ReporterUserId,
-        ReporterLanguage = i.Reporter?.PreferredLanguage,
+        ReporterLanguage = displayUsers?.GetValueOrDefault(i.ReporterUserId)?.PreferredLanguage,
         AssigneeUserId = i.AssigneeUserId,
-        AssigneeName = i.Assignee?.DisplayName,
+        AssigneeName = i.AssigneeUserId is { } assigneeId
+            ? displayUsers?.GetValueOrDefault(assigneeId)?.BurnerName
+            : null,
         i.GitHubIssueNumber,
         i.DueDate,
         ScreenshotUrl = i.ScreenshotStoragePath is not null ? $"/{i.ScreenshotStoragePath}" : null,
@@ -303,32 +292,44 @@ public class IssuesApiController : ControllerBase
         i.CommentCount
     };
 
-    private static object MapDetail(Issue i, IReadOnlyList<IssueThreadEvent> thread, UserInfo? reporter) => new
-    {
-        issue = MapList(i, reporter),
-        thread = thread.Select(e => e switch
+    private static object MapDetail(
+        Issue i,
+        IReadOnlyList<IssueThreadEvent> thread,
+        IReadOnlyDictionary<Guid, UserInfo> displayUsers) => new
         {
-            IssueCommentEvent c => (object)new
+            issue = MapList(i, displayUsers),
+            thread = thread.Select(e => e switch
             {
-                type = "comment",
-                at = c.At.ToDateTimeUtc(),
-                actorUserId = c.ActorUserId,
-                actorName = c.ActorDisplayName,
-                actorIsReporter = c.ActorIsReporter,
-                content = c.Content
-            },
-            IssueAuditEvent a => new
-            {
-                type = "audit",
-                at = a.At.ToDateTimeUtc(),
-                actorUserId = a.ActorUserId,
-                actorName = a.ActorDisplayName,
-                action = a.Action.ToString(),
-                description = a.Description
-            },
-            _ => throw new NotSupportedException()
-        })
-    };
+                IssueCommentEvent c => (object)new
+                {
+                    type = "comment",
+                    at = c.At.ToDateTimeUtc(),
+                    actorUserId = c.ActorUserId,
+                    actorName = c.ActorDisplayName,
+                    actorIsReporter = c.ActorIsReporter,
+                    content = c.Content
+                },
+                IssueAuditEvent a => new
+                {
+                    type = "audit",
+                    at = a.At.ToDateTimeUtc(),
+                    actorUserId = a.ActorUserId,
+                    actorName = a.ActorDisplayName,
+                    action = a.Action.ToString(),
+                    description = a.Description
+                },
+                _ => throw new NotSupportedException()
+            })
+        };
+
+    private async Task<IReadOnlyDictionary<Guid, UserInfo>> GetIssueDisplayUsersAsync(Issue issue)
+    {
+        var ids = new HashSet<Guid> { issue.ReporterUserId };
+        if (issue.AssigneeUserId is { } assigneeId) ids.Add(assigneeId);
+        if (issue.ResolvedByUserId is { } resolvedById) ids.Add(resolvedById);
+
+        return await users.GetUserInfosAsync(ids);
+    }
 }
 
 public class ApiCreateIssueModel

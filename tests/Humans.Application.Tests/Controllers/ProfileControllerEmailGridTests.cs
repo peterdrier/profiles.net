@@ -16,7 +16,6 @@ using Humans.Application.Interfaces.Shifts;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Tickets;
 using Humans.Application.Interfaces.Users;
-using Humans.Application;
 using Humans.Application.Tests.Infrastructure;
 using Humans.Domain.Entities;
 using Humans.Web;
@@ -28,7 +27,6 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -52,7 +50,6 @@ public class ProfileControllerEmailGridTests
     private readonly IAuthorizationService _authorizationService = Substitute.For<IAuthorizationService>();
     private readonly IAuditLogService _auditLogService = Substitute.For<IAuditLogService>();
     private readonly IUserService _userService = Substitute.For<IUserService>();
-    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
     private readonly ProfileController _controller;
@@ -101,7 +98,6 @@ public class ProfileControllerEmailGridTests
             Substitute.For<ITeamService>(),
             Substitute.For<ICampaignService>(),
             Substitute.For<IEmailOutboxService>(),
-            _cache,
             new FakeClock(Instant.FromUtc(2026, 4, 30, 12, 0)),
             _authorizationService,
             Substitute.For<IConsentService>(),
@@ -361,8 +357,11 @@ public class ProfileControllerEmailGridTests
                 return $"/Profile/Me/Emails/Verify?userId={routeValues["userId"]}&token={routeValues["token"]}";
             });
 
+        var targetUser = new User { Id = targetUserId, DisplayName = "Target User", PreferredLanguage = "es" };
         _userManager.FindByIdAsync(targetUserId.ToString())
-            .Returns(new User { Id = targetUserId, DisplayName = "Target User", PreferredLanguage = "es" });
+            .Returns(targetUser);
+        _userService.GetUserInfoAsync(targetUserId, Arg.Any<CancellationToken>())
+            .Returns(targetUser.ToUserInfo());
         _userEmailService.AddEmailAsync(targetUserId, newEmail, Arg.Any<CancellationToken>())
             .Returns(new DTOs.AddEmailResult(Guid.NewGuid(), token, IsConflict: false));
 

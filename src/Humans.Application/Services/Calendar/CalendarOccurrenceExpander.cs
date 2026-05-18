@@ -159,7 +159,7 @@ public static class CalendarOccurrenceExpander
                 var newStart = ex.OverrideStartUtc.Value;
                 var eventDuration = (ev.EndUtc ?? ev.StartUtc) - ev.StartUtc;
                 var newEnd = ex.OverrideEndUtc
-                    ?? (ev.EndUtc is null ? (Instant?)null : newStart.Plus(eventDuration));
+                    ?? (ev.EndUtc is null ? null : newStart.Plus(eventDuration));
 
                 if (newStart >= to || (newEnd ?? newStart) <= from) continue;
 
@@ -201,7 +201,7 @@ public static class CalendarOccurrenceExpander
     }
 
     /// <summary>Maps domain <c>CalendarEvent</c> (with Exceptions) to the immutable projection.</summary>
-    public static CalendarEventInfo ToInfo(Humans.Domain.Entities.CalendarEvent ev) => new(
+    public static CalendarEventInfo ToInfo(Domain.Entities.CalendarEvent ev) => new(
         Id: ev.Id,
         Title: ev.Title,
         Description: ev.Description,

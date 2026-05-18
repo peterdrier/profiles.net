@@ -1,12 +1,10 @@
 using Humans.Application.Interfaces.Camps;
 using Humans.Application.Interfaces.Events;
 using Humans.Domain.Constants;
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Filters;
 using Humans.Web.Models.Events;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
 using static Humans.Web.Helpers.EventsLookupHelpers;
@@ -18,30 +16,21 @@ namespace Humans.Web.Controllers;
 [Authorize(Roles = RoleGroups.EventsAdminOrAdmin)]
 [Route("Events/Dashboard")]
 [ServiceFilter(typeof(EventsFeatureFilter))]
-public class EventsDashboardController : HumansControllerBase
+public class EventsDashboardController(IEventService guide, ICampService camps, IUserService userService)
+    : HumansControllerBase(userService)
 {
-    private readonly IEventService _guide;
-    private readonly ICampService _camps;
-
-    public EventsDashboardController(IEventService guide, ICampService camps, IUserService userService)
-        : base(userService)
-    {
-        _guide = guide;
-        _camps = camps;
-    }
-
     [HttpGet("")]
     public async Task<IActionResult> Index()
     {
-        var guideSettings = await _guide.GetGuideSettingsAsync();
+        var guideSettings = await guide.GetGuideSettingsAsync();
         var eventSettings = guideSettings != null
-            ? await _guide.GetEventSettingsByIdAsync(guideSettings.EventSettingsId)
+            ? await guide.GetEventSettingsByIdAsync(guideSettings.EventSettingsId)
             : null;
         DateTimeZone? tz = eventSettings != null
             ? DateTimeZoneProviders.Tzdb.GetZoneOrNull(eventSettings.TimeZoneId)
             : null;
 
-        var allEvents = await _guide.GetAllEventsForDashboardAsync();
+        var allEvents = await guide.GetAllEventsForDashboardAsync();
 
         var model = new EventsDashboardViewModel
         {
@@ -82,7 +71,7 @@ public class EventsDashboardController : HumansControllerBase
                 }).ToList();
         }
 
-        var categories = await _guide.GetActiveCategoriesAsync();
+        var categories = await guide.GetActiveCategoriesAsync();
         model.CoverageByCategory = categories.Select(cat =>
         {
             var catEvents = allEvents.Where(e => e.CategoryId == cat.Id).ToList();
@@ -97,7 +86,7 @@ public class EventsDashboardController : HumansControllerBase
         }).ToList();
 
         var campEvents = allEvents.Where(e => e.CampId.HasValue).ToList();
-        var campsById = await LoadCampsByIdAsync(_camps, gateOpeningDate?.Year);
+        var campsById = await LoadCampsByIdAsync(camps, gateOpeningDate?.Year);
         model.TopCamps = campEvents
             .GroupBy(e => e.CampId!.Value)
             .Select(g =>

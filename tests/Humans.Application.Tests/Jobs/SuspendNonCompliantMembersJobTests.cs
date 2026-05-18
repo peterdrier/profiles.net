@@ -7,6 +7,7 @@ using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Infrastructure.Jobs;
 using Humans.Infrastructure.Services;
+using Humans.Application.Interfaces;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Caching;
 using Humans.Application.Interfaces.Email;
@@ -54,9 +55,7 @@ public class SuspendNonCompliantMembersJobTests : IDisposable
         _roleAssignmentClaimsInvalidator = Substitute.For<IRoleAssignmentClaimsCacheInvalidator>();
         _shiftAuthorizationInvalidator = Substitute.For<IShiftAuthorizationInvalidator>();
         _clock = new FakeClock(Now);
-        _metrics = new HumansMetricsService(
-            Substitute.For<IServiceScopeFactory>(),
-            Substitute.For<ILogger<HumansMetricsService>>());
+        _metrics = TestMetrics.Create();
         var logger = Substitute.For<ILogger<SuspendNonCompliantMembersJob>>();
 
         // Default: ITeamService.GetUserTeamsAsync returns empty list so tests
@@ -121,7 +120,7 @@ public class SuspendNonCompliantMembersJobTests : IDisposable
             Arg.Any<IReadOnlyCollection<Guid>>(),
             Arg.Any<Instant>(),
             Arg.Any<CancellationToken>())
-            .Returns((IReadOnlySet<Guid>)new HashSet<Guid>());
+            .Returns(new HashSet<Guid>());
 
         await _job.ExecuteAsync();
 
@@ -143,7 +142,7 @@ public class SuspendNonCompliantMembersJobTests : IDisposable
             Arg.Any<IReadOnlyCollection<Guid>>(),
             Arg.Any<Instant>(),
             Arg.Any<CancellationToken>())
-            .Returns((IReadOnlySet<Guid>)new HashSet<Guid> { userId });
+            .Returns(new HashSet<Guid> { userId });
 
         _userService.GetUserInfosAsync(
             Arg.Any<IReadOnlyCollection<Guid>>(),
@@ -336,6 +335,6 @@ public class SuspendNonCompliantMembersJobTests : IDisposable
             Arg.Any<IReadOnlyCollection<Guid>>(),
             Arg.Any<Instant>(),
             Arg.Any<CancellationToken>())
-            .Returns((IReadOnlySet<Guid>)suspendedIds.ToHashSet());
+            .Returns(suspendedIds.ToHashSet());
     }
 }

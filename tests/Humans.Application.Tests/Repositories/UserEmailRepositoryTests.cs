@@ -30,7 +30,6 @@ public sealed class UserEmailRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     [HumansFact]
@@ -42,7 +41,7 @@ public sealed class UserEmailRepositoryTests : IDisposable
         var rowC = await SeedVerifiedAsync(userId, "c@x.test", isGoogle: false);
 
         var updatedAt = Instant.FromUtc(2026, 4, 30, 12, 0);
-        await _repo.SetGoogleExclusiveAsync(userId, rowB.Id, updatedAt, default);
+        await _repo.SetGoogleExclusiveAsync(userId, rowB.Id, updatedAt, CancellationToken.None);
 
         var reloadedA = await GetByIdAsync(rowA.Id);
         var reloadedB = await GetByIdAsync(rowB.Id);

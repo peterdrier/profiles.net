@@ -104,7 +104,6 @@ public class CampLeadViewModel
 {
     public Guid LeadId { get; set; }
     public Guid UserId { get; set; }
-    public string DisplayName { get; set; } = string.Empty;
 }
 
 // Registration form
@@ -164,7 +163,6 @@ public class CampMemberRowViewModel
 {
     public Guid CampMemberId { get; set; }
     public Guid UserId { get; set; }
-    public string DisplayName { get; set; } = string.Empty;
     public NodaTime.Instant RequestedAt { get; set; }
     public NodaTime.Instant? ConfirmedAt { get; set; }
     public bool IsLead { get; set; }
@@ -231,4 +229,6 @@ public class CampSummaryRowViewModel
     public int EeSlotCount { get; set; }
     /// <summary>Count of Active members with HasEarlyEntry=true for this season.</summary>
     public int EeGrantedCount { get; set; }
+    /// <summary>Count of Active <see cref="Humans.Domain.Entities.CampMember"/> rows for this season (humans who joined in-app).</summary>
+    public int JoinedMemberCount { get; set; }
 }

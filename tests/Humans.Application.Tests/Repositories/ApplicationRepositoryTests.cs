@@ -27,7 +27,6 @@ public sealed class ApplicationRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     [HumansFact]
@@ -47,7 +46,7 @@ public sealed class ApplicationRepositoryTests : IDisposable
         var result = await _repo.GetByIdAsync(app.Id);
 
         result.Should().NotBeNull();
-        result!.BoardVotes.Should().HaveCount(1);
+        result.BoardVotes.Should().HaveCount(1);
         result.StateHistory.Should().NotBeNull();
     }
 

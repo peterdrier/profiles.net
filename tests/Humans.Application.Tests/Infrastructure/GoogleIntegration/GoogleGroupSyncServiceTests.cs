@@ -307,7 +307,7 @@ public sealed class GoogleGroupSyncServiceTests
 
         result.ErrorCount.Should().Be(1);
         await _provisioningClient.DidNotReceiveWithAnyArgs()
-            .LookupGroupIdAsync(default!, default);
+            .LookupGroupIdAsync(null!, CancellationToken.None);
         await _auditLogService.Received(1).LogAsync(
             AuditAction.AnomalousPermissionDetected,
             nameof(GoogleResource),
@@ -341,7 +341,7 @@ public sealed class GoogleGroupSyncServiceTests
 
         diff.MembersToRemove.Should().BeEmpty();
         await _membershipClient.DidNotReceiveWithAnyArgs()
-            .DeleteMembershipAsync(default!, default);
+            .DeleteMembershipAsync(null!, CancellationToken.None);
     }
 
     [HumansFact]
@@ -434,9 +434,9 @@ public sealed class GoogleGroupSyncServiceTests
 
         diff.ErrorMessage.Should().Contain("invalid argument 'roles'");
         await _userService.DidNotReceiveWithAnyArgs()
-            .TrySetGoogleEmailStatusFromSyncAsync(default, default, default);
+            .TrySetGoogleEmailStatusFromSyncAsync(Guid.Empty, default, CancellationToken.None);
         await _userService.DidNotReceiveWithAnyArgs()
-            .GetByEmailOrAlternateAsync(default!, default);
+            .GetByEmailOrAlternateAsync(null!, CancellationToken.None);
         _syncScheduler.Scheduled.Should().ContainSingle();
     }
 
@@ -457,9 +457,9 @@ public sealed class GoogleGroupSyncServiceTests
 
         diff.ErrorMessage.Should().Contain("billing account disabled");
         await _userService.DidNotReceiveWithAnyArgs()
-            .TrySetGoogleEmailStatusFromSyncAsync(default, default, default);
+            .TrySetGoogleEmailStatusFromSyncAsync(Guid.Empty, default, CancellationToken.None);
         await _userService.DidNotReceiveWithAnyArgs()
-            .GetByEmailOrAlternateAsync(default!, default);
+            .GetByEmailOrAlternateAsync(null!, CancellationToken.None);
         _syncScheduler.Scheduled.Should().ContainSingle();
     }
 
@@ -486,7 +486,47 @@ public sealed class GoogleGroupSyncServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(new GroupCreateResult("group-new", null));
         _membershipClient.ListMembershipsAsync("group-new", Arg.Any<CancellationToken>())
-            .Returns(new GroupMembershipListResult(Array.Empty<GroupMembership>(), null));
+            .Returns(new GroupMembershipListResult([], null));
+        _membershipClient.CreateMembershipAsync("group-new", "alice@nobodies.team", Arg.Any<CancellationToken>())
+            .Returns(new GroupMembershipMutationResult(GroupMembershipMutationOutcome.Added, null));
+
+        var diff = await service.ReconcileOneAsync("new-group@nobodies.team", SyncAction.Execute);
+
+        diff.ErrorMessage.Should().BeNull();
+        await _provisioningClient.Received(1).CreateGroupAsync(
+            "new-group@nobodies.team",
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+        await _provisioningClient.Received(2).LookupGroupIdAsync(
+            "new-group@nobodies.team", Arg.Any<CancellationToken>());
+        await _membershipClient.Received(1).CreateMembershipAsync(
+            "group-new", "alice@nobodies.team", Arg.Any<CancellationToken>());
+    }
+
+    [HumansFact]
+    public async Task ReconcileOneAsync_GroupLookup403_AutoProvisionsAndReconciles()
+    {
+        // Cloud Identity sometimes returns HTTP 403 (instead of 404) when the
+        // target group does not exist, because Google won't confirm/deny the
+        // existence of a group the caller can't see. The orchestrator must
+        // treat that as "not found" and attempt auto-provision.
+        var userId = Guid.NewGuid();
+        var service = CreateService(new StaticSource("new-group@nobodies.team", userId));
+        StubUsers((userId, "Alice", "alice@nobodies.team"));
+
+        _provisioningClient.LookupGroupIdAsync("new-group@nobodies.team", Arg.Any<CancellationToken>())
+            .Returns(
+                new GroupLookupIdResult(null, new GoogleClientError(403, "permission denied")),
+                new GroupLookupIdResult("group-new", null));
+        _provisioningClient.CreateGroupAsync(
+                "new-group@nobodies.team",
+                Arg.Any<string>(),
+                Arg.Any<string>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new GroupCreateResult("group-new", null));
+        _membershipClient.ListMembershipsAsync("group-new", Arg.Any<CancellationToken>())
+            .Returns(new GroupMembershipListResult([], null));
         _membershipClient.CreateMembershipAsync("group-new", "alice@nobodies.team", Arg.Any<CancellationToken>())
             .Returns(new GroupMembershipMutationResult(GroupMembershipMutationOutcome.Added, null));
 
@@ -761,27 +801,18 @@ public sealed class GoogleGroupSyncServiceTests
             resource.Url,
             IsActive: resource.IsActive);
 
-    private sealed class StaticSource : IGoogleGroupMembershipSource
+    private sealed class StaticSource(string key, params Guid[] userIds) : IGoogleGroupMembershipSource
     {
-        private readonly string _groupKey;
-        private readonly Guid[] _userIds;
-
-        public StaticSource(string groupKey, params Guid[] userIds)
-        {
-            _groupKey = groupKey;
-            _userIds = userIds;
-        }
-
         public Task<Dictionary<string, Guid[]>> GetExpectedAsync(
             string? groupKey = null,
             CancellationToken ct = default)
         {
-            if (groupKey is not null && !string.Equals(groupKey, _groupKey, StringComparison.OrdinalIgnoreCase))
+            if (groupKey is not null && !string.Equals(groupKey, key, StringComparison.OrdinalIgnoreCase))
                 return Task.FromResult(new Dictionary<string, Guid[]>(StringComparer.OrdinalIgnoreCase));
 
             return Task.FromResult(new Dictionary<string, Guid[]>(StringComparer.OrdinalIgnoreCase)
             {
-                [_groupKey] = _userIds
+                [key] = userIds
             });
         }
     }

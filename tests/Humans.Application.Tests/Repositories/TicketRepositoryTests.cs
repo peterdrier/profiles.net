@@ -37,7 +37,6 @@ public sealed class TicketRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     // ── GetSyncStateAsync / PersistSyncStateAsync ────────────────────────────
@@ -48,7 +47,7 @@ public sealed class TicketRepositoryTests : IDisposable
         var state = await _repo.GetSyncStateAsync();
 
         state.Should().NotBeNull();
-        state!.Id.Should().Be(1);
+        state.Id.Should().Be(1);
         state.SyncStatus.Should().Be(TicketSyncStatus.Idle);
     }
 
@@ -423,7 +422,7 @@ public sealed class TicketRepositoryTests : IDisposable
         var result = await _repo.GetAttendeeByIdAsync(targetId);
 
         result.Should().NotBeNull();
-        result!.VendorTicketId.Should().Be("tkt_1");
+        result.VendorTicketId.Should().Be("tkt_1");
         result.TicketOrder.Should().NotBeNull();
         result.TicketOrder.VendorOrderId.Should().Be("ord_siblings");
     }

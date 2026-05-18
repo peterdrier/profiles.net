@@ -171,7 +171,8 @@ public class AccountProvisioningServiceTests
             throw new NotSupportedException();
         public Task<EventParticipation?> UpsertParticipationAsync(
             Guid userId, int year, ParticipationStatus status,
-            ParticipationSource source, Instant? declaredAt, CancellationToken ct = default) =>
+            ParticipationSource source, Instant? declaredAt, Instant? checkedInAt,
+            CancellationToken ct = default) =>
             throw new NotSupportedException();
         public Task<bool> RemoveParticipationAsync(
             Guid userId, int year, ParticipationSource requiredSource, CancellationToken ct = default) =>
@@ -435,7 +436,7 @@ public class AccountProvisioningServiceTests
         // Verify UserEmail was created
         var userEmail = _userEmailFake.All.FirstOrDefault(ue => ue.UserId == result.User.Id);
         userEmail.Should().NotBeNull();
-        userEmail!.Email.Should().Be("alice@example.com");
+        userEmail.Email.Should().Be("alice@example.com");
         userEmail.IsPrimary.Should().BeTrue();
         userEmail.IsVerified.Should().BeTrue();
     }

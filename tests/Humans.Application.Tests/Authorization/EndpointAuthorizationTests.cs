@@ -233,6 +233,7 @@ public class EndpointAuthorizationTests
             "TeamController.Details",
             "AdminController.DbVersion",
             "ProfileController.VerifyEmail",
+            "ProfileController.Picture",
         };
 
         var controllerTypes = typeof(HumansControllerBase).Assembly.GetTypes()
@@ -308,7 +309,7 @@ public class EndpointAuthorizationTests
 
         attr.Should().NotBeNull(
             $"{controllerType.Name}{(actionName is not null ? "." + actionName : "")} should have [Authorize]");
-        attr!.Policy.Should().Be(expectedPolicy,
+        attr.Policy.Should().Be(expectedPolicy,
             $"{controllerType.Name}{(actionName is not null ? "." + actionName : "")} should have Policy='{expectedPolicy}'");
     }
 
@@ -318,7 +319,7 @@ public class EndpointAuthorizationTests
 
         attr.Should().NotBeNull(
             $"{controllerType.Name}{(actionName is not null ? "." + actionName : "")} should have [Authorize]");
-        attr!.Roles.Should().Be(expectedRoles,
+        attr.Roles.Should().Be(expectedRoles,
             $"{controllerType.Name}{(actionName is not null ? "." + actionName : "")} should have Roles='{expectedRoles}'");
     }
 

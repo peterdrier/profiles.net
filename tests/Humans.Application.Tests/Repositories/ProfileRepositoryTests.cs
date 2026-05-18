@@ -29,7 +29,6 @@ public sealed class ProfileRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     [HumansFact(Timeout = 10000)]
@@ -74,7 +73,7 @@ public sealed class ProfileRepositoryTests : IDisposable
             new(keepId, new LocalDate(2024, 3, 1), "Keep me", "New desc"),
             new(Guid.Empty, new LocalDate(2024, 5, 1), "Add me", null),
         };
-        await _repo.ReconcileCVEntriesAsync(profileId, newEntries, default);
+        await _repo.ReconcileCVEntriesAsync(profileId, newEntries, CancellationToken.None);
 
         // Assert: exactly two rows remain. Use AsNoTracking so the query hits the in-memory
         // store directly rather than returning stale entities from _dbContext's identity map.
@@ -127,7 +126,7 @@ public sealed class ProfileRepositoryTests : IDisposable
         {
             new(entryId, new LocalDate(2024, 3, 1), "Keep me", "unchanged"),
         };
-        await _repo.ReconcileCVEntriesAsync(profileId, entries, default);
+        await _repo.ReconcileCVEntriesAsync(profileId, entries, CancellationToken.None);
 
         var persisted = await _dbContext.VolunteerHistoryEntries
             .AsNoTracking()
@@ -166,7 +165,7 @@ public sealed class ProfileRepositoryTests : IDisposable
         {
             new(entryId, new LocalDate(2024, 6, 15), "Renamed Event", "desc"),
         };
-        await _repo.ReconcileCVEntriesAsync(profileId, entries, default);
+        await _repo.ReconcileCVEntriesAsync(profileId, entries, CancellationToken.None);
 
         var persisted = await _dbContext.VolunteerHistoryEntries
             .AsNoTracking()

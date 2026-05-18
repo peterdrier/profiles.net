@@ -93,7 +93,7 @@ public class ExpenseReportServiceTests
 
         var loaded = await _sut.GetAsync(id);
         loaded.Should().NotBeNull();
-        loaded!.Status.Should().Be(ExpenseReportStatus.Draft);
+        loaded.Status.Should().Be(ExpenseReportStatus.Draft);
         loaded.Total.Should().Be(0m);
         loaded.SubmitterUserId.Should().Be(userId);
         loaded.BudgetCategoryId.Should().Be(category.Id);
@@ -119,7 +119,7 @@ public class ExpenseReportServiceTests
 
         // No audit on mere draft creation
         await _auditLogService.DidNotReceiveWithAnyArgs().LogAsync(
-            default, default!, default, default!, default(Guid));
+            default, null!, Guid.Empty, null!, Guid.Empty);
     }
 
     [HumansFact]
@@ -457,7 +457,7 @@ public class ExpenseReportServiceTests
         var download = await _sut.TryReadAttachmentAsync(loaded!, attachId);
 
         download.Should().NotBeNull();
-        download!.Bytes.Should().Equal(4, 5, 6);
+        download.Bytes.Should().Equal(4, 5, 6);
         download.ContentType.Should().Be("application/pdf");
         download.OriginalFileName.Should().Be("receipt.pdf");
     }
@@ -531,7 +531,7 @@ public class ExpenseReportServiceTests
         // No attachment on the line — should not throw
         var act = async () => await _sut.RemoveAttachmentFromLineAsync(id, submitter, lineId);
         await act.Should().NotThrowAsync();
-        await _fileStorage.DidNotReceiveWithAnyArgs().DeleteAsync(default!, default);
+        await _fileStorage.DidNotReceiveWithAnyArgs().DeleteAsync(null!, CancellationToken.None);
     }
 
     // ─────────────────────────────── 4.4 ─────────────────────────────────────
@@ -1324,10 +1324,20 @@ public class ExpenseReportServiceTests
             []);
     private void SetupUserAndProfile(Guid userId, string displayName, string iban)
     {
-        _userService.GetByIdAsync(userId, Arg.Any<CancellationToken>())
-            .Returns(new User { Id = userId, DisplayName = displayName });
+        var nameParts = displayName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        var firstName = nameParts.Length > 0 ? nameParts[0] : displayName;
+        var lastName = nameParts.Length > 1 ? nameParts[1] : "Tester";
+
         _userService.GetUserInfoAsync(userId, Arg.Any<CancellationToken>())
-            .Returns(WrapInUserInfo(new Profile { Id = Guid.NewGuid(), UserId = userId, Iban = iban }));
+            .Returns(WrapInUserInfo(new Profile
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                BurnerName = displayName,
+                FirstName = firstName,
+                LastName = lastName,
+                Iban = iban
+            }));
     }
 
     private static TeamInfo MakeTeamInfo(Guid teamId,
@@ -1404,4 +1414,3 @@ public class ExpenseReportServiceTests
         UploadedAt = Instant.FromUtc(2026, 5, 1, 0, 0)
     };
 }
-

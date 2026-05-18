@@ -1,9 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Users;
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Authorization;
 using NodaTime;
@@ -13,22 +11,12 @@ namespace Humans.Web.Controllers;
 // Stub Profile backfill admin tool — see #635 (§15i). Idempotent.
 [Authorize(Policy = PolicyNames.AdminOnly)]
 [Route("Profile/Admin/Backfill")]
-public sealed class ProfileBackfillAdminController : HumansControllerBase
+public sealed class ProfileBackfillAdminController(
+    IUserService userService,
+    IProfileService profileService,
+    ILogger<ProfileBackfillAdminController> logger) : HumansControllerBase(userService)
 {
-    private readonly IUserService _userService;
-    private readonly IProfileService _profileService;
-    private readonly ILogger<ProfileBackfillAdminController> _logger;
-
-    public ProfileBackfillAdminController(
-        IUserService userService,
-        IProfileService profileService,
-        ILogger<ProfileBackfillAdminController> logger)
-        : base(userService)
-    {
-        _userService = userService;
-        _profileService = profileService;
-        _logger = logger;
-    }
+    private readonly IUserService _userService = userService;
 
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken ct = default)
@@ -51,10 +39,10 @@ public sealed class ProfileBackfillAdminController : HumansControllerBase
         foreach (var row in missing)
         {
             // Idempotent — ProfileService takes a per-userId lock around the get/add pair.
-            await _profileService.EnsureStubProfileAsync(row.UserId, ct);
+            await profileService.EnsureStubProfileAsync(row.UserId, ct);
         }
 
-        _logger.LogInformation(
+        logger.LogInformation(
             "Stub Profile backfill: created {Count} profiles", missing.Count);
         SetSuccess($"Materialized {missing.Count} Stub Profiles.");
         return RedirectToAction(nameof(Index));
@@ -67,7 +55,7 @@ public sealed class ProfileBackfillAdminController : HumansControllerBase
             .Select(u => new MissingProfileRow(
                 u.Id,
                 u.Email ?? string.Empty,
-                u.DisplayName,
+                u.BurnerName,
                 u.CreatedAt,
                 u.ContactSource))
             .OrderByDescending(r => r.CreatedAt)

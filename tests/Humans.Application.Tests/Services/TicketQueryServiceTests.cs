@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using Humans.Application;
 using Humans.Application.Interfaces.Budget;
 using Humans.Application.Interfaces.Campaigns;
 using Humans.Application.Interfaces.Profiles;
@@ -14,7 +13,6 @@ using Humans.Domain.Enums;
 using Humans.Infrastructure.Data;
 using Humans.Infrastructure.Repositories.Tickets;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using NodaTime;
 using NSubstitute;
 
@@ -77,13 +75,12 @@ public sealed class TicketQueryServiceTests : IDisposable
             .Returns([]);
 
         _teamService.GetTeamsAsync(Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyDictionary<Guid, TeamInfo>)new Dictionary<Guid, TeamInfo>());
+            .Returns(new Dictionary<Guid, TeamInfo>());
     }
 
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     [HumansFact]
@@ -610,7 +607,7 @@ public sealed class TicketQueryServiceTests : IDisposable
             .Returns(users.ToDictionary(u => u.Id, u => u.Email ?? string.Empty));
 
         _teamService.GetTeamsAsync(Arg.Any<CancellationToken>())
-            .Returns((IReadOnlyDictionary<Guid, TeamInfo>)new Dictionary<Guid, TeamInfo>());
+            .Returns(new Dictionary<Guid, TeamInfo>());
 
         _shiftManagementService.GetActiveAsync()
             .Returns((EventSettings?)null);

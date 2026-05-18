@@ -1,5 +1,4 @@
 using AwesomeAssertions;
-using Humans.Application;
 using Humans.Application.Interfaces.Issues;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
@@ -256,7 +255,7 @@ public class IssuesApiControllerTests
         var detail = ok.Value!;
         var threadProp = detail.GetType().GetProperty("thread")!.GetValue(detail);
         threadProp.Should().BeAssignableTo<IEnumerable<object>>();
-        var threadList = ((IEnumerable<object>)threadProp!).ToList();
+        var threadList = ((IEnumerable<object>)threadProp).ToList();
         threadList.Should().HaveCount(2);
 
         var first = threadList[0];
@@ -309,8 +308,11 @@ public class IssuesApiControllerTests
             profileLanguages: [],
             volunteerHistory: [],
             communicationPreferences: []);
-        _users.GetUserInfoAsync(issue.ReporterUserId, Arg.Any<CancellationToken>())
-            .Returns(new ValueTask<UserInfo?>(reporterInfo));
+        _users.GetUserInfosAsync(
+                Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(issue.ReporterUserId)),
+                Arg.Any<CancellationToken>())
+            .Returns(new ValueTask<IReadOnlyDictionary<Guid, UserInfo>>(
+                new Dictionary<Guid, UserInfo> { [issue.ReporterUserId] = reporterInfo }));
 
         var result = await _sut.Get(issue.Id);
 

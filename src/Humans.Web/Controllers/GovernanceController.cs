@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
 using Humans.Application.Interfaces.Governance;
@@ -11,37 +10,24 @@ using Humans.Application.Interfaces.Auth;
 #pragma warning disable CS0618 // RoleAssignment.User/CreatedByUser — stitched in-memory by RoleAssignmentService (§15i).
 
 using Humans.Application.Interfaces.Users;
-using Humans.Application;
 
 namespace Humans.Web.Controllers;
 
 [Authorize]
 [Route("[controller]")]
-public class GovernanceController : HumansControllerBase
+public class GovernanceController(
+    IUserService userService,
+    IGovernanceIndexService governanceIndexService,
+    IRoleAssignmentService roleAssignmentService,
+    IClock clock) : HumansControllerBase(userService)
 {
-    private readonly IGovernanceIndexService _governanceIndexService;
-    private readonly IRoleAssignmentService _roleAssignmentService;
-    private readonly IClock _clock;
-
-    public GovernanceController(
-        IUserService userService,
-        IGovernanceIndexService governanceIndexService,
-        IRoleAssignmentService roleAssignmentService,
-        IClock clock)
-        : base(userService)
-    {
-        _governanceIndexService = governanceIndexService;
-        _roleAssignmentService = roleAssignmentService;
-        _clock = clock;
-    }
-
     public async Task<IActionResult> Index()
     {
         var user = await GetCurrentUserInfoAsync();
         if (user is null)
             return NotFound();
 
-        var data = await _governanceIndexService.GetIndexDataAsync(user.Id);
+        var data = await governanceIndexService.GetIndexDataAsync(user.Id);
 
         var viewModel = new GovernanceIndexViewModel
         {
@@ -66,9 +52,9 @@ public class GovernanceController : HumansControllerBase
     public async Task<IActionResult> Roles(string? role, bool showInactive = false, int page = 1)
     {
         var pageSize = 50;
-        var now = _clock.GetCurrentInstant();
+        var now = clock.GetCurrentInstant();
 
-        var (assignments, totalCount) = await _roleAssignmentService.GetFilteredAsync(
+        var (assignments, totalCount) = await roleAssignmentService.GetFilteredAsync(
             role, activeOnly: !showInactive, page, pageSize, now);
 
         var viewModel = new AdminRoleAssignmentListViewModel
@@ -78,7 +64,6 @@ public class GovernanceController : HumansControllerBase
                 Id = ra.Id,
                 UserId = ra.UserId,
                 UserEmail = ra.UserEmail ?? string.Empty,
-                UserDisplayName = ra.UserDisplayName,
                 RoleName = ra.RoleName,
                 ValidFrom = ra.ValidFrom.ToDateTimeUtc(),
                 ValidTo = ra.ValidTo?.ToDateTimeUtc(),

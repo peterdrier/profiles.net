@@ -29,7 +29,6 @@ public sealed class CampRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     // ==========================================================================
@@ -242,7 +241,7 @@ public sealed class CampRepositoryTests : IDisposable
         var settings = await _repo.GetSettingsReadOnlyAsync();
 
         settings.Should().NotBeNull();
-        settings!.PublicYear.Should().Be(2026);
+        settings.PublicYear.Should().Be(2026);
     }
 
     [HumansFact]

@@ -42,7 +42,15 @@ namespace Humans.Infrastructure.Services.Users;
 /// (<c>IDbContextFactory</c>-based).
 /// </para>
 /// </remarks>
-public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserService, IUserMerge, IUserInfoInvalidator
+public sealed class CachingUserService(
+    IUserRepository userRepository,
+    IUserEmailRepository userEmailRepository,
+    IProfileRepository profileRepository,
+    IContactFieldRepository contactFieldRepository,
+    ICommunicationPreferenceRepository communicationPreferenceRepository,
+    IServiceScopeFactory scopeFactory,
+    ILogger<CachingUserService> logger) : TrackedCache<Guid, UserInfo>("User.UserInfo", warmOnStartup: true, logger),
+    IUserService, IUserMerge, IUserInfoInvalidator, IUserInfoSliceRefresher
 {
     /// <summary>
     /// DI service key under which the undecorated (inner) <see cref="IUserService"/>
@@ -51,33 +59,6 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     /// <see cref="IUserService"/> registration.
     /// </summary>
     public const string InnerServiceKey = "user-inner";
-
-    private readonly IUserRepository _userRepository;
-    private readonly IUserEmailRepository _userEmailRepository;
-    private readonly IProfileRepository _profileRepository;
-    private readonly IContactFieldRepository _contactFieldRepository;
-    private readonly ICommunicationPreferenceRepository _communicationPreferenceRepository;
-    private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<CachingUserService> _logger;
-
-    public CachingUserService(
-        IUserRepository userRepository,
-        IUserEmailRepository userEmailRepository,
-        IProfileRepository profileRepository,
-        IContactFieldRepository contactFieldRepository,
-        ICommunicationPreferenceRepository communicationPreferenceRepository,
-        IServiceScopeFactory scopeFactory,
-        ILogger<CachingUserService> logger)
-        : base("User.UserInfo", warmOnStartup: true, logger)
-    {
-        _userRepository = userRepository;
-        _userEmailRepository = userEmailRepository;
-        _profileRepository = profileRepository;
-        _contactFieldRepository = contactFieldRepository;
-        _communicationPreferenceRepository = communicationPreferenceRepository;
-        _scopeFactory = scopeFactory;
-        _logger = logger;
-    }
 
     // ==========================================================================
     // UserInfo reads
@@ -93,7 +74,7 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     /// </summary>
     protected override async ValueTask<UserInfo?> LoadRowAsync(Guid userId, CancellationToken ct)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
+        await using var scope = scopeFactory.CreateAsyncScope();
         var inner = scope.ServiceProvider.GetRequiredKeyedService<IUserService>(InnerServiceKey);
         return await inner.GetUserInfoAsync(userId, ct);
     }
@@ -149,12 +130,9 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
 
         await EnsureWarmedAsync(ct).ConfigureAwait(false);
 
-        var includeAdmin = (fields & PersonSearchFields.Admin) != PersonSearchFields.None;
-
-        // Admin-only exact-UserId lookup. Lets an admin paste a UserId from
-        // logs / audit trails / URLs and jump straight to that human. Public
-        // callers fall through to text matching so they can't enumerate IDs.
-        if (includeAdmin && Guid.TryParse(query, out var idGuid))
+        // Exact-UserId lookup. Lets anyone paste a UserId from logs / audit
+        // trails / URLs and jump straight to that human.
+        if (Guid.TryParse(query, out var idGuid))
         {
             if (TryGet(idGuid, out var byId) && byId.Profile is not null && byId.Profile.RejectedAt is null)
             {
@@ -175,18 +153,8 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
         var results = new List<HumanSearchResult>();
         foreach (var u in Values)
         {
-            // Must have a profile and not be rejected to be searchable.
             if (u.Profile is null) continue;
             if (u.Profile.RejectedAt is not null) continue;
-
-            // Public-only callers never see suspended humans. Admin callers
-            // do, because admin search is the primary tool for finding a
-            // suspended person to lift suspension etc.
-            if (!includeAdmin && u.IsSuspended) continue;
-
-            // Public-only: only approved profiles surface. Admin: pre-approval
-            // / consent-pending profiles are valid search targets.
-            if (!includeAdmin && !u.Profile.IsApproved) continue;
 
             var match = TryMatchBuckets(u, query, fields);
             if (match is null) continue;
@@ -304,32 +272,32 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     /// </summary>
     private async Task RefreshEntryAsync(Guid userId, CancellationToken ct)
     {
-        var user = await _userRepository.GetByIdAsync(userId, ct);
+        var user = await userRepository.GetByIdAsync(userId, ct);
         if (user is null)
         {
             DeleteKey(userId);
             return;
         }
 
-        var userEmails = await _userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        var participations = await _userRepository.GetEventParticipationsByUserIdAsync(userId, ct);
-        var loginsMap = await _userRepository.GetExternalLoginsByUserIdsAsync([userId], ct);
+        var userEmails = await userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
+        var participations = await userRepository.GetEventParticipationsByUserIdAsync(userId, ct);
+        var loginsMap = await userRepository.GetExternalLoginsByUserIdsAsync([userId], ct);
         var externalLogins = loginsMap.TryGetValue(userId, out var logins)
             ? logins
             : [];
 
-        var profile = await _profileRepository.GetByUserIdReadOnlyAsync(userId, ct);
+        var profile = await profileRepository.GetByUserIdReadOnlyAsync(userId, ct);
         IReadOnlyList<ContactField> contactFields = [];
         IReadOnlyList<ProfileLanguage> languages = [];
         IReadOnlyList<VolunteerHistoryEntry> volunteerHistory = [];
         if (profile is not null)
         {
-            contactFields = await _contactFieldRepository.GetByProfileIdReadOnlyAsync(profile.Id, ct);
+            contactFields = await contactFieldRepository.GetByProfileIdReadOnlyAsync(profile.Id, ct);
             languages = profile.Languages.ToList();
             volunteerHistory = profile.VolunteerHistory.ToList();
         }
 
-        var communicationPreferences = await _communicationPreferenceRepository
+        var communicationPreferences = await communicationPreferenceRepository
             .GetByUserIdReadOnlyAsync(userId, ct);
 
         Set(userId, UserInfo.Create(
@@ -354,30 +322,30 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     /// </remarks>
     protected override async Task WarmAllAsync(CancellationToken ct)
     {
-        var users = await _userRepository.GetAllAsync(ct);
+        var users = await userRepository.GetAllAsync(ct);
         if (users.Count == 0) return;
 
         var userIds = users.Select(u => u.Id).ToList();
 
-        var allEmails = await _userEmailRepository.GetAllAsync(ct);
+        var allEmails = await userEmailRepository.GetAllAsync(ct);
         var emailsByUser = allEmails
             .GroupBy(e => e.UserId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<UserEmail>)g.ToList());
 
-        var loginsByUser = await _userRepository.GetExternalLoginsByUserIdsAsync(userIds, ct);
+        var loginsByUser = await userRepository.GetExternalLoginsByUserIdsAsync(userIds, ct);
 
-        var profiles = await _profileRepository.GetAllAsync(ct);
+        var profiles = await profileRepository.GetAllAsync(ct);
         var profileByUser = profiles.ToDictionary(p => p.UserId);
 
-        var allContactFields = await _contactFieldRepository.GetAllAsync(ct);
+        var allContactFields = await contactFieldRepository.GetAllAsync(ct);
         var contactFieldsByProfile = allContactFields
             .GroupBy(c => c.ProfileId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<ContactField>)g.ToList());
 
-        var participationsByUser = await _userRepository
+        var participationsByUser = await userRepository
             .GetEventParticipationsByUserIdsAsync(userIds, ct);
 
-        var allPreferences = await _communicationPreferenceRepository.GetAllAsync(ct);
+        var allPreferences = await communicationPreferenceRepository.GetAllAsync(ct);
         var preferencesByUser = allPreferences
             .GroupBy(p => p.UserId)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<CommunicationPreference>)g.ToList());
@@ -414,7 +382,7 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     }
 
     // ==========================================================================
-    // IUserInfoInvalidator
+    // IUserInfoInvalidator (cross-section) + IUserInfoSliceRefresher (interceptor)
     // ==========================================================================
 
     /// <inheritdoc cref="IUserInfoInvalidator.InvalidateAsync" />
@@ -424,13 +392,201 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
         [CallerMemberName] string memberName = "",
         [CallerFilePath] string filePath = "")
     {
-        _logger.LogDebug(
+        logger.LogDebug(
             "UserInfo invalidate userId={UserId} caller={CallerMember} file={CallerFile}",
             userId, memberName, Path.GetFileName(filePath));
 
         // Warmed cache, row updated: replace in-place via the base primitive
         // (LoadRowAsync → Set, or DeleteKey if the inner returns null).
         await ReplaceAsync(userId, ct).ConfigureAwait(false);
+    }
+
+    public async Task RefreshUserFieldsAsync(
+        User user,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo refresh user fields userId={UserId} caller={CallerMember} file={CallerFile}",
+            user.Id, memberName, Path.GetFileName(filePath));
+
+        if (TryGet(user.Id, out var current))
+        {
+            Replace(user.Id, WithUserFields(current, user));
+            return;
+        }
+
+        if (!IsWarmedUp)
+        {
+            await ReplaceAsync(user.Id, ct).ConfigureAwait(false);
+            return;
+        }
+
+        Set(user.Id, UserInfo.Create(
+            user,
+            user.UserEmails.ToList(),
+            user.EventParticipations.ToList(),
+            externalLogins: [],
+            profile: null,
+            contactFields: [],
+            profileLanguages: [],
+            volunteerHistory: [],
+            communicationPreferences: []));
+    }
+
+    public Task RemoveAsync(
+        Guid userId,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo remove userId={UserId} caller={CallerMember} file={CallerFile}",
+            userId, memberName, Path.GetFileName(filePath));
+        DeleteKey(userId);
+        return Task.CompletedTask;
+    }
+
+    public async Task RefreshUserEmailsAsync(
+        Guid userId,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo refresh user-emails userId={UserId} caller={CallerMember} file={CallerFile}",
+            userId, memberName, Path.GetFileName(filePath));
+
+        if (!TryGet(userId, out var current))
+        {
+            await ReplaceAsync(userId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var rows = await userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
+        Replace(userId, current with { UserEmails = ToUserEmailInfos(rows) });
+    }
+
+    public async Task RefreshEventParticipationsAsync(
+        Guid userId,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo refresh event-participations userId={UserId} caller={CallerMember} file={CallerFile}",
+            userId, memberName, Path.GetFileName(filePath));
+
+        if (!TryGet(userId, out var current))
+        {
+            await ReplaceAsync(userId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var rows = await userRepository.GetEventParticipationsByUserIdAsync(userId, ct);
+        Replace(userId, current with { EventParticipations = ToEventParticipationInfos(rows) });
+    }
+
+    public async Task RefreshExternalLoginsAsync(
+        Guid userId,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo refresh external-logins userId={UserId} caller={CallerMember} file={CallerFile}",
+            userId, memberName, Path.GetFileName(filePath));
+
+        if (!TryGet(userId, out var current))
+        {
+            await ReplaceAsync(userId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var loginsByUser = await userRepository.GetExternalLoginsByUserIdsAsync([userId], ct);
+        var rows = loginsByUser.TryGetValue(userId, out var logins) ? logins : [];
+        Replace(userId, current with { ExternalLogins = ToExternalLoginInfos(rows) });
+    }
+
+    public async Task RefreshCommunicationPreferencesAsync(
+        Guid userId,
+        CancellationToken ct = default,
+        [CallerMemberName] string memberName = "",
+        [CallerFilePath] string filePath = "")
+    {
+        logger.LogDebug(
+            "UserInfo refresh communication-preferences userId={UserId} caller={CallerMember} file={CallerFile}",
+            userId, memberName, Path.GetFileName(filePath));
+
+        if (!TryGet(userId, out var current))
+        {
+            await ReplaceAsync(userId, ct).ConfigureAwait(false);
+            return;
+        }
+
+        var rows = await communicationPreferenceRepository.GetByUserIdReadOnlyAsync(userId, ct);
+        Replace(userId, current with { CommunicationPreferences = ToCommunicationPreferenceInfos(rows) });
+    }
+
+    private static IReadOnlyList<UserEmailInfo> ToUserEmailInfos(IEnumerable<UserEmail> rows) =>
+        rows
+            .OrderByDescending(e => e.IsPrimary)
+            .ThenBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
+            .Select(e => new UserEmailInfo(
+                e.Id, e.Email, e.IsVerified, e.IsPrimary, e.IsGoogle,
+                e.Provider, e.ProviderKey, e.Visibility, e.VerificationSentAt,
+                e.CreatedAt, e.UpdatedAt))
+            .ToList();
+
+    private static IReadOnlyList<EventParticipationInfo> ToEventParticipationInfos(IEnumerable<EventParticipation> rows) =>
+        rows
+            .OrderBy(p => p.Year)
+            .Select(p => new EventParticipationInfo(
+                p.Id, p.Year, p.Status, p.Source, p.DeclaredAt, p.CheckedInAt))
+            .ToList();
+
+    private static IReadOnlyList<UserExternalLoginInfo> ToExternalLoginInfos(
+        IEnumerable<(string Provider, string ProviderKey)> rows) =>
+        rows
+            .Select(l => new UserExternalLoginInfo(l.Provider, l.ProviderKey))
+            .ToList();
+
+    private static IReadOnlyList<CommunicationPreferenceInfo> ToCommunicationPreferenceInfos(
+        IEnumerable<CommunicationPreference> rows) =>
+        rows
+            .OrderBy(c => c.Category)
+            .Select(c => new CommunicationPreferenceInfo(
+                c.Id, c.Category, c.OptedOut, c.InboxEnabled,
+                c.UpdatedAt, c.UpdateSource, c.SubscribedAt))
+            .ToList();
+
+    private static UserInfo WithUserFields(UserInfo current, User user)
+    {
+#pragma warning disable CS0618 // DisplayName / ProfilePictureUrl are part of the cached legacy user-column mirror.
+        return current with
+        {
+            DisplayName = user.DisplayName,
+            PreferredLanguage = user.PreferredLanguage,
+            FallbackPictureUrl = user.ProfilePictureUrl,
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt,
+            LastConsentReminderSentAt = user.LastConsentReminderSentAt,
+            DeletionRequestedAt = user.DeletionRequestedAt,
+            DeletionScheduledFor = user.DeletionScheduledFor,
+            DeletionEligibleAfter = user.DeletionEligibleAfter,
+            UnsubscribedFromCampaigns = user.UnsubscribedFromCampaigns,
+            ICalToken = user.ICalToken,
+            SuppressScheduleChangeEmails = user.SuppressScheduleChangeEmails,
+            MagicLinkSentAt = user.MagicLinkSentAt,
+            GoogleEmailStatus = user.GoogleEmailStatus,
+            ContactSource = user.ContactSource,
+            ExternalSourceId = user.ExternalSourceId,
+            MergedToUserId = user.MergedToUserId,
+            MergedAt = user.MergedAt,
+            IdentityEmailColumn = user.IdentityEmailColumn,
+        };
+#pragma warning restore CS0618
     }
 
     // ==========================================================================
@@ -440,14 +596,14 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
 
     private async Task<T> WithInnerAsync<T>(Func<IUserService, Task<T>> work)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
+        await using var scope = scopeFactory.CreateAsyncScope();
         var inner = scope.ServiceProvider.GetRequiredKeyedService<IUserService>(InnerServiceKey);
         return await work(inner);
     }
 
     private async Task WithInnerAsync(Func<IUserService, Task> work)
     {
-        await using var scope = _scopeFactory.CreateAsyncScope();
+        await using var scope = scopeFactory.CreateAsyncScope();
         var inner = scope.ServiceProvider.GetRequiredKeyedService<IUserService>(InnerServiceKey);
         await work(inner);
     }
@@ -507,7 +663,7 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     /// </summary>
     private static User RehydrateUser(UserInfo info)
     {
-#pragma warning disable CS0618 // DisplayName fallback is the legacy column we are mirroring.
+#pragma warning disable CS0618 // DisplayName is the legacy column this rehydration mirrors.
         var user = new User
         {
             Id = info.Id,
@@ -569,9 +725,24 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
                     Year = p.Year,
                     Status = p.Status,
                     Source = p.Source,
-                    DeclaredAt = p.DeclaredAt
+                    DeclaredAt = p.DeclaredAt,
+                    CheckedInAt = p.CheckedInAt,
                 });
             }
+        }
+        return result;
+    }
+
+    public async Task<IReadOnlyList<OnsiteUserRow>> GetOnsiteUsersAsync(
+        int year, CancellationToken ct = default)
+    {
+        await EnsureWarmedAsync(ct).ConfigureAwait(false);
+        var result = new List<OnsiteUserRow>();
+        foreach (var u in Values)
+        {
+            var onsiteSince = u.OnsiteSinceForYear(year);
+            if (onsiteSince is null) continue;
+            result.Add(new OnsiteUserRow(u.Id, u.BurnerName, onsiteSince));
         }
         return result;
     }
@@ -683,16 +854,17 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
     }
 
     public async Task SetParticipationFromTicketSyncAsync(
-        Guid userId, int year, ParticipationStatus status, CancellationToken ct = default)
+        Guid userId, int year, ParticipationStatus status, Instant? checkedInAt, CancellationToken ct = default)
     {
-        await WithInnerAsync(inner => inner.SetParticipationFromTicketSyncAsync(userId, year, status, ct));
-        await RefreshEntryAsync(userId, ct);
+        await WithInnerAsync(inner =>
+            inner.SetParticipationFromTicketSyncAsync(userId, year, status, checkedInAt, ct));
+        await RefreshEventParticipationsAsync(userId, ct);
     }
 
     public async Task RemoveTicketSyncParticipationAsync(Guid userId, int year, CancellationToken ct = default)
     {
         await WithInnerAsync(inner => inner.RemoveTicketSyncParticipationAsync(userId, year, ct));
-        await RefreshEntryAsync(userId, ct);
+        await RefreshEventParticipationsAsync(userId, ct);
     }
 
     public async Task<int> BackfillParticipationsAsync(
@@ -701,7 +873,8 @@ public sealed class CachingUserService : TrackedCache<Guid, UserInfo>, IUserServ
         CancellationToken ct = default)
     {
         var count = await WithInnerAsync(inner => inner.BackfillParticipationsAsync(year, entries, ct));
-        foreach (var (userId, _) in entries) await RefreshEntryAsync(userId, ct);
+        foreach (var userId in entries.Select(e => e.UserId).Distinct())
+            await RefreshEventParticipationsAsync(userId, ct);
         return count;
     }
 

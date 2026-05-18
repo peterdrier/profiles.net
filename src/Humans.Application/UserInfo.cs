@@ -13,7 +13,10 @@ public sealed record UserEmailInfo(
     bool IsGoogle,
     string? Provider,
     string? ProviderKey,
-    ContactFieldVisibility? Visibility);
+    ContactFieldVisibility? Visibility,
+    Instant? VerificationSentAt,
+    Instant CreatedAt,
+    Instant UpdatedAt);
 
 /// <summary>Compact projection of <see cref="ContactField"/> carried inside <see cref="ProfileInfo"/>.</summary>
 public sealed record ContactFieldInfo(
@@ -53,7 +56,8 @@ public sealed record EventParticipationInfo(
     int Year,
     ParticipationStatus Status,
     ParticipationSource Source,
-    Instant? DeclaredAt);
+    Instant? DeclaredAt,
+    Instant? CheckedInAt);
 
 /// <summary>Compact projection of an <c>AspNetUserLogins</c> row.</summary>
 public sealed record UserExternalLoginInfo(
@@ -123,7 +127,7 @@ public sealed record UserInfo(
     Guid Id,
     [property: Obsolete("Rendering callers must use UserInfo.BurnerName / <vc:human> — DisplayName is the raw legacy column mirror. See memory/architecture/burnername-is-the-display-name.md.", DiagnosticId = "HUM_USERINFO_DISPLAYNAME", UrlFormat = "https://github.com/nobodies-collective/Humans/issues/691")] string DisplayName,
     string PreferredLanguage,
-    string? ProfilePictureUrl,
+    string? FallbackPictureUrl,
     Instant CreatedAt,
     Instant? LastLoginAt,
     Instant? LastConsentReminderSentAt,
@@ -154,6 +158,17 @@ public sealed record UserInfo(
         Profile is not null && !string.IsNullOrWhiteSpace(Profile.BurnerName)
             ? Profile.BurnerName
             : DisplayName;
+
+    /// <summary>
+    /// Canonical profile picture URL. Custom upload served from the file share via
+    /// <c>/Profile/Picture?id={ProfileId}&amp;v={ticks}</c> when present, otherwise the
+    /// legacy <see cref="User.ProfilePictureUrl"/> column as a fallback. This is the ONLY
+    /// place profile picture URLs come from across the application.
+    /// </summary>
+    public string? ProfilePictureUrl =>
+        Profile is { HasCustomPicture: true }
+            ? $"/Profile/Picture?id={Profile.Id}&v={Profile.UpdatedAt.ToUnixTimeTicks()}"
+            : FallbackPictureUrl;
 
     /// <summary>Effective email — first verified UserEmail (primary-preferred), falling back to Identity column. Mirrors <see cref="User.Email"/>.</summary>
     public string? Email
@@ -213,6 +228,19 @@ public sealed record UserInfo(
         (p.Status == ParticipationStatus.Ticketed ||
          p.Status == ParticipationStatus.Attended));
 
+    /// <summary>
+    /// On-site for the given <paramref name="year"/> when an Attended row with
+    /// a non-null <see cref="EventParticipationInfo.CheckedInAt"/> exists.
+    /// Returns the gate-arrival instant or null. Drives the profile "Onsite
+    /// since {time}" chip (issue nobodies-collective/Humans#736).
+    /// </summary>
+    public Instant? OnsiteSinceForYear(int year) => EventParticipations
+        .Where(p => p.Year == year
+            && p.Status == ParticipationStatus.Attended
+            && p.CheckedInAt is not null)
+        .Select(p => p.CheckedInAt)
+        .FirstOrDefault();
+
     /// <summary>Stub profile: no profile row, explicit Stub state, or legacy null State. Callers writing consents must block on this.</summary>
     public bool IsStub =>
         Profile is null || Profile.State is null or ProfileState.Stub;
@@ -262,13 +290,14 @@ public sealed record UserInfo(
             .ThenBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
             .Select(e => new UserEmailInfo(
                 e.Id, e.Email, e.IsVerified, e.IsPrimary, e.IsGoogle,
-                e.Provider, e.ProviderKey, e.Visibility))
+                e.Provider, e.ProviderKey, e.Visibility, e.VerificationSentAt,
+                e.CreatedAt, e.UpdatedAt))
             .ToList();
 
         var participationInfos = eventParticipations
             .OrderBy(p => p.Year)
             .Select(p => new EventParticipationInfo(
-                p.Id, p.Year, p.Status, p.Source, p.DeclaredAt))
+                p.Id, p.Year, p.Status, p.Source, p.DeclaredAt, p.CheckedInAt))
             .ToList();
 
         var loginInfos = externalLogins
@@ -347,7 +376,7 @@ public sealed record UserInfo(
             Id: user.Id,
             DisplayName: user.DisplayName,
             PreferredLanguage: user.PreferredLanguage,
-            ProfilePictureUrl: user.ProfilePictureUrl,
+            FallbackPictureUrl: user.ProfilePictureUrl,
             CreatedAt: user.CreatedAt,
             LastLoginAt: user.LastLoginAt,
             LastConsentReminderSentAt: user.LastConsentReminderSentAt,

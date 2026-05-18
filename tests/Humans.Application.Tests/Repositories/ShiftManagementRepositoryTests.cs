@@ -36,7 +36,6 @@ public sealed class ShiftManagementRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     [HumansFact]
@@ -50,7 +49,7 @@ public sealed class ShiftManagementRepositoryTests : IDisposable
         var result = await _repo.GetActiveEventSettingsAsync();
 
         result.Should().NotBeNull();
-        result!.Id.Should().Be(active.Id);
+        result.Id.Should().Be(active.Id);
     }
 
     [HumansFact]

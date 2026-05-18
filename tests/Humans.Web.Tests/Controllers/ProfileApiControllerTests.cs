@@ -56,12 +56,6 @@ public class ProfileApiControllerTests
         var userStore = Substitute.For<IUserStore<User>>();
         _userManager = Substitute.For<UserManager<User>>(
             userStore, null, null, null, null, null, null, null, null);
-
-        // Picture URLs are not the focus here — return an empty dictionary so the
-        // helper returns null URLs for every result row.
-        _profileService
-            .GetCustomPictureInfoByUserIdsAsync(Arg.Any<IEnumerable<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns([]);
     }
 
     private ProfileApiController BuildSut(User? currentUser)
@@ -120,14 +114,14 @@ public class ProfileApiControllerTests
     private static UserInfo MakeViewerUserInfo(User user) =>
         UserInfo.Create(
             user: user,
-            userEmails: Array.Empty<UserEmail>(),
-            eventParticipations: Array.Empty<EventParticipation>(),
-            externalLogins: Array.Empty<(string, string)>(),
+            userEmails: [],
+            eventParticipations: [],
+            externalLogins: [],
             profile: null,
-            contactFields: Array.Empty<ContactField>(),
-            profileLanguages: Array.Empty<ProfileLanguage>(),
-            volunteerHistory: Array.Empty<VolunteerHistoryEntry>(),
-            communicationPreferences: Array.Empty<CommunicationPreference>());
+            contactFields: [],
+            profileLanguages: [],
+            volunteerHistory: [],
+            communicationPreferences: []);
 
     private static UserInfo MakeUserInfo(
         Guid userId,
@@ -145,7 +139,7 @@ public class ProfileApiControllerTests
             IsApproved = true,
             CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
             UpdatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
-            RejectedAt = isRejected ? Instant.FromUtc(2026, 2, 1, 0, 0) : (Instant?)null,
+            RejectedAt = isRejected ? Instant.FromUtc(2026, 2, 1, 0, 0) : null,
         };
         var user = new User
         {
@@ -242,7 +236,7 @@ public class ProfileApiControllerTests
             .Returns([]);
 
         // Mix of types — Phone must win over Signal regardless of insert order.
-        _contactFieldService.GetVisibleContactFieldsAsync(targetProfileId, viewer.Id, Arg.Any<CancellationToken>())
+        _contactFieldService.GetVisibleContactFieldsAsync(targetUserId, viewer.Id, Arg.Any<CancellationToken>())
             .Returns([
                 new ContactFieldDto(Guid.NewGuid(), ContactFieldType.Signal, "Signal", "signal-handle",
                     ContactFieldVisibility.AllActiveProfiles),
@@ -274,7 +268,7 @@ public class ProfileApiControllerTests
             .Returns(ContactFieldVisibility.AllActiveProfiles);
         _userEmailService.GetVisibleEmailsAsync(targetUserId, Arg.Any<ContactFieldVisibility>(), Arg.Any<CancellationToken>())
             .Returns([]);
-        _contactFieldService.GetVisibleContactFieldsAsync(targetProfileId, viewer.Id, Arg.Any<CancellationToken>())
+        _contactFieldService.GetVisibleContactFieldsAsync(targetUserId, viewer.Id, Arg.Any<CancellationToken>())
             .Returns([]);
 
         var sut = BuildSut(viewer);
@@ -303,7 +297,7 @@ public class ProfileApiControllerTests
             .Returns([]);
 
 #pragma warning disable CS0618 // Verifying the controller skips the obsolete Email enum value.
-        _contactFieldService.GetVisibleContactFieldsAsync(targetProfileId, viewer.Id, Arg.Any<CancellationToken>())
+        _contactFieldService.GetVisibleContactFieldsAsync(targetUserId, viewer.Id, Arg.Any<CancellationToken>())
             .Returns([
                 new ContactFieldDto(Guid.NewGuid(), ContactFieldType.Email, "Email", "obsolete@example.com",
                     ContactFieldVisibility.AllActiveProfiles),

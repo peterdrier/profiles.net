@@ -39,7 +39,6 @@ public sealed class TeamRepositoryTests : IDisposable
     public void Dispose()
     {
         _dbContext.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     // ==========================================================================
@@ -54,7 +53,7 @@ public sealed class TeamRepositoryTests : IDisposable
         var result = await _repo.GetByIdAsync(team.Id);
 
         result.Should().NotBeNull();
-        result!.Id.Should().Be(team.Id);
+        result.Id.Should().Be(team.Id);
         result.Name.Should().Be("Test");
     }
 
@@ -77,7 +76,7 @@ public sealed class TeamRepositoryTests : IDisposable
         var result = await _repo.GetByIdWithRelationsAsync(team.Id);
 
         result.Should().NotBeNull();
-        result!.Members.Should().HaveCount(1);
+        result.Members.Should().HaveCount(1);
         result.ChildTeams.Should().HaveCount(1);
     }
 

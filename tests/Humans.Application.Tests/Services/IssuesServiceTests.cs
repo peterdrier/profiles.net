@@ -80,6 +80,7 @@ public class IssuesServiceTests : IDisposable
                 return Task.FromResult(_dbContext.Users.AsNoTracking().FirstOrDefault(u => u.Id == id));
             });
         _userService.StubGetUserInfosFromContext(_dbContext);
+        _userService.StubGetUserInfoFromContext(_dbContext);
 
         _userEmailService = Substitute.For<IUserEmailService>();
         _userEmailService
@@ -277,13 +278,16 @@ public class IssuesServiceTests : IDisposable
     public async Task PostCommentAsync_handler_sends_email_and_notification_to_reporter()
     {
         var reporterId = Guid.NewGuid();
-        _dbContext.Users.Add(new User
+        var reporter = new User
         {
             Id = reporterId,
             Email = "reporter@test.com",
             DisplayName = "Reporter",
             PreferredLanguage = "en"
-        });
+        };
+        _dbContext.Users.Add(reporter);
+        _userService.GetUserInfoAsync(reporterId, Arg.Any<CancellationToken>())
+            .Returns(reporter.ToUserInfo());
         await _dbContext.SaveChangesAsync();
 
         var issueId = await SeedIssueRowAsync(reporterId, IssueStatus.Open, "Report Title");
@@ -876,7 +880,7 @@ public class IssuesServiceTests : IDisposable
         await SeedIssueRowAsync(aliceId, IssueStatus.Open, "Alice's second");
         await SeedIssueRowAsync(bobId, IssueStatus.Open, "Bob's");
 
-        var slices = await _service.ContributeForUserAsync(aliceId, default);
+        var slices = await _service.ContributeForUserAsync(aliceId, CancellationToken.None);
 
         slices.Should().ContainSingle();
         slices[0].SectionName.Should().Be("Issues");

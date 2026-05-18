@@ -4,7 +4,6 @@ using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Profiles;
 using Humans.Domain.Enums;
 using Humans.Web.Extensions;
-using Humans.Web.Helpers;
 using Humans.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,27 +13,16 @@ namespace Humans.Web.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/profiles")]
-public class ProfileApiController : ApiControllerBase
+public class ProfileApiController(
+    IProfileService profileService,
+    IUserService userService,
+    IContactFieldService contactFieldService,
+    IUserEmailService userEmailService) : ApiControllerBase(userService)
 {
     private const int MaxResults = 10;
 
-    private readonly IProfileService _profileService;
-    private readonly IUserService _userService;
-    private readonly IContactFieldService _contactFieldService;
-    private readonly IUserEmailService _userEmailService;
-
-    public ProfileApiController(
-        IProfileService profileService,
-        IUserService userService,
-        IContactFieldService contactFieldService,
-        IUserEmailService userEmailService)
-        : base(userService)
-    {
-        _profileService = profileService;
-        _userService = userService;
-        _contactFieldService = contactFieldService;
-        _userEmailService = userEmailService;
-    }
+    private readonly IProfileService _profileService = profileService;
+    private readonly IUserService _userService = userService;
 
     [HttpGet("search")]
     public async Task<IActionResult> Search(
@@ -57,19 +45,12 @@ public class ProfileApiController : ApiControllerBase
         var viewerUserId = viewer.Id;
 
         var results = await _userService.SearchUsersAsync(q, fields, MaxResults, ct);
-        var userIds = results.Select(r => r.UserId).ToList();
-        var pictureUrls = await ProfilePictureUrlHelper.BuildEffectiveUrlsAsync(
-            _profileService,
-            Url,
-            userIds,
-            ct);
 
         var response = new List<HumanLookupSearchResult>(results.Count);
         foreach (var result in results.OrderBy(r => r.BurnerName, StringComparer.OrdinalIgnoreCase))
         {
             var detail = await GetSharedDetailAsync(
                 result.UserId,
-                result.ProfileId,
                 viewerUserId,
                 ct);
 
@@ -77,7 +58,7 @@ public class ProfileApiController : ApiControllerBase
                 result.UserId,
                 result.BurnerName,
                 detail,
-                pictureUrls.GetValueOrDefault(result.UserId)));
+                result.ProfilePictureUrl));
         }
 
         // Display sort at controller — memory/architecture/display-sort-in-controllers.md.
@@ -97,14 +78,8 @@ public class ProfileApiController : ApiControllerBase
         if (info?.Profile is null || info.Profile.RejectedAt is not null)
             return NotFound();
 
-        var pictureUrls = await ProfilePictureUrlHelper.BuildEffectiveUrlsAsync(
-            _profileService,
-            Url, [userId],
-            ct);
-
         var detail = await GetSharedDetailAsync(
             userId,
-            info.Profile.Id,
             viewerUserId,
             ct);
 
@@ -112,21 +87,20 @@ public class ProfileApiController : ApiControllerBase
             userId,
             info.BurnerName,
             detail,
-            pictureUrls.GetValueOrDefault(userId)));
+            info.ProfilePictureUrl));
     }
 
     // Disambiguation: viewer-visible primary email → highest-priority visible contact field → null. Legal name omitted deliberately.
     private async Task<string?> GetSharedDetailAsync(
         Guid userId,
-        Guid profileId,
         Guid viewerUserId,
         CancellationToken ct)
     {
-        var accessLevel = await _contactFieldService.GetViewerAccessLevelAsync(
+        var accessLevel = await contactFieldService.GetViewerAccessLevelAsync(
             userId,
             viewerUserId,
             ct);
-        var visibleEmails = await _userEmailService.GetVisibleEmailsAsync(userId, accessLevel, ct);
+        var visibleEmails = await userEmailService.GetVisibleEmailsAsync(userId, accessLevel, ct);
         var visibleEmail = visibleEmails
             .OrderByDescending(e => e.IsPrimary)
             .ThenBy(e => e.Email, StringComparer.OrdinalIgnoreCase)
@@ -136,8 +110,8 @@ public class ProfileApiController : ApiControllerBase
         if (!string.IsNullOrWhiteSpace(visibleEmail))
             return visibleEmail;
 
-        var visibleContactFields = await _contactFieldService.GetVisibleContactFieldsAsync(
-            profileId,
+        var visibleContactFields = await contactFieldService.GetVisibleContactFieldsAsync(
+            userId,
             viewerUserId,
             ct);
 

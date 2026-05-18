@@ -1,3 +1,4 @@
+using Humans.Application.DTOs;
 using Humans.Domain.Enums;
 using NodaTime;
 
@@ -12,10 +13,14 @@ public sealed record AdminDashboardViewModel(
     int? ShiftFilledOf,
     int? ShiftTotalOf,
     int OpenFeedback,
+    int OnlineNow,
+    int OnlineLastHour,
+    int OnlineLast24h,
     IReadOnlyList<DepartmentCoverage> StaffingByDepartment,
     IReadOnlyList<DashboardActivityRow> RecentActivity,
     DashboardApplicationStats AppStats,
-    IReadOnlyList<DashboardLanguageCount> LanguageDistribution);
+    IReadOnlyList<DashboardLanguageCount> LanguageDistribution,
+    UserSetMembership SetMembership);
 
 public sealed record DepartmentCoverage(string Name, int Filled, int Total)
 {

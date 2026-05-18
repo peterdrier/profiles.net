@@ -1,11 +1,9 @@
 using Humans.Application.Interfaces.Camps;
 using Humans.Application.Interfaces.CityPlanning;
 using Humans.Application.Interfaces.Containers;
-using Humans.Domain.Entities;
 using Humans.Web.Authorization.Requirements;
 using Humans.Web.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 
 using Humans.Application.Interfaces.Users;
@@ -14,37 +12,21 @@ namespace Humans.Web.Controllers;
 
 [Authorize]
 [Route("Camp/{slug}/Containers")]
-public class ContainerController : HumansControllerBase
+public class ContainerController(
+    ICampService campService,
+    IContainerService containerService,
+    ICityPlanningService cityPlanningService,
+    IAuthorizationService authorizationService,
+    IUserService userService,
+    ILogger<ContainerController> logger) : HumansControllerBase(userService)
 {
-    private readonly ICampService _campService;
-    private readonly IContainerService _containerService;
-    private readonly ICityPlanningService _cityPlanningService;
-    private readonly IAuthorizationService _authorizationService;
-    private readonly ILogger<ContainerController> _logger;
-
-    public ContainerController(
-        ICampService campService,
-        IContainerService containerService,
-        ICityPlanningService cityPlanningService,
-        IAuthorizationService authorizationService,
-        IUserService userService,
-        ILogger<ContainerController> logger)
-        : base(userService)
-    {
-        _campService = campService;
-        _containerService = containerService;
-        _cityPlanningService = cityPlanningService;
-        _authorizationService = authorizationService;
-        _logger = logger;
-    }
-
     private async Task<bool> AuthorizeAsync(ContainerAuthorizationTarget target, ContainerOperationRequirement requirement) =>
-        (await _authorizationService.AuthorizeAsync(User, target, requirement)).Succeeded;
+        (await authorizationService.AuthorizeAsync(User, target, requirement)).Succeeded;
 
     [HttpGet("")]
     public async Task<IActionResult> Index(string slug, CancellationToken ct)
     {
-        var camp = await _campService.GetCampBySlugAsync(slug, ct);
+        var camp = await campService.GetCampBySlugAsync(slug, ct);
         if (camp is null) return NotFound();
 
         var target = ContainerAuthorizationTarget.ForCamp(camp.Id);
@@ -53,12 +35,12 @@ public class ContainerController : HumansControllerBase
         // Place returns false for leads when phase is closed — drives the "phase closed" view message.
         var canPlace = await AuthorizeAsync(target, ContainerOperationRequirement.Place);
 
-        var settings = await _cityPlanningService.GetSettingsAsync(ct);
-        var containers = await _containerService.GetByCampAsync(camp.Id, ct);
+        var settings = await cityPlanningService.GetSettingsAsync(ct);
+        var containers = await containerService.GetByCampAsync(camp.Id, ct);
         var sortedContainers = containers
             .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-        var placements = await _containerService.GetPlacementsByYearAsync(settings.Year, ct);
+        var placements = await containerService.GetPlacementsByYearAsync(settings.Year, ct);
 
         var vm = BuildIndexViewModel(camp, settings.Year, settings.IsContainerPlacementOpen, canPlace, sortedContainers, placements);
         return View(vm);
@@ -120,7 +102,7 @@ public class ContainerController : HumansControllerBase
         var (userError, user) = await RequireCurrentUserAsync();
         if (userError is not null) return userError;
 
-        var camp = await _campService.GetCampBySlugAsync(slug, ct);
+        var camp = await campService.GetCampBySlugAsync(slug, ct);
         if (camp is null) return NotFound();
 
         // Place includes the phase-gate for leads — write actions need it.
@@ -134,7 +116,7 @@ public class ContainerController : HumansControllerBase
         }
 
         return await TryRunContainerWriteAsync(
-            () => _containerService.CreateAsync(model.ToContainerData(camp.Id), user.Id, ct),
+            () => containerService.CreateAsync(model.ToContainerData(camp.Id), user.Id, ct),
             slug,
             "Container added.");
     }
@@ -156,7 +138,7 @@ public class ContainerController : HumansControllerBase
         }
 
         return await TryRunContainerWriteAsync(
-            () => _containerService.UpdateAsync(id, model.ToContainerData(container!.CampId), user.Id, ct),
+            () => containerService.UpdateAsync(id, model.ToContainerData(container!.CampId), user.Id, ct),
             slug,
             "Container updated.");
     }
@@ -171,7 +153,7 @@ public class ContainerController : HumansControllerBase
         var (notFound, _) = await ResolveAndAuthorizeAsync(id, ContainerOperationRequirement.Manage, ct);
         if (notFound is not null) return notFound;
 
-        await _containerService.DeleteAsync(id, user.Id, ct);
+        await containerService.DeleteAsync(id, user.Id, ct);
         SetSuccess("Container deleted.");
         return RedirectToAction(nameof(Index), new { slug });
     }
@@ -179,7 +161,7 @@ public class ContainerController : HumansControllerBase
     private async Task<(IActionResult? Error, ContainerDto? Container)> ResolveAndAuthorizeAsync(
         Guid id, ContainerOperationRequirement requirement, CancellationToken ct)
     {
-        var dto = await _containerService.GetByIdAsync(id, ct);
+        var dto = await containerService.GetByIdAsync(id, ct);
         if (dto is null) return (NotFound(), null);
 
         if (!await AuthorizeAsync(ContainerAuthorizationTarget.For(dto), requirement))
@@ -198,7 +180,7 @@ public class ContainerController : HumansControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            _logger.LogWarning("Container write failed for camp {Slug}: {Message}", slug, ex.Message);
+            logger.LogWarning("Container write failed for camp {Slug}: {Message}", slug, ex.Message);
             SetError(ex.Message);
             return RedirectToAction(nameof(Index), new { slug });
         }
