@@ -1186,10 +1186,33 @@ public sealed class CampService : ICampService, IUserDataContributor, IUserMerge
         return await _repo.IsUserActiveLeadAsync(userId, campId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CampLookup>> GetEventManagedCampsAsync(
+        Guid userId, int year, CancellationToken cancellationToken = default)
+    {
+        // Role-based: camps where the user holds Lead or Workshop for any season.
+        var roleCampIds = await _roleRepo.GetCampIdsBySpecialRolesForUserAsync(
+            userId, LeadOrWorkshop, cancellationToken);
+
+        // Legacy fallback: camps where the user is an active lead via the old CampLead table.
+        var legacyCamps = await _repo.GetCampsByLeadUserIdAsync(userId, cancellationToken);
+        var legacyCampIds = legacyCamps.Select(c => c.Id);
+
+        var allCampIds = roleCampIds.Union(legacyCampIds).ToHashSet();
+        if (allCampIds.Count == 0) return [];
+
+        // Filter the year's full camp list down to the ones the user manages.
+        var campsForYear = await _repo.GetCampsWithLeadsForYearAsync(year, null, cancellationToken);
+
+        return campsForYear
+            .Where(c => allCampIds.Contains(c.Id))
+            .Select(CreateCampLookup)
+            .ToList();
+    }
+
     public async Task<bool> IsUserCampEventManagerAsync(
         Guid userId, Guid campId, CancellationToken cancellationToken = default)
     {
-        // Authorizes camp-event submission (BarrioEventsController). Lead OR
+        // Authorizes camp-event submission (EventsController). Lead OR
         // Workshop on the camp's current season. Camp leads inherit Workshop
         // power because the role set is the OR — no separate "lead-implies-
         // workshop" logic. Legacy CampLead fallback covers the deploy window
