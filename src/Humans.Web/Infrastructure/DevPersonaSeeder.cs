@@ -8,6 +8,7 @@ using Humans.Application.Interfaces.GoogleIntegration;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
+using Humans.Application.Services.Camps;
 using Humans.Application.Configuration;
 using Humans.Domain.Constants;
 using Humans.Domain.Entities;
@@ -43,6 +44,7 @@ public sealed class DevPersonaSeeder(
     ISystemTeamSync systemTeamSync,
     IUserService userService,
     ICampService campService,
+    ICampRoleService campRoleService,
     IClock clock,
     IMemoryCache cache,
     IOptions<CityPlanningOptions> cityPlanningOptions,
@@ -375,22 +377,29 @@ public sealed class DevPersonaSeeder(
 
     private async Task<bool> EnsureCampLeadAsync(CampLookup camp, Guid leadUserId)
     {
-        if (camp.Leads.Any(l => l.UserId == leadUserId))
+        // Idempotent: skip if the user already holds the Camp Lead role.
+        if (await campService.IsUserCampLeadAsync(leadUserId, camp.Id))
             return false;
 
-        try
+        var leadDef = await campRoleService.GetDefinitionBySlugAsync(CampSystemRoles.CampLeadSlug);
+        if (leadDef is null)
         {
-            await campService.AddLeadAsync(camp.Id, leadUserId);
-            return true;
-        }
-        catch (InvalidOperationException ex) when (ex.Message.Contains("already an active lead", StringComparison.Ordinal))
-        {
-            // Idempotent: lead was added between the pre-check and AddLeadAsync.
             logger.LogInformation(
-                "DEV: camp lead {UserId} for {CampId} already active — skipping",
-                leadUserId, camp.Id);
+                "DEV: Camp Lead role definition missing — skipping lead seed for {CampId}. Run 'Seed system roles'.",
+                camp.Id);
             return false;
         }
+
+        // Adds an Active CampMember (idempotent) + the Camp Lead role assignment.
+        var outcome = await campService.AddMemberAndAssignRoleInActiveSeasonAsync(
+            camp.Id, leadDef.Id, leadUserId, leadUserId);
+        if (outcome == AssignCampRoleOutcome.Assigned)
+            return true;
+
+        logger.LogInformation(
+            "DEV: camp lead {UserId} for {CampId} not newly assigned ({Outcome}) — skipping",
+            leadUserId, camp.Id, outcome);
+        return false;
     }
 
     /// <summary>
@@ -401,7 +410,7 @@ public sealed class DevPersonaSeeder(
         var now = clock.GetCurrentInstant();
         var changed = false;
 
-        var department = await teamService.GetTeamBySlugAsync("dev-test-department");
+        var department = await teamService.GetTeamEntityBySlugAsync("dev-test-department");
         if (department is null)
         {
             department = await teamService.CreateTeamAsync(
@@ -412,7 +421,7 @@ public sealed class DevPersonaSeeder(
             changed = true;
         }
 
-        var subTeam = await teamService.GetTeamBySlugAsync("dev-test-subteam");
+        var subTeam = await teamService.GetTeamEntityBySlugAsync("dev-test-subteam");
         if (subTeam is null)
         {
             subTeam = await teamService.CreateTeamAsync(
@@ -473,7 +482,7 @@ public sealed class DevPersonaSeeder(
         }
 
         var changed = false;
-        var team = await teamService.GetTeamBySlugAsync(teamSlug);
+        var team = await teamService.GetTeamEntityBySlugAsync(teamSlug);
         if (team is null)
         {
             if (!string.Equals(teamSlug, "city-planning", StringComparison.OrdinalIgnoreCase))

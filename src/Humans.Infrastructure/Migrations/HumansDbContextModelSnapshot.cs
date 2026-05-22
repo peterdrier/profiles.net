@@ -1886,6 +1886,10 @@ namespace Humans.Infrastructure.Migrations
                     b.Property<Guid?>("GuideSharedVenueId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Host")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<bool>("IsRecurring")
                         .HasColumnType("boolean");
 

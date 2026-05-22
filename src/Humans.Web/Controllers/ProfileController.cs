@@ -106,7 +106,7 @@ public class ProfileController(
         Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
     };
 
-    // Admin humans list: bit-flag PersonSearchFields filter + status partition + projection.
+    // Admin humans list: bit-flag PersonSearchFields filter + UserInfo-derived status/filter + projection.
     private async Task<IReadOnlyList<AdminHumanRow>> BuildAdminHumansAsync(
         string? search, string? statusFilter, CancellationToken ct)
     {
@@ -135,13 +135,11 @@ public class ProfileController(
                 .ToHashSet();
         }
 
-        return await AdminHumanListAssembler.AssembleAsync(
+        return AdminHumanListAssembler.Assemble(
             allUsers,
             notificationEmails,
             searchUserIds,
-            statusFilter,
-            membershipCalculator,
-            ct);
+            statusFilter);
     }
 
     // ─── Own Profile (Me) ────────────────────────────────────────────
@@ -2033,6 +2031,43 @@ public class ProfileController(
             id => Url.Action(nameof(AdminDetail), "Profile", new { id }));
 
         return View("AdminList", viewModel);
+    }
+
+    // ─── Admin: Role Assignment Roster ───────────────────────────────
+
+    [Authorize(Policy = PolicyNames.HumanAdminBoardOrAdmin)]
+    [HttpGet("Admin/Roles")]
+    public async Task<IActionResult> Roles(string? role, bool showInactive = false, int page = 1)
+    {
+        var pageSize = 50;
+        var now = clock.GetCurrentInstant();
+
+        var (assignments, totalCount) = await roleAssignmentService.GetFilteredAsync(
+            role, activeOnly: !showInactive, page, pageSize, now);
+
+        var viewModel = new AdminRoleAssignmentListViewModel
+        {
+            RoleAssignments = assignments.Select(ra => new AdminRoleAssignmentViewModel
+            {
+                Id = ra.Id,
+                UserId = ra.UserId,
+                UserEmail = ra.UserEmail ?? string.Empty,
+                RoleName = ra.RoleName,
+                ValidFrom = ra.ValidFrom.ToDateTimeUtc(),
+                ValidTo = ra.ValidTo?.ToDateTimeUtc(),
+                Notes = ra.Notes,
+                IsActive = ra.IsActive(now),
+                CreatedByName = ra.CreatedByDisplayName,
+                CreatedAt = ra.CreatedAt.ToDateTimeUtc()
+            }).ToList(),
+            RoleFilter = role,
+            ShowInactive = showInactive,
+            TotalCount = totalCount,
+            PageNumber = page,
+            PageSize = pageSize
+        };
+
+        return View("~/Views/Shared/Roles.cshtml", viewModel);
     }
 
     // ─── Admin: Per-Person Detail ────────────────────────────────────

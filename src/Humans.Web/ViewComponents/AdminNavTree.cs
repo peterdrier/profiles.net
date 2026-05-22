@@ -20,6 +20,7 @@ public static class AdminNavTree
         ]),
         new("Members", [
             new("Humans", "Profile", "AdminList",       null, null, "fa-solid fa-users",            PolicyNames.HumanAdminBoardOrAdmin),
+            new("Roles",  "Profile", "Roles",           null, null, "fa-solid fa-id-badge",         PolicyNames.HumanAdminBoardOrAdmin),
             new("Review", "OnboardingReview", "Index",   null, null, "fa-solid fa-clipboard-check",  PolicyNames.ReviewQueueAccess,
                  PillCount: PillCounts.ReviewQueue)
         ]),
@@ -46,7 +47,6 @@ public static class AdminNavTree
             new("Voting", "GovernanceBoardVoting", "BoardVoting", null, null, "fa-solid fa-check-to-slot", PolicyNames.BoardOrAdmin,
                  PillCount: PillCounts.VotingQueue),
             new("Applications", "GovernanceApplications", "Admin", null, null, "fa-solid fa-file-signature", PolicyNames.BoardOrAdmin),
-            new("Roles",        "Governance",  "Roles",            null, null, "fa-solid fa-id-badge",       PolicyNames.BoardOrAdmin),
             new("Audit log",    "AuditLog",    "Index",            null, null, "fa-solid fa-book-open",      PolicyNames.BoardOrAdmin)
         ]),
         new("Integrations", [
@@ -76,6 +76,7 @@ public static class AdminNavTree
             new("Logs",            "Admin", "Logs",          null, null, "fa-solid fa-triangle-exclamation", PolicyNames.AdminOnly),
             new("DB stats",        "Admin", "DbStats",       null, null, "fa-solid fa-database",            PolicyNames.AdminOnly),
             new("Cache stats",     "Admin", "CacheStats",    null, null, "fa-solid fa-bolt",                PolicyNames.AdminOnly),
+            new("Client stats",    "Debug", "ClientStats",   null, null, "fa-solid fa-display",             PolicyNames.AdminOnly),
             new("All users (debug)", "UsersAdminDebug", "Index", null, null, "fa-solid fa-bug-slash", PolicyNames.AdminOnly),
             new("Configuration",   "Admin", "Configuration", null, null, "fa-solid fa-gear",                PolicyNames.AdminOnly),
             new("Maintenance",     "Admin", "Maintenance",   null, null, "fa-solid fa-screwdriver-wrench",  PolicyNames.AdminOnly),
@@ -89,6 +90,10 @@ public static class AdminNavTree
                  EnvironmentGate: env => !env.IsProduction()),
             new("Seed camp roles", "DevSeed", "SeedCampRoles", null, null, "fa-solid fa-user-tag",  PolicyNames.AdminOnly,
                  EnvironmentGate: env => !env.IsProduction())
+        ]),
+        new("Design", [
+            new("Color palette", "ColorPalette",  "Index", null, null, "fa-solid fa-palette", PolicyNames.AdminOnly),
+            new("Components",    "WidgetGallery", "Index", null, null, "fa-solid fa-shapes",  PolicyNames.AdminOnly)
         ])
     ];
 }

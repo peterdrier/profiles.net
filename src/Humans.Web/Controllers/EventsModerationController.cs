@@ -53,6 +53,7 @@ public class EventsModerationController(
             ApprovedCount = counts.GetValueOrDefault(EventStatus.Approved),
             RejectedCount = counts.GetValueOrDefault(EventStatus.Rejected),
             ResubmitRequestedCount = counts.GetValueOrDefault(EventStatus.ResubmitRequested),
+            WithdrawnCount = counts.GetValueOrDefault(EventStatus.Withdrawn),
             TimeZoneId = eventSettings?.TimeZoneId,
             Events = events.Select(e => BuildRow(e, tz, campsById, submitterInfoById)).ToList()
         };
@@ -198,7 +199,7 @@ public class EventsModerationController(
             }
 
             var editUrl = guideEvent.CampId.HasValue
-                ? Url.Action("Edit", "BarrioEvents", new { slug = campSlug, eventId }, Request.Scheme)!
+                ? Url.Action("BarrioEdit", "Events", new { slug = campSlug, eventId }, Request.Scheme)!
                 : Url.Action("Edit", "Events", new { eventId }, Request.Scheme)!;
 
             var lifecycleStatus = actionType switch

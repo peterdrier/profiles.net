@@ -54,6 +54,14 @@ public interface ICampRoleRepository : IRepository
         Guid userId, Guid campId, IReadOnlyCollection<CampSpecialRole> specialRoles, CancellationToken ct = default);
 
     /// <summary>
+    /// Returns the distinct camp IDs on which the user holds a non-deactivated
+    /// assignment to any of the given special roles (any season).
+    /// Used by <c>CampService.GetEventManagedCampsAsync</c>.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetCampIdsBySpecialRolesForUserAsync(
+        Guid userId, IReadOnlyCollection<CampSpecialRole> specialRoles, CancellationToken ct = default);
+
+    /// <summary>
     /// Returns the season id where the user holds an active assignment to a
     /// special role with <see cref="CampRoleDefinition.SpecialRole"/> equal to
     /// <paramref name="specialRole"/> on a camp participating in
@@ -77,6 +85,14 @@ public interface ICampRoleRepository : IRepository
     /// </summary>
     Task<IReadOnlyList<Guid>> GetSpecialRoleHolderUserIdsAsync(
         CampSpecialRole specialRole, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the distinct user ids holding the given special role on the
+    /// specified season (non-deactivated definition). Used to source the camp
+    /// detail "Contact the leads" recipient list and admin/CSV lead columns.
+    /// </summary>
+    Task<IReadOnlyList<Guid>> GetSpecialRoleHolderUserIdsForSeasonAsync(
+        Guid campSeasonId, CampSpecialRole specialRole, CancellationToken ct = default);
 
     /// <summary>
     /// Returns true if the user currently holds the given special role on any
