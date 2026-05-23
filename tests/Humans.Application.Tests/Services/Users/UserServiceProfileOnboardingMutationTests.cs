@@ -246,6 +246,83 @@ public sealed class UserServiceProfileOnboardingMutationTests : ServiceTestHarne
         result.ErrorKey.Should().Be("NotFound");
     }
 
+    [HumansFact(Timeout = 5000)]
+    public async Task EnsureStubProfileAsync_TwoConcurrentCallers_OnlyOneAddAsync()
+    {
+        var userId = Guid.NewGuid();
+        SeedUser(userId);
+        await Db.SaveChangesAsync();
+
+        var fakeRepo = Substitute.For<IProfileRepository>();
+        Profile? stored = null;
+        fakeRepo.GetByUserIdAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(_ => Task.FromResult(stored));
+        fakeRepo.When(r => r.AddAsync(Arg.Any<Profile>(), Arg.Any<CancellationToken>()))
+            .Do(call => stored = call.Arg<Profile>());
+
+        var service = BuildWithProfileRepository(fakeRepo);
+
+#pragma warning disable VSTHRD003
+        await Task.WhenAll(
+            Task.Run(() => service.EnsureStubProfileAsync(userId)),
+            Task.Run(() => service.EnsureStubProfileAsync(userId)));
+#pragma warning restore VSTHRD003
+
+        await fakeRepo.Received(1).AddAsync(Arg.Any<Profile>(), Arg.Any<CancellationToken>());
+    }
+
+    [HumansFact]
+    public async Task EnsureStubProfileAsync_MergedTombstone_NoOps()
+    {
+        var userId = Guid.NewGuid();
+        var user = SeedUser(userId);
+        user.MergedAt = Clock.GetCurrentInstant();
+        await Db.SaveChangesAsync();
+
+        await _service.EnsureStubProfileAsync(userId);
+
+        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
+    }
+
+    [HumansFact]
+    public async Task EnsureStubProfileAsync_DeletedTombstone_NoOps()
+    {
+        var userId = Guid.NewGuid();
+        var user = SeedUser(userId);
+        user.DisplayName = "Deleted User";
+        await Db.SaveChangesAsync();
+
+        await _service.EnsureStubProfileAsync(userId);
+
+        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
+    }
+
+    [HumansFact]
+    public async Task SetMembershipTierAsync_UpdatesTierAndUpdatedAt()
+    {
+        var userId = Guid.NewGuid();
+        await SeedUserWithProfileAsync(userId);
+        Clock.Advance(NodaTime.Duration.FromHours(1));
+
+        await _service.SetMembershipTierAsync(userId, MembershipTier.Colaborador);
+
+        var profile = await Db.Profiles.AsNoTracking().FirstAsync(p => p.UserId == userId);
+        profile.MembershipTier.Should().Be(MembershipTier.Colaborador);
+        profile.UpdatedAt.Should().Be(Clock.GetCurrentInstant());
+    }
+
+    [HumansFact]
+    public async Task SetMembershipTierAsync_UnknownUser_NoOps()
+    {
+        var unknownUserId = Guid.NewGuid();
+
+        var updated = await _service.SetMembershipTierAsync(unknownUserId, MembershipTier.Asociado);
+
+        updated.Should().BeFalse();
+        var profileExists = await Db.Profiles.AsNoTracking().AnyAsync(p => p.UserId == unknownUserId);
+        profileExists.Should().BeFalse();
+    }
+
     private async Task<Guid> SeedUserWithProfileAsync(
         Guid userId,
         MembershipTier tier = MembershipTier.Volunteer,
@@ -268,4 +345,15 @@ public sealed class UserServiceProfileOnboardingMutationTests : ServiceTestHarne
         await Db.SaveChangesAsync();
         return profile.Id;
     }
+
+    private UserService BuildWithProfileRepository(IProfileRepository profileRepository) =>
+        new(
+            new UserRepository(DbFactory),
+            new UserEmailRepository(DbFactory),
+            profileRepository,
+            new ContactFieldRepository(DbFactory),
+            Substitute.For<ICommunicationPreferenceRepository>(),
+            AdminAuthorization,
+            Clock,
+            NullLogger<UserService>.Instance);
 }

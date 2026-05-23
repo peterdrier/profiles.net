@@ -35,16 +35,6 @@ public sealed class ProfileService(IProfileRepository profileRepository,
     private static SemaphoreSlim LockFor(Guid userId)
         => _userLocks[(uint)userId.GetHashCode() % (uint)_userLocks.Length];
 
-    public async Task SetMembershipTierAsync(
-        Guid userId, MembershipTier tier, CancellationToken ct = default)
-    {
-        await userService.SetMembershipTierAsync(userId, tier, ct);
-    }
-
-    public async Task EnsureStubProfileAsync(Guid userId, CancellationToken ct = default)
-    {
-        await userService.EnsureStubProfileAsync(userId, ct);
-    }
 
     public async Task SetProfilePictureAsync(
         Guid userId, byte[] pictureData, string contentType, CancellationToken ct = default)
@@ -272,26 +262,6 @@ public sealed class ProfileService(IProfileRepository profileRepository,
         return (true, 0, null);
     }
 
-    public async Task SaveCVEntriesAsync(Guid userId, IReadOnlyList<CVEntry> entries, CancellationToken ct = default)
-    {
-        await userService.SaveProfileVolunteerHistoryAsync(userId, entries, ct);
-    }
-
-    public async Task<IReadOnlyList<ProfileLanguageSnapshot>> GetProfileLanguagesAsync(
-        Guid profileId, CancellationToken ct = default)
-    {
-        var languages = await profileRepository.GetLanguagesAsync(profileId, ct);
-        return languages.Select(l => new ProfileLanguageSnapshot(
-            l.Id,
-            l.ProfileId,
-            l.LanguageCode,
-            l.Proficiency)).ToList();
-    }
-
-    public async Task SaveProfileLanguagesAsync(Guid profileId, IReadOnlyList<ProfileLanguage> languages, CancellationToken ct = default)
-    {
-        await userService.SaveProfileLanguagesAsync(profileId, languages, ct);
-    }
 
     // --- GDPR Export — Profile-section slices ---
 
@@ -440,25 +410,6 @@ public sealed class ProfileService(IProfileRepository profileRepository,
         _ => string.Empty
     };
 
-    public async Task<IReadOnlySet<Guid>> SuspendForMissingConsentAsync(
-        IReadOnlyCollection<Guid> userIds,
-        Instant now,
-        CancellationToken ct = default)
-    {
-        return await userService.SuspendProfilesForMissingConsentAsync(userIds, now, ct);
-    }
-
-    public async Task<IReadOnlyList<(Guid UserId, MembershipTier NewTier)>>
-        DowngradeTierForExpiredAsync(
-            MembershipTier currentTier,
-            IReadOnlyCollection<Guid> userIdsToKeep,
-            IReadOnlyDictionary<Guid, MembershipTier> fallbackTierByUser,
-            Instant now,
-            CancellationToken ct = default)
-    {
-        return await userService.DowngradeMembershipTierForExpiredAsync(
-            currentTier, userIdsToKeep, fallbackTierByUser, now, ct);
-    }
 
     public async Task ReassignAsync(Guid sourceUserId, Guid targetUserId, Guid actorUserId, Instant updatedAt,
         CancellationToken ct)

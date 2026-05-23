@@ -59,18 +59,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
 
         _userService.StubGetUserInfosFromContext(Db);
         _userService.StubGetUserInfoFromContext(Db);
-        _userService.EnsureStubProfileAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.EnsureStubProfileAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<CancellationToken>(1)));
-        _userService.SetMembershipTierAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<MembershipTier>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.SetMembershipTierAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<MembershipTier>(1),
-                call.ArgAt<CancellationToken>(2)));
         _userService.SaveProfileAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<UserProfileSaveCommand>(),
@@ -103,22 +91,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
                 call.ArgAt<Guid>(1),
                 call.ArgAt<Instant>(2),
                 call.ArgAt<CancellationToken>(3)));
-        _userService.SaveProfileVolunteerHistoryAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<IReadOnlyList<CVEntry>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.SaveProfileVolunteerHistoryAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<IReadOnlyList<CVEntry>>(1),
-                call.ArgAt<CancellationToken>(2)));
-        _userService.SaveProfileLanguagesAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<IReadOnlyList<ProfileLanguage>>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.SaveProfileLanguagesAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<IReadOnlyList<ProfileLanguage>>(1),
-                call.ArgAt<CancellationToken>(2)));
         _userService.SetProfileIbanAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<string?>(),
@@ -127,26 +99,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
                 call.ArgAt<Guid>(0),
                 call.ArgAt<string?>(1),
                 call.ArgAt<CancellationToken>(2)));
-        _userService.SuspendProfilesForMissingConsentAsync(
-                Arg.Any<IReadOnlyCollection<Guid>>(),
-                Arg.Any<Instant>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.SuspendProfilesForMissingConsentAsync(
-                call.ArgAt<IReadOnlyCollection<Guid>>(0),
-                call.ArgAt<Instant>(1),
-                call.ArgAt<CancellationToken>(2)));
-        _userService.DowngradeMembershipTierForExpiredAsync(
-                Arg.Any<MembershipTier>(),
-                Arg.Any<IReadOnlyCollection<Guid>>(),
-                Arg.Any<IReadOnlyDictionary<Guid, MembershipTier>>(),
-                Arg.Any<Instant>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.DowngradeMembershipTierForExpiredAsync(
-                call.ArgAt<MembershipTier>(0),
-                call.ArgAt<IReadOnlyCollection<Guid>>(1),
-                call.ArgAt<IReadOnlyDictionary<Guid, MembershipTier>>(2),
-                call.ArgAt<Instant>(3),
-                call.ArgAt<CancellationToken>(4)));
     }
 
     // --- Profile save flow ---
@@ -693,126 +645,5 @@ public sealed class ProfileServiceTests : ServiceTestHarness
         json.Should().NotContain("\"IsPrimary\":");
     }
 
-    // Smoke test for the per-userId user-storage lock that replaced the
-    // AddIfNotExistsByUserIdAsync 23505-translating repo method. Asserts the
-    // lock serializes two concurrent EnsureStubProfileAsync callers so that
-    // only one AddAsync fires for a given userId.
-    [HumansFact(Timeout = 5000)]
-    public async Task EnsureStubProfileAsync_TwoConcurrentCallers_OnlyOneAddAsync()
-    {
-        var userId = Guid.NewGuid();
-        await SeedUserAsync(userId);
-
-        var fakeRepo = Substitute.For<IProfileRepository>();
-        Profile? stored = null;
-        fakeRepo.GetByUserIdAsync(userId, Arg.Any<CancellationToken>())
-            .Returns(_ => Task.FromResult(stored));
-        fakeRepo.When(r => r.AddAsync(Arg.Any<Profile>(), Arg.Any<CancellationToken>()))
-            .Do(call => stored = call.Arg<Profile>());
-
-        var service = new UserService(
-            new UserRepository(DbFactory),
-            _userEmailRepository,
-            fakeRepo,
-            _contactFieldRepository,
-            _communicationPreferenceRepository,
-            AdminAuthorization,
-            Clock,
-            NullLogger<UserService>.Instance);
-
-#pragma warning disable VSTHRD003 // Avoid awaiting foreign Tasks
-        await Task.WhenAll(
-            Task.Run(() => service.EnsureStubProfileAsync(userId)),
-            Task.Run(() => service.EnsureStubProfileAsync(userId)));
-#pragma warning restore VSTHRD003
-
-        await fakeRepo.Received(1).AddAsync(Arg.Any<Profile>(), Arg.Any<CancellationToken>());
-    }
-
-    [HumansFact]
-    public async Task EnsureStubProfileAsync_MergedTombstone_NoOps()
-    {
-        var userId = Guid.NewGuid();
-        var user = await SeedUserAsync(userId);
-        user.MergedAt = Clock.GetCurrentInstant();
-        await Db.SaveChangesAsync();
-
-        await _service.EnsureStubProfileAsync(userId);
-
-        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
-    }
-
-    [HumansFact]
-    public async Task EnsureStubProfileAsync_DeletedTombstone_NoOps()
-    {
-        var userId = Guid.NewGuid();
-        var user = await SeedUserAsync(userId);
-        user.DisplayName = "Deleted User";
-        await Db.SaveChangesAsync();
-
-        await _service.EnsureStubProfileAsync(userId);
-
-        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
-    }
-
-    [HumansFact]
-    public async Task EnsureStubProfileAsync_LegacyMergedLocalEmail_NoOps()
-    {
-        var userId = Guid.NewGuid();
-        var user = await SeedUserAsync(userId);
-        user.Email = $"legacy-{userId}@merged.local";
-        await Db.SaveChangesAsync();
-
-        await _service.EnsureStubProfileAsync(userId);
-
-        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
-    }
-
-    [HumansFact]
-    public async Task EnsureStubProfileAsync_LegacyDeletedLocalEmail_NoOps()
-    {
-        var userId = Guid.NewGuid();
-        var user = await SeedUserAsync(userId);
-        user.Email = $"purged-{userId}@deleted.local";
-        await Db.SaveChangesAsync();
-
-        await _service.EnsureStubProfileAsync(userId);
-
-        (await Db.Profiles.AnyAsync(p => p.UserId == userId)).Should().BeFalse();
-    }
-
-    // ==========================================================================
-    // Issue #474 — phase 5 service-ownership: every profile state mutation now
-    // routes through ProfileService so the §15 caching decorator can keep the
-    // FullProfile dict in sync atomically with the DB write. These tests pin
-    // the contracts the decorator relies on (return values, field updates,
-    // error keys) so future refactors can't drift the behaviour.
-    // ==========================================================================
-
-    [HumansFact]
-    public async Task SetMembershipTierAsync_UpdatesTierAndUpdatedAt()
-    {
-        var userId = Guid.NewGuid();
-        await SeedUserWithProfileAsync(userId);
-        Clock.Advance(Duration.FromHours(1));
-
-        await _service.SetMembershipTierAsync(userId, MembershipTier.Colaborador);
-
-        var profile = await Db.Profiles.AsNoTracking().FirstAsync(p => p.UserId == userId);
-        profile.MembershipTier.Should().Be(MembershipTier.Colaborador);
-        profile.UpdatedAt.Should().Be(Clock.GetCurrentInstant());
-    }
-
-    [HumansFact]
-    public async Task SetMembershipTierAsync_UnknownUser_NoOp()
-    {
-        var unknownUserId = Guid.NewGuid();
-
-        // No throw, no profile created — just a logged warning.
-        await _service.SetMembershipTierAsync(unknownUserId, MembershipTier.Asociado);
-
-        var profileExists = await Db.Profiles.AsNoTracking().AnyAsync(p => p.UserId == unknownUserId);
-        profileExists.Should().BeFalse();
-    }
 
 }
