@@ -60,6 +60,7 @@ public class ProfileControllerEditTests
     private readonly IShiftManagementService _shiftMgmt = Substitute.For<IShiftManagementService>();
     private readonly ProfileController _controller;
     private readonly Guid _userId = Guid.NewGuid();
+    private readonly Guid _profileId = Guid.NewGuid();
 
     public ProfileControllerEditTests()
     {
@@ -149,7 +150,13 @@ public class ProfileControllerEditTests
         _profileService.SaveProfileAsync(
                 Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProfileSaveRequest>(),
                 Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Guid.NewGuid());
+            .Returns(_profileId);
+        _userService.SaveProfileVolunteerHistoryAsync(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyList<CVEntry>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        _userService.SaveProfileLanguagesAsync(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyList<ProfileLanguage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new UserProfileLanguagesSaveResult(true, _userId)));
     }
 
     [HumansFact]
@@ -164,6 +171,10 @@ public class ProfileControllerEditTests
             .SubmitAsync(Guid.Empty, default, null!, null, null, null, null!, CancellationToken.None);
         await _applicationDecisionService.DidNotReceiveWithAnyArgs()
             .UpdateDraftApplicationAsync(Guid.Empty, default, null!, null, null, null, CancellationToken.None);
+        await _userService.Received(1).SaveProfileVolunteerHistoryAsync(
+            _userId, Arg.Any<IReadOnlyList<CVEntry>>(), Arg.Any<CancellationToken>());
+        await _userService.Received(1).SaveProfileLanguagesAsync(
+            _profileId, Arg.Any<IReadOnlyList<ProfileLanguage>>(), Arg.Any<CancellationToken>());
     }
 
     [HumansFact]

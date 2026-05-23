@@ -447,7 +447,7 @@ public class ProfileController(
             ))
             .ToList();
 
-        await profileService.SaveCVEntriesAsync(user.Id, cvEntries);
+        await _userService.SaveProfileVolunteerHistoryAsync(user.Id, cvEntries);
 
         // Languages: remove-and-replace.
         var newLanguages = model.EditableLanguages
@@ -461,7 +461,7 @@ public class ProfileController(
             })
             .ToList();
 
-        await profileService.SaveProfileLanguagesAsync(profileId, newLanguages);
+        await _userService.SaveProfileLanguagesAsync(profileId, newLanguages);
 
         await shiftMgmt.SetVolunteerTagPreferencesAsync(user.Id, model.EditableShiftTagIds);
 
@@ -2518,7 +2518,6 @@ public class ProfileController(
     }
 
 }
-
 
 
 
