@@ -1,5 +1,4 @@
 using Humans.Application.DTOs;
-using Humans.Application.Interfaces.Onboarding;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
@@ -93,63 +92,6 @@ public interface IProfileService : IApplicationService, IUserMerge
     /// </summary>
     Task SaveProfileLanguagesAsync(Guid profileId, IReadOnlyList<ProfileLanguage> languages, CancellationToken ct = default);
 
-    // ==========================================================================
-    // Onboarding-section support methods — exposed so OnboardingService can
-    // coordinate profile mutations without touching the Profile section's
-    // DbSet directly (design-rules §2c). Each method owns its own cache
-    // invalidation (UserInfo refresh, nav-badge, notification meter) so the
-    // Onboarding orchestrator has no cache responsibilities (§15i goal).
-    // ==========================================================================
-
-    /// <summary>
-    /// Records a reviewer's consent-check decision. <paramref name="result"/>
-    /// must be <see cref="ConsentCheckStatus.Cleared"/> (also sets
-    /// <c>IsApproved=true</c>) or <see cref="ConsentCheckStatus.Flagged"/>
-    /// (sets <c>IsApproved=false</c>). The system-side
-    /// <see cref="ConsentCheckStatus.Pending"/> transition lives on
-    /// <see cref="SetConsentCheckPendingAsync"/>. Error keys:
-    /// <c>NotFound</c>, <c>AlreadyRejected</c> (Cleared only).
-    /// </summary>
-    Task<OnboardingResult> RecordConsentCheckAsync(
-        Guid userId, Guid reviewerId, ConsentCheckStatus result, string? notes,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Rejects a signup (records rejection reason, sets RejectedAt).
-    /// Error keys: <c>NotFound</c>, <c>AlreadyRejected</c>.
-    /// </summary>
-    Task<OnboardingResult> RejectSignupAsync(
-        Guid userId, Guid reviewerId, string? reason, CancellationToken ct = default);
-
-    /// <summary>
-    /// Approves a profile as volunteer (sets IsApproved).
-    /// Error keys: <c>NotFound</c>.
-    /// </summary>
-    Task<OnboardingResult> ApproveVolunteerAsync(
-        Guid userId, Guid adminId, CancellationToken ct = default);
-
-    /// <summary>
-    /// Sets the human's suspension state. Dual-writes the legacy
-    /// <c>IsSuspended</c> bool and the canonical
-    /// <see cref="ProfileState"/> lifecycle marker (suspending →
-    /// <see cref="ProfileState.Suspended"/>; unsuspending re-derives
-    /// Active vs Stub from BurnerName + FirstName + LastName all being set).
-    /// Suspending also persists <paramref name="notes"/> as
-    /// <c>AdminNotes</c>; unsuspending ignores notes. Error keys:
-    /// <c>NotFound</c>.
-    /// </summary>
-    Task<OnboardingResult> SetSuspendedAsync(
-        Guid userId, Guid adminId, bool suspended, string? notes,
-        CancellationToken ct = default);
-
-    /// <summary>
-    /// Sets a profile's consent check status to <c>Pending</c> and bumps
-    /// <c>UpdatedAt</c>. Returns false if no profile exists. The caller is
-    /// expected to have verified eligibility (all required consents signed,
-    /// not approved, no existing status); this method performs the write and
-    /// cache refresh.
-    /// </summary>
-    Task<bool> SetConsentCheckPendingAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Anonymizes the personal fields of the user's profile for GDPR
@@ -167,7 +109,8 @@ public interface IProfileService : IApplicationService, IUserMerge
     /// <summary>
     /// Sets <see cref="Profile.IsSuspended"/> to true and stamps
     /// <see cref="Profile.UpdatedAt"/> for users whose consent grace period has
-    /// expired. Unlike <see cref="SetSuspendedAsync"/>, this variant does not
+    /// expired. Unlike the per-human lifecycle mutation on
+    /// <see cref="IUserService.ApplyProfileOnboardingMutationAsync"/>, this variant does not
     /// require an admin actor, skip-list already-suspended profiles (so the
     /// caller can pre-filter with the returned set), and does not write an
     /// audit log entry — the caller is expected to emit the
