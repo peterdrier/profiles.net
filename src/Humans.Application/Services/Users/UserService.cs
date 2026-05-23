@@ -408,6 +408,18 @@ public sealed class UserService(
             contentType);
     }
 
+    public async Task<UserProfileAnonymizeResult> AnonymizeProfileForDeletionAsync(
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var profile = await profileRepo.GetByUserIdReadOnlyAsync(userId, ct);
+        var anonymized = await profileRepo.AnonymizeForDeletionByUserIdAsync(userId, ct);
+        return new UserProfileAnonymizeResult(
+            anonymized,
+            profile?.Id,
+            profile?.ProfilePictureContentType);
+    }
+
     public async Task<bool> SaveProfileVolunteerHistoryAsync(
         Guid userId,
         IReadOnlyList<CVEntry> entries,

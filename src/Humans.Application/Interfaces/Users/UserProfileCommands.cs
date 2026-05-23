@@ -65,6 +65,11 @@ public sealed record UserProfilePictureContentTypeResult(
     string? PreviousProfilePictureContentType,
     string? CurrentProfilePictureContentType);
 
+public sealed record UserProfileAnonymizeResult(
+    bool Anonymized,
+    Guid? ProfileId,
+    string? PreviousProfilePictureContentType);
+
 public sealed record UserProfileLanguagesSaveResult(
     bool Saved,
     Guid? UserId);

@@ -379,6 +379,40 @@ public class CachingUserServiceTests
     }
 
     [HumansFact]
+    public async Task AnonymizeProfileForDeletionAsync_RefreshesAnonymizedProfileSlice()
+    {
+        var userId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var sut = CreateSut();
+        await PrimeAsync(sut, SampleUserInfo(userId));
+
+        _inner.AnonymizeProfileForDeletionAsync(userId, Arg.Any<CancellationToken>())
+            .Returns(new UserProfileAnonymizeResult(true, profileId, "image/png"));
+
+        var profile = new Profile
+        {
+            Id = profileId,
+            UserId = userId,
+            BurnerName = "",
+            FirstName = "Deleted",
+            LastName = "User",
+            ProfilePictureContentType = null,
+            CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
+            UpdatedAt = Instant.FromUtc(2026, 1, 2, 0, 0),
+        };
+        StubRefreshEntry(userId, profile);
+
+        var result = await sut.AnonymizeProfileForDeletionAsync(userId);
+
+        result.Anonymized.Should().BeTrue();
+        result.PreviousProfilePictureContentType.Should().Be("image/png");
+        var refreshed = await sut.GetUserInfoAsync(userId);
+        refreshed!.Profile.Should().NotBeNull();
+        refreshed.Profile!.FirstName.Should().Be("Deleted");
+        refreshed.Profile.ProfilePictureContentType.Should().BeNull();
+    }
+
+    [HumansFact]
     public async Task SaveProfileVolunteerHistoryAsync_RefreshesVolunteerHistorySlice()
     {
         var userId = Guid.NewGuid();

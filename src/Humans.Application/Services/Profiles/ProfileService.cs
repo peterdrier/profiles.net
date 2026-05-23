@@ -534,16 +534,15 @@ public sealed class ProfileService(IProfileRepository profileRepository,
     public async Task<bool> AnonymizeExpiredProfileAsync(Guid userId, CancellationToken ct = default)
     {
         // Clear content-type column (GDPR read-gate) then best-effort delete file; log on FS failure for manual cleanup.
-        var profile = await profileRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        var anonymized = await profileRepository.AnonymizeForDeletionByUserIdAsync(userId, ct);
-        if (anonymized)
-            await userInfoInvalidator.InvalidateAsync(userId, ct);
-        if (anonymized && profile?.ProfilePictureContentType is not null)
+        var storageResult = await userService.AnonymizeProfileForDeletionAsync(userId, ct);
+        if (storageResult.Anonymized &&
+            storageResult.ProfileId is { } profileId &&
+            storageResult.PreviousProfilePictureContentType is { } contentType)
         {
             try
             {
                 await fileStorage.DeleteAsync(
-                    ProfilePictureKey(profile.Id, profile.ProfilePictureContentType), ct);
+                    ProfilePictureKey(profileId, contentType), ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -551,10 +550,10 @@ public sealed class ProfileService(IProfileRepository profileRepository,
                     "Failed to delete filesystem profile picture during anonymization for {ProfileId}; " +
                     "DB has been cleared so the read-path gate prevents the stale file from being served, " +
                     "but the file should be removed manually to complete GDPR data deletion",
-                    profile.Id);
+                    profileId);
             }
         }
-        return anonymized;
+        return storageResult.Anonymized;
     }
 
     // Pictures live at uploads/profile-pictures/{id}{ext}; Program.cs 404s the subpath so reads go through GetProfilePictureAsync (GDPR gate).

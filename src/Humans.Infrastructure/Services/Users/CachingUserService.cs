@@ -880,6 +880,16 @@ public sealed class CachingUserService(
         return result;
     }
 
+    public async Task<UserProfileAnonymizeResult> AnonymizeProfileForDeletionAsync(
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.AnonymizeProfileForDeletionAsync(userId, ct));
+        if (result.Anonymized) await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
     public async Task<bool> SaveProfileVolunteerHistoryAsync(
         Guid userId,
         IReadOnlyList<CVEntry> entries,

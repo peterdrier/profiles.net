@@ -219,6 +219,15 @@ public interface IUserService : IUserServiceRead, IApplicationService, IUserMerg
         CancellationToken ct = default);
 
     /// <summary>
+    /// Anonymizes profile-owned personal data for GDPR deletion and returns the
+    /// previous picture metadata so the orchestrator can remove filesystem
+    /// bytes after the DB read gate has been cleared.
+    /// </summary>
+    Task<UserProfileAnonymizeResult> AnonymizeProfileForDeletionAsync(
+        Guid userId,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Reconciles the profile's volunteer-history rows. Returns false when no
     /// profile exists for the user.
     /// </summary>
