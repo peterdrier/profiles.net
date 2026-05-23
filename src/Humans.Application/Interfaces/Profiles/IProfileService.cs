@@ -50,17 +50,4 @@ public interface IProfileService : IApplicationService, IUserMerge
     Task<(bool CanAdd, int MinutesUntilResend, Guid? PendingEmailId)>
         GetEmailCooldownInfoAsync(Guid pendingEmailId, CancellationToken ct = default);
 
-    /// <summary>
-    /// Anonymizes the personal fields of the user's profile for GDPR
-    /// expiry-based deletion: clears first/last name → "Deleted"/"User",
-    /// burner name → empty, and blanks every optional demographic /
-    /// emergency-contact / admin-note / contribution-interest field. Also
-    /// removes every <c>ContactField</c> and <c>VolunteerHistoryEntry</c> row
-    /// owned by the profile in the same save. No-op if the user has no
-    /// profile. Returns <c>true</c> if a profile was anonymized. Used by the
-    /// account deletion job via
-    /// <see cref="Users.IAccountDeletionService.AnonymizeExpiredAccountAsync"/>.
-    /// </summary>
-    Task<bool> AnonymizeExpiredProfileAsync(Guid userId, CancellationToken ct = default);
-
 }

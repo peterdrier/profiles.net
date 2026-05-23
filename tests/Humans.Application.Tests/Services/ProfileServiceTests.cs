@@ -74,12 +74,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
                 call.ArgAt<Guid>(0),
                 call.ArgAt<string>(1),
                 call.ArgAt<CancellationToken>(2)));
-        _userService.AnonymizeProfileForDeletionAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.AnonymizeProfileForDeletionAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<CancellationToken>(1)));
         _userService.ReassignProfileSubAggregatesAsync(
                 Arg.Any<Guid>(),
                 Arg.Any<Guid>(),
@@ -236,21 +230,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
         _fileStorage.Files.Should().NotContainKey(PicKey(profileId, "image/png"));
     }
 
-    [HumansFact]
-    public async Task AnonymizeExpiredProfileAsync_ClearsProfileAndDeletesPictureFile()
-    {
-        var userId = Guid.NewGuid();
-        var profileId = await SeedUserWithProfileAsync(userId, withPicture: true);
-
-        var anonymized = await _service.AnonymizeExpiredProfileAsync(userId);
-
-        anonymized.Should().BeTrue();
-        var profile = await Db.Profiles.AsNoTracking().SingleAsync(p => p.UserId == userId);
-        profile.ProfilePictureContentType.Should().BeNull();
-        profile.FirstName.Should().Be("Deleted");
-        profile.LastName.Should().Be("User");
-        _fileStorage.Files.Should().NotContainKey(PicKey(profileId, "image/png"));
-    }
 
     // Threshold check (formerly SaveProfileAsync_CallsSetConsentCheckPending)
     // moved out of ProfileService entirely — it's a director method on

@@ -323,6 +323,27 @@ public sealed class UserServiceProfileOnboardingMutationTests : ServiceTestHarne
         profileExists.Should().BeFalse();
     }
 
+    [HumansFact]
+    public async Task AnonymizeProfileForDeletionAsync_ClearsProfileAndReturnsPreviousPictureMetadata()
+    {
+        var userId = Guid.NewGuid();
+        var profileId = await SeedUserWithProfileAsync(userId);
+        var profile = await Db.Profiles.FirstAsync(p => p.Id == profileId);
+        profile.ProfilePictureContentType = "image/png";
+        await Db.SaveChangesAsync();
+
+        var result = await _service.AnonymizeProfileForDeletionAsync(userId);
+
+        result.Anonymized.Should().BeTrue();
+        result.ProfileId.Should().Be(profileId);
+        result.PreviousProfilePictureContentType.Should().Be("image/png");
+
+        var fresh = await Db.Profiles.AsNoTracking().SingleAsync(p => p.UserId == userId);
+        fresh.ProfilePictureContentType.Should().BeNull();
+        fresh.FirstName.Should().Be("Deleted");
+        fresh.LastName.Should().Be("User");
+    }
+
     private async Task<Guid> SeedUserWithProfileAsync(
         Guid userId,
         MembershipTier tier = MembershipTier.Volunteer,
