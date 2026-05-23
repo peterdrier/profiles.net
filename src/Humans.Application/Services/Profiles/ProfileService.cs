@@ -19,7 +19,6 @@ public sealed class ProfileService(IProfileRepository profileRepository,
     IContactFieldRepository contactFieldRepository,
     ICommunicationPreferenceRepository communicationPreferenceRepository,
     IFileStorage fileStorage,
-    IClock clock,
     ILogger<ProfileService> logger) : IProfileService, IUserDataContributor, IUserMerge
 {
     public async Task SetProfilePictureAsync(
@@ -115,26 +114,6 @@ public sealed class ProfileService(IProfileRepository profileRepository,
 
         return new ProfilePictureMigrationSnapshot(rows.Count, onFs, dbOnly);
     }
-
-    public async Task<(bool CanAdd, int MinutesUntilResend, Guid? PendingEmailId)>
-        GetEmailCooldownInfoAsync(Guid pendingEmailId, CancellationToken ct = default)
-    {
-        var now = clock.GetCurrentInstant();
-        var pendingRecord = await userEmailRepository.GetByIdReadOnlyAsync(pendingEmailId, ct);
-
-        if (pendingRecord?.VerificationSentAt.HasValue == true)
-        {
-            var cooldownEnd = pendingRecord.VerificationSentAt.Value.Plus(Duration.FromMinutes(5));
-            if (now < cooldownEnd)
-            {
-                var minutesUntilResend = (int)Math.Ceiling((cooldownEnd - now).TotalMinutes);
-                return (false, minutesUntilResend, pendingEmailId);
-            }
-        }
-
-        return (true, 0, null);
-    }
-
 
     // --- GDPR Export — Profile-section slices ---
 

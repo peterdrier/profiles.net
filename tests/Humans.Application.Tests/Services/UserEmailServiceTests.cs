@@ -81,6 +81,72 @@ public class UserEmailServiceTests
                 call.ArgAt<CancellationToken>(3)));
     }
 
+    [HumansFact]
+    public async Task GetEmailCooldownInfoAsync_WithinCooldown_ReturnsFalse()
+    {
+        var userId = Guid.NewGuid();
+        var emailId = Guid.NewGuid();
+        _repository.GetByIdReadOnlyAsync(emailId, Arg.Any<CancellationToken>())
+            .Returns(new UserEmail
+            {
+                Id = emailId,
+                UserId = userId,
+                Email = "test@test.com",
+                VerificationSentAt = _clock.GetCurrentInstant() - Duration.FromMinutes(2),
+            });
+
+        var (canAdd, minutesUntilResend, pendingEmailId) =
+            await _service.GetEmailCooldownInfoAsync(emailId);
+
+        canAdd.Should().BeFalse();
+        minutesUntilResend.Should().BeGreaterThan(0);
+        pendingEmailId.Should().Be(emailId);
+    }
+
+    [HumansFact]
+    public async Task GetEmailCooldownInfoAsync_AfterCooldown_ReturnsTrue()
+    {
+        var userId = Guid.NewGuid();
+        var emailId = Guid.NewGuid();
+        _repository.GetByIdReadOnlyAsync(emailId, Arg.Any<CancellationToken>())
+            .Returns(new UserEmail
+            {
+                Id = emailId,
+                UserId = userId,
+                Email = "test@test.com",
+                VerificationSentAt = _clock.GetCurrentInstant() - Duration.FromMinutes(6),
+            });
+
+        var (canAdd, minutesUntilResend, pendingEmailId) =
+            await _service.GetEmailCooldownInfoAsync(emailId);
+
+        canAdd.Should().BeTrue();
+        minutesUntilResend.Should().Be(0);
+        pendingEmailId.Should().BeNull();
+    }
+
+    [HumansFact]
+    public async Task GetEmailCooldownInfoAsync_NoVerificationSent_ReturnsTrue()
+    {
+        var userId = Guid.NewGuid();
+        var emailId = Guid.NewGuid();
+        _repository.GetByIdReadOnlyAsync(emailId, Arg.Any<CancellationToken>())
+            .Returns(new UserEmail
+            {
+                Id = emailId,
+                UserId = userId,
+                Email = "test@test.com",
+                VerificationSentAt = null,
+            });
+
+        var (canAdd, minutesUntilResend, pendingEmailId) =
+            await _service.GetEmailCooldownInfoAsync(emailId);
+
+        canAdd.Should().BeTrue();
+        minutesUntilResend.Should().Be(0);
+        pendingEmailId.Should().BeNull();
+    }
+
     private async Task<UserEmailAddResult> AddUserEmailThroughRepositoryAsync(
         Guid userId,
         UserEmailAddCommand command,

@@ -56,7 +56,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
             _userEmailRepository,
             _contactFieldRepository, _communicationPreferenceRepository,
             _fileStorage,
-            Clock,
             NullLogger<ProfileService>.Instance);
         _editor = new ProfileEditorService(
             _userService,
@@ -357,72 +356,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
     // concern.
 
     // --- Cooldown and export ---
-
-    [HumansFact]
-    public async Task GetEmailCooldownInfoAsync_WithinCooldown_ReturnsFalse()
-    {
-        var userId = Guid.NewGuid();
-        await SeedUserAsync(userId);
-        var emailId = Guid.NewGuid();
-        Db.UserEmails.Add(new UserEmail
-        {
-            Id = emailId,
-            UserId = userId,
-            Email = "test@test.com",
-            VerificationSentAt = Clock.GetCurrentInstant() - Duration.FromMinutes(2),
-        });
-        await Db.SaveChangesAsync();
-
-        var (canAdd, minutesUntilResend, pendingEmailId) = await _service.GetEmailCooldownInfoAsync(emailId);
-
-        canAdd.Should().BeFalse();
-        minutesUntilResend.Should().BeGreaterThan(0);
-        pendingEmailId.Should().Be(emailId);
-    }
-
-    [HumansFact]
-    public async Task GetEmailCooldownInfoAsync_AfterCooldown_ReturnsTrue()
-    {
-        var userId = Guid.NewGuid();
-        await SeedUserAsync(userId);
-        var emailId = Guid.NewGuid();
-        Db.UserEmails.Add(new UserEmail
-        {
-            Id = emailId,
-            UserId = userId,
-            Email = "test@test.com",
-            VerificationSentAt = Clock.GetCurrentInstant() - Duration.FromMinutes(6),
-        });
-        await Db.SaveChangesAsync();
-
-        var (canAdd, minutesUntilResend, pendingEmailId) = await _service.GetEmailCooldownInfoAsync(emailId);
-
-        canAdd.Should().BeTrue();
-        minutesUntilResend.Should().Be(0);
-        pendingEmailId.Should().BeNull();
-    }
-
-    [HumansFact]
-    public async Task GetEmailCooldownInfoAsync_NoVerificationSent_ReturnsTrue()
-    {
-        var userId = Guid.NewGuid();
-        await SeedUserAsync(userId);
-        var emailId = Guid.NewGuid();
-        Db.UserEmails.Add(new UserEmail
-        {
-            Id = emailId,
-            UserId = userId,
-            Email = "test@test.com",
-            VerificationSentAt = null,
-        });
-        await Db.SaveChangesAsync();
-
-        var (canAdd, minutesUntilResend, pendingEmailId) = await _service.GetEmailCooldownInfoAsync(emailId);
-
-        canAdd.Should().BeTrue();
-        minutesUntilResend.Should().Be(0);
-        pendingEmailId.Should().BeNull();
-    }
 
     // SearchProfilesAsync + GetFullProfileAsync tests removed alongside the
     // FullProfile delete. The search surface lives on IUserService.SearchUsersAsync

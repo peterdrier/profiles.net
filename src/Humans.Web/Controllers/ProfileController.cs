@@ -2378,7 +2378,7 @@ public class ProfileController(
         if (pendingEmail is not null)
         {
             var (cooldownCanAdd, cooldownMinutes, _) =
-                await profileService.GetEmailCooldownInfoAsync(pendingEmail.Id, ct);
+                await userEmailService.GetEmailCooldownInfoAsync(pendingEmail.Id, ct);
             canAdd = cooldownCanAdd;
             minutesUntilResend = cooldownMinutes;
         }
@@ -2518,6 +2518,5 @@ public class ProfileController(
     }
 
 }
-
 
 

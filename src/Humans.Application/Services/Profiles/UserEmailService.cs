@@ -51,6 +51,25 @@ public sealed class UserEmailService(
         )).ToList();
     }
 
+    public async Task<(bool CanAdd, int MinutesUntilResend, Guid? PendingEmailId)>
+        GetEmailCooldownInfoAsync(Guid pendingEmailId, CancellationToken ct = default)
+    {
+        var pendingRecord = await repository.GetByIdReadOnlyAsync(pendingEmailId, ct);
+
+        if (pendingRecord?.VerificationSentAt.HasValue == true)
+        {
+            var now = clock.GetCurrentInstant();
+            var cooldownEnd = pendingRecord.VerificationSentAt.Value.Plus(Duration.FromMinutes(5));
+            if (now < cooldownEnd)
+            {
+                var minutesUntilResend = (int)Math.Ceiling((cooldownEnd - now).TotalMinutes);
+                return (false, minutesUntilResend, pendingEmailId);
+            }
+        }
+
+        return (true, 0, null);
+    }
+
     public async Task<IReadOnlyList<UserEmailDto>> GetVisibleEmailsAsync(
         Guid userId, ContactFieldVisibility accessLevel,
         CancellationToken cancellationToken = default)
