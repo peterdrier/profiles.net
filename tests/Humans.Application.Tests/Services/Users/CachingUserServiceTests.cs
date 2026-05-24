@@ -413,7 +413,7 @@ public class CachingUserServiceTests
     }
 
     [HumansFact]
-    public async Task ReassignProfileSubAggregatesAsync_RefreshesBothAffectedUsers()
+    public async Task ReassignAsync_RefreshesBothAffectedUsers()
     {
         var sourceUserId = Guid.NewGuid();
         var targetUserId = Guid.NewGuid();
@@ -422,12 +422,13 @@ public class CachingUserServiceTests
         await PrimeAsync(sut, SampleUserInfo(targetUserId, "Target"));
 
         var updatedAt = Instant.FromUtc(2026, 1, 2, 0, 0);
-        _inner.ReassignProfileSubAggregatesAsync(
+        _inner.ReassignAsync(
                 sourceUserId,
                 targetUserId,
+                Arg.Any<Guid>(),
                 updatedAt,
                 Arg.Any<CancellationToken>())
-            .Returns(2);
+            .Returns(Task.CompletedTask);
 
         StubRefreshEntry(sourceUserId, new Profile
         {
@@ -450,9 +451,8 @@ public class CachingUserServiceTests
             UpdatedAt = updatedAt,
         });
 
-        var count = await sut.ReassignProfileSubAggregatesAsync(sourceUserId, targetUserId, updatedAt);
+        await sut.ReassignAsync(sourceUserId, targetUserId, Guid.NewGuid(), updatedAt, CancellationToken.None);
 
-        count.Should().Be(2);
         var source = await sut.GetUserInfoAsync(sourceUserId);
         var target = await sut.GetUserInfoAsync(targetUserId);
         source!.Profile.Should().NotBeNull();

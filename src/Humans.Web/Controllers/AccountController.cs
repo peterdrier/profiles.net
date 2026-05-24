@@ -55,17 +55,6 @@ public class AccountController(
             return RedirectToAction(nameof(Login), new { returnUrl, error = "oauth" });
         }
 
-        // see #532 — capture Google avatar URL but never render it; user opts in via "Import my Google photo".
-        var googlePictureClaim = info.Principal.FindFirstValue("urn:google:picture");
-        if (!string.IsNullOrEmpty(googlePictureClaim))
-        {
-            logger.LogInformation("Google avatar URL captured for {Provider} sign-in", info.LoginProvider);
-        }
-        else
-        {
-            logger.LogInformation("Google avatar URL not captured for {Provider} sign-in (claim missing)", info.LoginProvider);
-        }
-
         var result = await signInManager.ExternalLoginSignInAsync(
             info.LoginProvider,
             info.ProviderKey,
@@ -89,7 +78,6 @@ public class AccountController(
 
         var email = info.Principal.FindFirstValue(ClaimTypes.Email) ?? string.Empty;
         var name = info.Principal.FindFirstValue(ClaimTypes.Name);
-        var pictureUrl = info.Principal.FindFirstValue("urn:google:picture");
 
         // Link-while-signed-in must precede lockout/email-match/create — otherwise a fresh OAuth email spawns a duplicate.
         if (User.Identity?.IsAuthenticated == true)
@@ -101,10 +89,6 @@ public class AccountController(
                 if (addLinkResult.Succeeded)
                 {
                     currentUser.LastLoginAt = clock.GetCurrentInstant();
-                    if (string.IsNullOrEmpty(currentUser.ProfilePictureUrl) && pictureUrl is not null)
-                    {
-                        currentUser.ProfilePictureUrl = pictureUrl;
-                    }
                     await userManager.UpdateAsync(currentUser);
 
                     if (!string.IsNullOrEmpty(email))
@@ -199,10 +183,6 @@ public class AccountController(
                 if (linkResult.Succeeded)
                 {
                     existingByEmail.LastLoginAt = clock.GetCurrentInstant();
-                    if (string.IsNullOrEmpty(existingByEmail.ProfilePictureUrl) && pictureUrl is not null)
-                    {
-                        existingByEmail.ProfilePictureUrl = pictureUrl;
-                    }
                     await userManager.UpdateAsync(existingByEmail);
 
                     await TryReconcileOAuthIdentityAsync(existingByEmail.Id, info);
@@ -232,7 +212,6 @@ public class AccountController(
         {
             Id = newUserId,
             DisplayName = name ?? email,
-            ProfilePictureUrl = pictureUrl,
             CreatedAt = clock.GetCurrentInstant(),
             LastLoginAt = clock.GetCurrentInstant()
         };

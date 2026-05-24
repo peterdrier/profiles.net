@@ -1,12 +1,6 @@
 using Microsoft.Extensions.Logging;
-using NodaTime;
 using Humans.Application.DTOs;
-using Humans.Application.Extensions;
-using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Repositories;
-using Humans.Domain.Entities;
-using Humans.Domain.Enums;
-using Humans.Domain.Helpers;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Interfaces;
 using Humans.Application.Interfaces.Profiles;
@@ -15,11 +9,8 @@ namespace Humans.Application.Services.Profiles;
 
 public sealed class ProfileService(IProfileRepository profileRepository,
     IUserService userService,
-    IUserEmailRepository userEmailRepository,
-    IContactFieldRepository contactFieldRepository,
-    ICommunicationPreferenceRepository communicationPreferenceRepository,
     IFileStorage fileStorage,
-    ILogger<ProfileService> logger) : IProfilePictureService, IUserDataContributor, IUserMerge
+    ILogger<ProfileService> logger) : IProfilePictureService
 {
     public async Task SetProfilePictureAsync(
         Guid userId, byte[] pictureData, string contentType, CancellationToken ct = default)
@@ -114,121 +105,4 @@ public sealed class ProfileService(IProfileRepository profileRepository,
 
         return new ProfilePictureMigrationSnapshot(rows.Count, onFs, dbOnly);
     }
-
-    // --- GDPR Export — Profile-section slices ---
-
-    public async Task<IReadOnlyList<UserDataSlice>> ContributeForUserAsync(Guid userId, CancellationToken ct)
-    {
-        var profile = await profileRepository.GetByUserIdReadOnlyAsync(userId, ct);
-
-        var contactFields = profile is not null
-            ? await contactFieldRepository.GetByProfileIdReadOnlyAsync(profile.Id, ct)
-            : [];
-
-        var userEmails = await userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
-
-        var volunteerHistory = profile?.VolunteerHistory
-            .OrderByDescending(v => v.Date)
-            .ThenByDescending(v => v.CreatedAt)
-            .ToList() ?? (IReadOnlyList<VolunteerHistoryEntry>)[];
-
-        var profileLanguages = profile is not null
-            ? await profileRepository.GetLanguagesAsync(profile.Id, ct)
-            : [];
-
-        var communicationPreferences = await communicationPreferenceRepository
-            .GetByUserIdReadOnlyAsync(userId, ct);
-
-        var profileSlice = profile is null
-            ? new UserDataSlice(GdprExportSections.Profile, null)
-            : new UserDataSlice(GdprExportSections.Profile, new
-            {
-                profile.BurnerName,
-                profile.FirstName,
-                profile.LastName,
-                Birthday = profile.DateOfBirth is not null
-                    ? $"{profile.DateOfBirth.Value.Month:D2}-{profile.DateOfBirth.Value.Day:D2}"
-                    : null,
-                profile.City,
-                profile.CountryCode,
-                profile.Latitude,
-                profile.Longitude,
-                profile.Bio,
-                profile.Pronouns,
-                profile.ContributionInterests,
-                profile.BoardNotes,
-                profile.MembershipTier,
-                profile.IsApproved,
-                profile.IsSuspended,
-                profile.NoPriorBurnExperience,
-                ConsentCheckStatus = profile.ConsentCheckStatus?.ToString(),
-                ConsentCheckAt = profile.ConsentCheckAt.ToInvariantInstantString(),
-                profile.ConsentCheckNotes,
-                profile.RejectionReason,
-                RejectedAt = profile.RejectedAt.ToInvariantInstantString(),
-                profile.EmergencyContactName,
-                profile.EmergencyContactPhone,
-                profile.EmergencyContactRelationship,
-                profile.HasCustomProfilePicture,
-                CreatedAt = profile.CreatedAt.ToInvariantInstantString(),
-                UpdatedAt = profile.UpdatedAt.ToInvariantInstantString()
-            });
-
-        var contactFieldSlice = new UserDataSlice(GdprExportSections.ContactFields, contactFields.Select(cf => new
-        {
-            cf.FieldType,
-            Label = cf.DisplayLabel,
-            cf.Value,
-            cf.Visibility
-        }).ToList());
-
-        var userEmailsSlice = new UserDataSlice(GdprExportSections.UserEmails, userEmails.Select(e => new
-        {
-            e.Email,
-            e.IsVerified,
-            // JSON keys pinned per memory/code/no-rename-serialized-fields.md (GDPR export stability).
-            IsOAuth = e.Provider != null,
-            IsNotificationTarget = e.IsPrimary,
-            e.Visibility
-        }).ToList());
-
-        var volunteerHistorySlice = new UserDataSlice(GdprExportSections.VolunteerHistory, volunteerHistory.Select(vh => new
-        {
-            Date = vh.Date.ToIsoDateString(),
-            vh.EventName,
-            vh.Description,
-            CreatedAt = vh.CreatedAt.ToInvariantInstantString()
-        }).ToList());
-
-        var languagesSlice = new UserDataSlice(GdprExportSections.Languages, profileLanguages.Select(pl => new
-        {
-            pl.LanguageCode,
-            pl.Proficiency
-        }).ToList());
-
-        var commPrefsSlice = new UserDataSlice(GdprExportSections.CommunicationPreferences, communicationPreferences.Select(cp => new
-        {
-            cp.Category,
-            cp.OptedOut,
-            cp.InboxEnabled,
-            UpdatedAt = cp.UpdatedAt.ToInvariantInstantString(),
-            cp.UpdateSource
-        }).ToList());
-
-        return [
-            profileSlice,
-            contactFieldSlice,
-            userEmailsSlice,
-            volunteerHistorySlice,
-            languagesSlice,
-            commPrefsSlice
-        ];
-    }
-
-    public async Task ReassignAsync(Guid sourceUserId, Guid targetUserId, Guid actorUserId, Instant updatedAt,
-        CancellationToken ct)
-    {
-        await userService.ReassignProfileSubAggregatesAsync(sourceUserId, targetUserId, updatedAt, ct);
-    }
-
 }

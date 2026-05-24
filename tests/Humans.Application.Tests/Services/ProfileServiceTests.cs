@@ -53,8 +53,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
 
         _service = new ProfileService(
             _profileRepository, _userService,
-            _userEmailRepository,
-            _contactFieldRepository, _communicationPreferenceRepository,
             _fileStorage,
             NullLogger<ProfileService>.Instance);
         _editor = new ProfileEditorService(
@@ -80,16 +78,6 @@ public sealed class ProfileServiceTests : ServiceTestHarness
                 call.ArgAt<Guid>(0),
                 call.ArgAt<string>(1),
                 call.ArgAt<CancellationToken>(2)));
-        _userService.ReassignProfileSubAggregatesAsync(
-                Arg.Any<Guid>(),
-                Arg.Any<Guid>(),
-                Arg.Any<Instant>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call => storageUserService.ReassignProfileSubAggregatesAsync(
-                call.ArgAt<Guid>(0),
-                call.ArgAt<Guid>(1),
-                call.ArgAt<Instant>(2),
-                call.ArgAt<CancellationToken>(3)));
     }
 
     // --- Profile editor save flow ---
@@ -513,47 +501,5 @@ public sealed class ProfileServiceTests : ServiceTestHarness
             UpdatedAt = Clock.GetCurrentInstant()
         };
     }
-
-    [HumansFact]
-    public async Task ContributeForUserAsync_EmitsIsOAuthKey_SourcedFromProviderColumn()
-    {
-        // The JSON key stays "IsOAuth" per memory/code/no-rename-serialized-fields.md
-        // (exports are JSON files users download). The value sources from
-        // (Provider != null) — pre-PR-4 semantics meaning "this row has an OAuth
-        // login attached". The PR 4 spec's Task 17 swapped both the JSON key and
-        // the value source (e.IsGoogle); both have been reverted so the export
-        // emits identical bytes for the same row data as before PR 4.
-        //
-        // This row has Provider="Google" and IsGoogle=false to pin the source:
-        // under the reverted (Provider != null) projection it emits IsOAuth=true,
-        // which proves the source is Provider, not IsGoogle.
-        var userId = Guid.NewGuid();
-        await SeedUserAsync(userId);
-        Db.UserEmails.Add(new UserEmail
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            Email = "g@example.com",
-            IsVerified = true,
-            IsPrimary = true,
-            Provider = "Google",
-            ProviderKey = "sub-1",
-            IsGoogle = false,
-        });
-        await Db.SaveChangesAsync();
-
-        var slices = await _service.ContributeForUserAsync(userId, CancellationToken.None);
-
-        var userEmailsSlice = slices.Single(s =>
-            string.Equals(s.SectionName, Interfaces.Gdpr.GdprExportSections.UserEmails, StringComparison.Ordinal));
-        var json = System.Text.Json.JsonSerializer.Serialize(userEmailsSlice.Data);
-        json.Should().Contain("\"IsOAuth\":true");
-        // Legacy JSON key preserved for the C# IsPrimary rename
-        // (memory/code/no-rename-serialized-fields.md). Mirrors EF's HasColumnName pin on the
-        // renamed property — the GDPR export must keep emitting "IsNotificationTarget".
-        json.Should().Contain("\"IsNotificationTarget\":true");
-        json.Should().NotContain("\"IsPrimary\":");
-    }
-
 
 }

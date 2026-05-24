@@ -420,13 +420,6 @@ public sealed class UserService(
             profile?.ProfilePictureContentType);
     }
 
-    public Task<int> ReassignProfileSubAggregatesAsync(
-        Guid sourceUserId,
-        Guid targetUserId,
-        Instant updatedAt,
-        CancellationToken ct = default) =>
-        profileRepo.ReassignSubAggregatesToUserAsync(sourceUserId, targetUserId, updatedAt, ct);
-
     public async Task<bool> SaveProfileVolunteerHistoryAsync(
         Guid userId,
         IReadOnlyList<CVEntry> entries,
@@ -755,7 +748,10 @@ public sealed class UserService(
         var user = await repo.GetByIdAsync(userId, ct);
         if (user is null)
         {
-            return [new UserDataSlice(GdprExportSections.Account, null)];
+            return [
+                new UserDataSlice(GdprExportSections.Account, null),
+                new UserDataSlice(GdprExportSections.Profile, null)
+            ];
         }
 
         // see nobodies-collective/Humans#687 — User.GoogleEmail deprecated, not exported.
@@ -792,10 +788,110 @@ public sealed class UserService(
             })
             .ToList();
 
+        var profile = await profileRepo.GetByUserIdReadOnlyAsync(userId, ct);
+
+        var contactFields = profile is not null
+            ? await contactFieldRepo.GetByProfileIdReadOnlyAsync(profile.Id, ct)
+            : [];
+
+        var volunteerHistory = profile?.VolunteerHistory
+            .OrderByDescending(v => v.Date)
+            .ThenByDescending(v => v.CreatedAt)
+            .ToList() ?? (IReadOnlyList<VolunteerHistoryEntry>)[];
+
+        var profileLanguages = profile is not null
+            ? await profileRepo.GetLanguagesAsync(profile.Id, ct)
+            : [];
+
+        var communicationPreferences = await communicationPreferenceRepo
+            .GetByUserIdReadOnlyAsync(userId, ct);
+
+        var profileSlice = profile is null
+            ? new UserDataSlice(GdprExportSections.Profile, null)
+            : new UserDataSlice(GdprExportSections.Profile, new
+            {
+                profile.BurnerName,
+                profile.FirstName,
+                profile.LastName,
+                Birthday = profile.DateOfBirth is not null
+                    ? $"{profile.DateOfBirth.Value.Month:D2}-{profile.DateOfBirth.Value.Day:D2}"
+                    : null,
+                profile.City,
+                profile.CountryCode,
+                profile.Latitude,
+                profile.Longitude,
+                profile.Bio,
+                profile.Pronouns,
+                profile.ContributionInterests,
+                profile.BoardNotes,
+                profile.MembershipTier,
+                profile.IsApproved,
+                profile.IsSuspended,
+                profile.NoPriorBurnExperience,
+                ConsentCheckStatus = profile.ConsentCheckStatus?.ToString(),
+                ConsentCheckAt = profile.ConsentCheckAt.ToInvariantInstantString(),
+                profile.ConsentCheckNotes,
+                profile.RejectionReason,
+                RejectedAt = profile.RejectedAt.ToInvariantInstantString(),
+                profile.EmergencyContactName,
+                profile.EmergencyContactPhone,
+                profile.EmergencyContactRelationship,
+                profile.HasCustomProfilePicture,
+                CreatedAt = profile.CreatedAt.ToInvariantInstantString(),
+                UpdatedAt = profile.UpdatedAt.ToInvariantInstantString()
+            });
+
+        var contactFieldSlice = new UserDataSlice(GdprExportSections.ContactFields, contactFields.Select(cf => new
+        {
+            cf.FieldType,
+            Label = cf.DisplayLabel,
+            cf.Value,
+            cf.Visibility
+        }).ToList());
+
+        var userEmailsSlice = new UserDataSlice(GdprExportSections.UserEmails, userEmails.Select(e => new
+        {
+            e.Email,
+            e.IsVerified,
+            // JSON keys pinned per memory/code/no-rename-serialized-fields.md (GDPR export stability).
+            IsOAuth = e.Provider != null,
+            IsNotificationTarget = e.IsPrimary,
+            e.Visibility
+        }).ToList());
+
+        var volunteerHistorySlice = new UserDataSlice(GdprExportSections.VolunteerHistory, volunteerHistory.Select(vh => new
+        {
+            Date = vh.Date.ToIsoDateString(),
+            vh.EventName,
+            vh.Description,
+            CreatedAt = vh.CreatedAt.ToInvariantInstantString()
+        }).ToList());
+
+        var languagesSlice = new UserDataSlice(GdprExportSections.Languages, profileLanguages.Select(pl => new
+        {
+            pl.LanguageCode,
+            pl.Proficiency
+        }).ToList());
+
+        var commPrefsSlice = new UserDataSlice(GdprExportSections.CommunicationPreferences, communicationPreferences.Select(cp => new
+        {
+            cp.Category,
+            cp.OptedOut,
+            cp.InboxEnabled,
+            UpdatedAt = cp.UpdatedAt.ToInvariantInstantString(),
+            cp.UpdateSource
+        }).ToList());
+
         return
         [
             new UserDataSlice(GdprExportSections.Account, shaped),
-            new UserDataSlice(GdprExportSections.EventParticipations, participationsShaped)
+            new UserDataSlice(GdprExportSections.EventParticipations, participationsShaped),
+            profileSlice,
+            contactFieldSlice,
+            userEmailsSlice,
+            volunteerHistorySlice,
+            languagesSlice,
+            commPrefsSlice
         ];
     }
 
@@ -1017,11 +1113,11 @@ public sealed class UserService(
     public async Task ReassignAsync(Guid mergedFromUserId, Guid mergedToUserId, Guid actorUserId, Instant now,
         CancellationToken ct)
     {
-        // `now` and `actorUserId` unused — kept for IUserMerge contract.
+        // `actorUserId` unused — kept for IUserMerge contract.
         _ = actorUserId;
-        _ = now;
         await repo.ReassignLoginsToUserAsync(mergedFromUserId, mergedToUserId, ct);
         await repo.ReassignEventParticipationToUserAsync(mergedFromUserId, mergedToUserId, ct);
+        await profileRepo.ReassignSubAggregatesToUserAsync(mergedFromUserId, mergedToUserId, now, ct);
     }
 
     public Task<IReadOnlySet<Guid>> GetMergedSourceIdsAsync(

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Users;
@@ -34,6 +35,47 @@ public sealed class UserServiceProfileOnboardingMutationTests : ServiceTestHarne
             AdminAuthorization,
             Clock,
             NullLogger<UserService>.Instance);
+    }
+
+    [HumansFact]
+    public async Task ContributeForUserAsync_EmitsUserProfileSlices_WithOAuthKeySourcedFromProviderColumn()
+    {
+        // The JSON key stays "IsOAuth" per memory/code/no-rename-serialized-fields.md
+        // (exports are JSON files users download). The value sources from
+        // (Provider != null), not IsGoogle.
+        var userId = Guid.NewGuid();
+        SeedUser(userId);
+        Db.UserEmails.Add(new UserEmail
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Email = "g@example.com",
+            IsVerified = true,
+            IsPrimary = true,
+            Provider = "Google",
+            ProviderKey = "sub-1",
+            IsGoogle = false,
+        });
+        await Db.SaveChangesAsync();
+
+        var slices = await _service.ContributeForUserAsync(userId, CancellationToken.None);
+
+        slices.Select(s => s.SectionName).Should().Contain([
+            GdprExportSections.Account,
+            GdprExportSections.EventParticipations,
+            GdprExportSections.Profile,
+            GdprExportSections.ContactFields,
+            GdprExportSections.UserEmails,
+            GdprExportSections.VolunteerHistory,
+            GdprExportSections.Languages,
+            GdprExportSections.CommunicationPreferences
+        ]);
+        var userEmailsSlice = slices.Single(s =>
+            string.Equals(s.SectionName, GdprExportSections.UserEmails, StringComparison.Ordinal));
+        var json = System.Text.Json.JsonSerializer.Serialize(userEmailsSlice.Data);
+        json.Should().Contain("\"IsOAuth\":true");
+        json.Should().Contain("\"IsNotificationTarget\":true");
+        json.Should().NotContain("\"IsPrimary\":");
     }
 
     [HumansFact]
