@@ -23,3 +23,4 @@ HUM0018 | Humans.Architecture   | Warning  | Section-aware analyzer (e.g. HUM001
 HUM0019 | Humans.Architecture   | Warning  | Read of Identity-derived User column (Email/NormalizedEmail/UserName/NormalizedUserName) from Application or Web
 HUM0020 | Humans.Architecture   | Error    | Caching decorator references a repository directly instead of routing through the keyed inner service
 HUM0021 | Humans.Architecture   | Warning  | Read of obsolete cross-domain navigation property from Application, Web, or Infrastructure
+HUM0022 | Humans.Architecture   | Error    | Notification DbSets may only be written by NotificationRepository
