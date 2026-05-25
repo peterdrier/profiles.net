@@ -1,4 +1,5 @@
 using Humans.Application.Interfaces.Caching;
+using Humans.Application.Interfaces.EarlyEntry;
 using Humans.Application.Interfaces.Cantina;
 using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Repositories;
@@ -56,7 +57,11 @@ internal static class ShiftsSectionExtensions
         // VolunteerTracking — Scoped repository so multi-step camp-setup + blocked-day mutations share one change-tracker.
         services.AddScoped<IVolunteerTrackingRepository, VolunteerTrackingRepository>();
         services.AddScoped<IVolunteerTrackingService, ShiftsVolunteerTrackingService>();
-        services.AddScoped<IVolunteerTrackingExportService, Humans.Application.Services.Shifts.VolunteerTrackingExportService>();
+        services.AddScoped<Humans.Application.Services.Shifts.VolunteerTrackingExportService>();
+        services.AddScoped<IVolunteerTrackingExportService>(sp =>
+            sp.GetRequiredService<Humans.Application.Services.Shifts.VolunteerTrackingExportService>());
+        services.AddScoped<IEarlyEntryProvider>(sp =>
+            sp.GetRequiredService<Humans.Application.Services.Shifts.VolunteerTrackingExportService>());
         services.AddScoped<VolunteerTrackingXlsxBuilder>();
 
         // ShiftView — see #720. Singleton decorator over keyed-Scoped inner, mirrors CachingUserService/CachingTeamService.
