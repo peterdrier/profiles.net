@@ -2,7 +2,7 @@
 
 # Project Rules Index
 
-Atomic rules. Fetch the body when the description's trigger matches your task. See [`META.md`](META.md) for the pattern; [`design-rules.md`](../docs/architecture/design-rules.md) for the architecture narrative.
+Atomic rules. Fetch the body when the description's trigger matches your task. The constitution above these atoms is [`peters-hard-rules.md`](../docs/architecture/peters-hard-rules.md) (final word on conflict); architectural term definitions are in [`CONTEXT.md`](../CONTEXT.md); see [`META.md`](META.md) for the pattern and [`design-rules.md`](../docs/architecture/design-rules.md) for the implementing detail.
 
 ---
 
@@ -32,6 +32,8 @@ Atomic rules. Fetch the body when the description's trigger matches your task. S
 - [`no-hand-edited-migrations`](architecture/no-hand-edited-migrations.md) — HARD RULE. EF migrations AND `HumansDbContextModelSnapshot.cs` 100% auto-generated. Backfills in admin buttons. Pre-commit hook enforces files; snapshot is on you.
 - [`no-linq-at-db-layer`](architecture/no-linq-at-db-layer.md) — services call thick repo methods returning materialized lists, not `db.Set<T>().Where/Select` chains
 - [`analyzer-exceptions-via-attributes`](architecture/analyzer-exceptions-via-attributes.md) — HARD RULE. Analyzer rule grandfathers live as `[Grandfathered("HUM####", ...)]` attributes on the violating class. No baselines, no editorconfig per-file overrides, no analyzer-internal allowlists, no SuppressMessage as a maintained list.
+- [`dontfix-attribute`](architecture/dontfix-attribute.md) — `[DontFix]` is the one sanctioned PERMANENT analyzer exception, **Peter-applied only**. Agents add `[Grandfathered]` (debt, auto-fixable) but NEVER `[DontFix]` (never auto-fix; tech-debt passes skip it). Sole carve-out to `no-analyzer-suppressions`.
+- [`universal-enforcement-over-per-section`](architecture/universal-enforcement-over-per-section.md) — architecture enforcers are universal (derived from a hard rule, keyed off convention), never per-section/per-class; a per-section analyzer/test or a workaround mechanism (interceptor, dual-writer allowlist, tombstone) is a smell to consolidate. Don't invent the rule to justify the consolidation.
 - [`no-startup-guards`](architecture/no-startup-guards.md) — HARD RULE. App must always boot. Fix at runtime / admin button / idempotent migration — never refuse to start.
 - [`one-ifilestorage`](architecture/one-ifilestorage.md) — HARD RULE. One `IFileStorage`, key-namespaced under `uploads/`, rooted at `wwwroot/`. No per-domain storage interface; no parallel filesystem root.
 - [`person-search`](architecture/person-search.md) — HARD RULE. Person search uses `IProfileService.SearchProfilesAsync` with the `PersonSearchFields` bit-flag. UI is `<vc:human-search>` (inline picker) or `_HumanSearchResults` (page-style). Admin-bit fields require admin auth at controller. Emergency-contact never searchable. Shift volunteer search is exempt.
@@ -40,6 +42,8 @@ Atomic rules. Fetch the body when the description's trigger matches your task. S
 - [`repository-required-for-db-access`](architecture/repository-required-for-db-access.md) — HARD RULE. Every DB-accessing service goes through a repository interface; no service injects `HumansDbContext` directly, even for singleton-row tables.
 - [`section-read-write-split`](architecture/section-read-write-split.md) — sections consumed cross-section expose `I<Section>ServiceRead` (DTOs only) inherited by full `I<Section>Service`; advisory now, analyzer later. Reference: Teams (`ITeamServiceRead` / `ITeamService`).
 - [`no-leaf-to-director-callbacks`](architecture/no-leaf-to-director-callbacks.md) — HARD RULE. ProfileService/ConsentService/UserService never depend on or call back into OnboardingService/HumanLifecycleService/etc. Narrow-interface band-aids are a symptom; relocate the predicate to the field's owner.
+- [`orchestrator-marker`](architecture/orchestrator-marker.md) — Orchestrators own no tables and inject no repository; marker `IOrchestrator` is a SIBLING of `IApplicationService` (not a child). Owns-a-table ⇒ it's a Section, not an orchestrator (the AgentService mislabel). Analyzer-enforced (to build). See `CONTEXT.md`.
+- [`crosscut-purity`](architecture/crosscut-purity.md) — Crosscuts (Audit/Email/Notification/Metrics) own their own data and call NO section; when a crosscut op needs cross-lane data, an Orchestrator gathers it and calls the crosscut with it. See `CONTEXT.md`.
 - [`shared-drives-only`](architecture/shared-drives-only.md) — Drive resources on Shared Drives only; API calls need `SupportsAllDrives` + `permissionDetails`
 - [`slug-routes-fallback-to-guid`](architecture/slug-routes-fallback-to-guid.md) — slug-keyed URLs accept the entity GUID in the same slot and look up by Id when the slug doesn't match; new routes only, pre-existing routes migrate opportunistically
 - [`user-profile-foundational`](architecture/user-profile-foundational.md) — UserService/ProfileService are bottom of the stack; no outbound calls to higher-level sections

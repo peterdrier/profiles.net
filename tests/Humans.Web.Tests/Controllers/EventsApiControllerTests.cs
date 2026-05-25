@@ -9,7 +9,6 @@ using Humans.Domain.Enums;
 using Humans.Web.Controllers.Api;
 using Humans.Web.Models.Events;
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NodaTime;
 using NSubstitute;
@@ -27,17 +26,12 @@ public class EventsApiControllerTests
     private readonly IEventService _guide = Substitute.For<IEventService>();
     private readonly ICampService _camps = Substitute.For<ICampService>();
     private readonly IUserService _users = Substitute.For<IUserService>();
-    private readonly UserManager<User> _userManager;
 
     public EventsApiControllerTests()
     {
-        var userStore = Substitute.For<IUserStore<User>>();
-        _userManager = Substitute.For<UserManager<User>>(
-            userStore, null, null, null, null, null, null, null, null);
-
         // No guide settings → no event-settings/timezone/gate-date lookups in the action.
         _guide.GetGuideSettingsAsync(Arg.Any<CancellationToken>())
-            .Returns((EventGuideSettings?)null);
+            .Returns((EventGuideSettingsView?)null);
     }
 
     [HumansFact]
@@ -86,7 +80,7 @@ public class EventsApiControllerTests
         dto.Host.Should().Be("Camp Host");
     }
 
-    private void StubApprovedEvents(params Event[] events) =>
+    private void StubApprovedEvents(params ApprovedEventView[] events) =>
         _guide.GetApprovedEventsAsync(
                 Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<string?>(),
                 Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
@@ -103,7 +97,7 @@ public class EventsApiControllerTests
 
     private EventsApiController BuildController()
     {
-        var controller = new EventsApiController(_guide, _camps, _users, _userManager)
+        var controller = new EventsApiController(_guide, _camps, _users)
         {
             ControllerContext = new ControllerContext
             {
@@ -117,21 +111,27 @@ public class EventsApiControllerTests
         return controller;
     }
 
-    private static Event MakeEvent(Guid? campId, Guid submitterId, string? host) => new()
-    {
-        Id = Guid.NewGuid(),
-        CampId = campId,
-        GuideSharedVenueId = campId == null ? Guid.NewGuid() : null,
-        SubmitterUserId = submitterId,
-        CategoryId = Guid.NewGuid(),
-        Title = "Test Event",
-        Description = "Description",
-        Host = host,
-        StartAt = Instant.FromUtc(2026, 8, 1, 18, 0),
-        DurationMinutes = 60,
-        Status = EventStatus.Approved,
-        Category = new EventCategory { Id = Guid.NewGuid(), Name = "Music", Slug = "music", IsSensitive = false },
-    };
+    private static ApprovedEventView MakeEvent(Guid? campId, Guid submitterId, string? host) => new(
+        Id: Guid.NewGuid(),
+        CampId: campId,
+        GuideSharedVenueId: campId == null ? Guid.NewGuid() : null,
+        SubmitterUserId: submitterId,
+        CategoryId: Guid.NewGuid(),
+        CategorySlug: "music",
+        CategoryName: "Music",
+        CategoryIsSensitive: false,
+        VenueName: null,
+        Title: "Test Event",
+        Description: "Description",
+        LocationNote: null,
+        Host: host,
+        StartAt: Instant.FromUtc(2026, 8, 1, 18, 0),
+        DurationMinutes: 60,
+        IsRecurring: false,
+        RecurrenceDays: null,
+        PriorityRank: 0,
+        SubmittedAt: Instant.FromUtc(2026, 7, 1, 0, 0),
+        LastUpdatedAt: Instant.FromUtc(2026, 7, 1, 0, 0));
 
     private static UserInfo MakeUserInfo(Guid userId, string burnerName)
     {

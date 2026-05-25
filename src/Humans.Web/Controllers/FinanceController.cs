@@ -1,9 +1,10 @@
 using Humans.Application.Interfaces.Budget;
+using Humans.Application.Interfaces.Finance;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Tickets;
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Authorization;
+using Humans.Web.Extensions;
 using Humans.Web.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,9 +20,10 @@ public class FinanceController(
     IBudgetService budgetService,
     ITeamServiceRead teamService,
     ITicketingBudgetService ticketingBudgetService,
-    ITicketQueryService ticketQueryService,
+    ITicketServiceRead ticketQueryService,
     IClock clock,
     IUserServiceRead userService,
+    IHoldedFinanceService holdedFinance,
     ILogger<FinanceController> logger) : HumansControllerBase(userService)
 {
     [HttpGet("")]
@@ -127,7 +129,9 @@ public class FinanceController(
                 return RedirectToAction(nameof(Index));
             }
 
-            var grossTicketRevenue = await ticketQueryService.GetGrossTicketRevenueAsync();
+            var grossTicketRevenue = (await ticketQueryService.GetTicketOrdersAsync())
+                .Where(o => o.PaymentStatus == TicketPaymentStatus.Paid)
+                .Sum(o => o.TotalAmount);
             var model = BuildCashFlowModel(activeYear, period, grossTicketRevenue);
             return View(model);
         }
@@ -544,15 +548,61 @@ public class FinanceController(
         return RedirectToAction(nameof(YearDetail), new { id = yearId });
     }
 
+    [HttpGet("HoldedAccounts")]
+    public async Task<IActionResult> HoldedAccounts(int blockStart = 62900100)
+    {
+        var plan = await holdedFinance.GetProvisioningPlanAsync(blockStart);
+        ViewBag.BlockStart = blockStart;
+        return View(plan);
+    }
+
+    [HttpPost("HoldedAccounts/Provision")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ProvisionHoldedAccounts(int blockStart, bool addAll)
+    {
+        try
+        {
+            var n = await holdedFinance.ProvisionAsync(blockStart, addAll);
+            SetSuccess($"Provisioned {n} Holded account(s).");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Holded provisioning failed");
+            SetError("Provisioning failed.");
+        }
+        return RedirectToAction(nameof(HoldedAccounts), new { blockStart });
+    }
+
+    [HttpGet("HoldedUnmatched")]
+    public async Task<IActionResult> HoldedUnmatched()
+        => View(await holdedFinance.GetUnmatchedAsync());
+
+    [HttpPost("HoldedSync/Run")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RunHoldedSync()
+    {
+        try
+        {
+            var r = await holdedFinance.SyncAsync();
+            SetSuccess($"Synced {r.DocCount} docs ({r.Matched} matched, {r.Unmatched} unmatched).");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Holded sync failed");
+            SetError("Sync failed.");
+        }
+        return RedirectToAction(nameof(HoldedUnmatched));
+    }
+
     /// <summary>FinanceOverviewViewModel via shared summary + actual tickets in ViewBag.</summary>
-    private async Task<FinanceOverviewViewModel> BuildFinanceOverviewAsync(BudgetYear year, IReadOnlyList<BudgetYearSummarySnapshot> allYears)
+    private async Task<FinanceOverviewViewModel> BuildFinanceOverviewAsync(BudgetYearDetail year, IReadOnlyList<BudgetYearSummarySnapshot> allYears)
     {
         var summary = budgetService.ComputeBudgetSummaryWithBuffers(year.Groups);
 
         var ticketingGroup = year.Groups.FirstOrDefault(g => g.IsTicketingGroup);
         if (ticketingGroup is not null)
         {
-            var actualSold = ticketingBudgetService.GetActualTicketsSold(ticketingGroup);
+            var actualSold = budgetService.GetActualTicketsSold(ticketingGroup);
             ViewBag.ActualTicketsSold = actualSold;
 
             var projections = await ticketingBudgetService.GetProjectionsAsync(ticketingGroup.Id);
@@ -569,6 +619,14 @@ public class FinanceController(
             }
         }
 
+        IReadOnlyDictionary<Guid, decimal> holdedActuals = new Dictionary<Guid, decimal>();
+        if (int.TryParse(year.Year, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var calendarYear))
+        {
+            var actuals = await holdedFinance.GetActualsForYearAsync(calendarYear);
+            holdedActuals = actuals.ToDictionary(r => r.BudgetCategoryId, r => r.Actual);
+        }
+
         return new FinanceOverviewViewModel
         {
             Year = year,
@@ -577,12 +635,13 @@ public class FinanceController(
             TotalExpenses = summary.TotalExpenses,
             NetBalance = summary.NetBalance,
             IncomeSlices = summary.IncomeSlices.Select(s => new BudgetSlice { Name = s.Name, Amount = s.Amount, Percentage = s.Percentage }).ToList(),
-            ExpenseSlices = summary.ExpenseSlices.Select(s => new BudgetSlice { Name = s.Name, Amount = s.Amount, Percentage = s.Percentage }).ToList()
+            ExpenseSlices = summary.ExpenseSlices.Select(s => new BudgetSlice { Name = s.Name, Amount = s.Amount, Percentage = s.Percentage }).ToList(),
+            HoldedActualsByCategory = holdedActuals
         };
     }
 
     /// <summary>CashFlow VM: aggregate by period; synthesize VAT settlements; FinanceAdmin-only.</summary>
-    private CashFlowViewModel BuildCashFlowModel(BudgetYear year, string period, decimal grossTicketRevenue)
+    private CashFlowViewModel BuildCashFlowModel(BudgetYearDetail year, string period, decimal grossTicketRevenue)
     {
         if (!string.Equals(period, "weekly", StringComparison.OrdinalIgnoreCase) &&
             !string.Equals(period, "monthly", StringComparison.OrdinalIgnoreCase))
@@ -693,7 +752,7 @@ public class FinanceController(
                 var monday = g.Key;
                 var sunday = monday.PlusDays(6);
                 return new CashFlowPeriodGroup(
-                    $"{monday.ToString("d MMM", System.Globalization.CultureInfo.InvariantCulture)} - {sunday.ToString("d MMM yyyy", System.Globalization.CultureInfo.InvariantCulture)}",
+                    $"{monday.ToDateTimeUnspecified().ToDisplayDayMonth()} - {sunday.ToDisplayDate()}",
                     monday,
                     sunday,
                     g.ToList());
@@ -714,7 +773,7 @@ public class FinanceController(
                 var firstDay = new LocalDate(g.Key.Year, g.Key.Month, 1);
                 var lastDay = firstDay.PlusDays(firstDay.Calendar.GetDaysInMonth(g.Key.Year, g.Key.Month) - 1);
                 return new CashFlowPeriodGroup(
-                    firstDay.ToString("MMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                    firstDay.ToDateTimeUnspecified().ToDisplayMonthYear(),
                     firstDay,
                     lastDay,
                     g.ToList());

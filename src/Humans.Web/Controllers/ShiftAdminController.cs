@@ -24,7 +24,7 @@ public class ShiftAdminController(
     IShiftSignupService signupService,
     IShiftView shiftView,
     IGeneralAvailabilityService availabilityService,
-    IUserService userService,
+    IUserServiceRead userService,
     IAuthorizationService authorizationService,
     IClock clock,
     ShiftAdminPageBuilder pageBuilder,
@@ -304,11 +304,9 @@ public class ShiftAdminController(
 
     [HttpPost("Rotas/{rotaId}/Move")]
     [ValidateAntiForgeryToken]
+    [Authorize(Policy = PolicyNames.VolunteerManager)]
     public async Task<IActionResult> MoveRota(string slug, Guid rotaId, MoveRotaModel model)
     {
-        if (!RoleChecks.IsVolunteerManager(User))
-            return Forbid();
-
         var (teamError, user, team) = await ResolveDepartmentManagementAsync(slug);
         if (teamError is not null) return teamError;
 

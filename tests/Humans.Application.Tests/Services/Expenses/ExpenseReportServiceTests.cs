@@ -2,7 +2,6 @@ using AwesomeAssertions;
 using Humans.Application.Interfaces;
 using Humans.Application.Interfaces.Budget;
 using Humans.Application.Interfaces.Holded;
-using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Users;
@@ -26,7 +25,6 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
     private readonly IBudgetService _budgetService;
     private readonly ITeamService _teamService;
     private readonly IUserService _userService;
-    private readonly IProfileService _profileService;
     private readonly ExpenseReportService _sut;
 
     public ExpenseReportServiceTests()
@@ -38,7 +36,6 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
         _budgetService = Substitute.For<IBudgetService>();
         _teamService = Substitute.For<ITeamService>();
         _userService = Substitute.For<IUserService>();
-        _profileService = Substitute.For<IProfileService>();
 
         _sut = new ExpenseReportService(
             _expenseRepo,
@@ -46,7 +43,6 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
             _budgetService,
             _teamService,
             _userService,
-            _profileService,
             AuditLog,
             Substitute.For<IHoldedClient>(),
             Clock,
@@ -94,7 +90,7 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
     [HumansFact]
     public async Task CreateDraftAsync_Throws_WhenNoActiveYear()
     {
-        _budgetService.GetActiveYearAsync().Returns((BudgetYear?)null);
+        _budgetService.GetActiveYearAsync().Returns((BudgetYearDetail?)null);
 
         var act = async () => await _sut.CreateDraftAsync(Guid.NewGuid(), Guid.NewGuid(), null);
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -721,8 +717,8 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
     public async Task SaveSubmitterIbanWithResultAsync_ReturnsSuccess_WhenIbanSaved()
     {
         var submitter = Guid.NewGuid();
-        _profileService
-            .SetIbanAsync(submitter, "ES9121000418450200051332", Arg.Any<CancellationToken>())
+        _userService
+            .SetProfileIbanAsync(submitter, "ES9121000418450200051332", Arg.Any<CancellationToken>())
             .Returns(true);
 
         var result = await _sut.SaveSubmitterIbanWithResultAsync(submitter, "ES91 2100 0418 4502 0005 1332");
@@ -731,6 +727,12 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
         result.Message.Should().Be("IBAN saved.");
         result.HasIban.Should().BeTrue();
         result.MaskedIban.Should().NotBeNullOrWhiteSpace();
+        await AuditLog.Received(1).LogAsync(
+            AuditAction.IbanSet,
+            nameof(Profile),
+            submitter,
+            "IBAN set",
+            submitter);
     }
 
     [HumansFact]
@@ -1280,7 +1282,36 @@ public sealed class ExpenseReportServiceTests : ServiceTestHarness
         };
         year.Groups.Add(group);
 
-        _budgetService.GetActiveYearAsync().Returns(year);
+        var yearDetail = new BudgetYearDetail(
+            year.Id,
+            year.Year,
+            year.Name,
+            year.Status,
+            year.IsDeleted,
+            [
+                new BudgetGroupDetail(
+                    group.Id,
+                    group.BudgetYearId,
+                    group.Name,
+                    group.SortOrder,
+                    group.IsRestricted,
+                    group.IsDepartmentGroup,
+                    group.IsTicketingGroup,
+                    null,
+                    [
+                        new BudgetCategoryDetail(
+                            category.Id,
+                            category.BudgetGroupId,
+                            category.Name,
+                            category.AllocatedAmount,
+                            category.ExpenditureType,
+                            category.TeamId,
+                            category.SortOrder,
+                            [])
+                    ])
+            ]);
+
+        _budgetService.GetActiveYearAsync().Returns(yearDetail);
         _budgetService.GetCategoryByIdAsync(category.Id).Returns(ToBudgetCategorySnapshot(category));
 
         return (year, category);

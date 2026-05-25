@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AwesomeAssertions;
 using Humans.Application.Configuration;
 using Humans.Application.DTOs;
+using Humans.Application.DTOs.Shifts;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Campaigns;
@@ -39,7 +40,7 @@ namespace Humans.Application.Tests.Controllers;
 
 /// <summary>
 /// Coverage for the initial-setup tier-application orchestration that moved
-/// from <c>ProfileService.SaveProfileAsync</c> into <c>ProfileController.Edit</c>
+/// from the profile save coordinator into <c>ProfileController.Edit</c>
 /// POST under issue nobodies-collective/Humans#685. The four removed
 /// <c>ProfileServiceTests</c> tests that exercised the old service-layer
 /// dispatch are replaced here at the controller layer:
@@ -52,14 +53,17 @@ namespace Humans.Application.Tests.Controllers;
 /// </summary>
 public class ProfileControllerEditTests
 {
-    private readonly IProfileService _profileService = Substitute.For<IProfileService>();
+    private readonly IProfilePictureService _profilePictureService = Substitute.For<IProfilePictureService>();
+    private readonly IProfileEditorService _profileEditorService = Substitute.For<IProfileEditorService>();
     private readonly IUserService _userService = Substitute.For<IUserService>();
     private readonly IApplicationDecisionService _applicationDecisionService =
         Substitute.For<IApplicationDecisionService>();
     private readonly IConfiguration _configuration = Substitute.For<IConfiguration>();
     private readonly IShiftManagementService _shiftMgmt = Substitute.For<IShiftManagementService>();
+    private readonly IShiftView _shiftView = Substitute.For<IShiftView>();
     private readonly ProfileController _controller;
     private readonly Guid _userId = Guid.NewGuid();
+    private readonly Guid _profileId = Guid.NewGuid();
 
     public ProfileControllerEditTests()
     {
@@ -86,7 +90,8 @@ public class ProfileControllerEditTests
         _controller = new ProfileController(
             _userService,
             userManager,
-            _profileService,
+            _profilePictureService,
+            _profileEditorService,
             Substitute.For<IContactFieldService>(),
             Substitute.For<IEmailService>(),
             Substitute.For<IUserEmailService>(),
@@ -97,13 +102,13 @@ public class ProfileControllerEditTests
             Substitute.For<IRoleAssignmentService>(),
             Substitute.For<IShiftSignupService>(),
             _shiftMgmt,
-            Substitute.For<IShiftView>(),
+            _shiftView,
             Substitute.For<IGdprExportService>(),
             _configuration,
             new ConfigurationRegistry(),
             NullLogger<ProfileController>.Instance,
             localizer,
-            Substitute.For<ITicketQueryService>(),
+            Substitute.For<ITicketService>(),
             Substitute.For<ITeamService>(),
             Substitute.For<ICampaignService>(),
             Substitute.For<IEmailOutboxService>(),
@@ -113,7 +118,6 @@ public class ProfileControllerEditTests
             _applicationDecisionService,
             Substitute.For<IAccountDeletionService>(),
             Substitute.For<IMembershipCalculator>(),
-            Substitute.For<IHttpClientFactory>(),
             Substitute.For<SignInManager<User>>(
                 userManager,
                 Substitute.For<IHttpContextAccessor>(),
@@ -135,6 +139,11 @@ public class ProfileControllerEditTests
             .Returns(new User { Id = _userId, DisplayName = "Test Human", PreferredLanguage = "en" });
         userManager.GetUserId(Arg.Any<ClaimsPrincipal>()).Returns(_userId.ToString());
 
+        // Edit GET reads shiftView.GetUserAsync(...).TagPreferences (#720); return
+        // an empty view so the GET path doesn't NRE before the dietary population.
+        _shiftView.GetUserAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns(new ShiftUserView(_userId, null, null, null, [], []));
+
         // Edit POST resolves the current user through GetCurrentUserInfoAsync
         // (cache-resident); subsequent setup-detection lookups in the action body
         // also call IUserService.GetUserInfoAsync. Default stub returns a UserInfo
@@ -146,10 +155,22 @@ public class ProfileControllerEditTests
                     .ToUserInfo()));
 
         // SaveProfileAsync is invoked unconditionally by the happy path.
-        _profileService.SaveProfileAsync(
+        _profileEditorService.SaveProfileAsync(
                 Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<ProfileSaveRequest>(),
-                Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns(Guid.NewGuid());
+                Arg.Any<CancellationToken>())
+            .Returns(_profileId);
+        _userService.SaveProfileVolunteerHistoryAsync(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyList<CVEntry>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(true));
+        _userService.SaveProfileLanguagesAsync(
+                Arg.Any<Guid>(), Arg.Any<IReadOnlyList<ProfileLanguage>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new UserProfileLanguagesSaveResult(true, _userId)));
+
+        // The happy path now also writes meal-pref + allergies onto the shift
+        // profile. Return a fresh profile by default so existing tests don't NRE
+        // when the controller sets fields on it.
+        _shiftMgmt.GetOrCreateShiftProfileAsync(Arg.Any<Guid>())
+            .Returns(_ => new VolunteerEventProfile { UserId = _userId });
     }
 
     [HumansFact]
@@ -164,6 +185,10 @@ public class ProfileControllerEditTests
             .SubmitAsync(Guid.Empty, default, null!, null, null, null, null!, CancellationToken.None);
         await _applicationDecisionService.DidNotReceiveWithAnyArgs()
             .UpdateDraftApplicationAsync(Guid.Empty, default, null!, null, null, null, CancellationToken.None);
+        await _userService.Received(1).SaveProfileVolunteerHistoryAsync(
+            _userId, Arg.Any<IReadOnlyList<CVEntry>>(), Arg.Any<CancellationToken>());
+        await _userService.Received(1).SaveProfileLanguagesAsync(
+            _profileId, Arg.Any<IReadOnlyList<ProfileLanguage>>(), Arg.Any<CancellationToken>());
     }
 
     [HumansFact]
@@ -311,6 +336,96 @@ public class ProfileControllerEditTests
 
         await _shiftMgmt.DidNotReceiveWithAnyArgs()
             .SetVolunteerTagPreferencesAsync(Guid.Empty, null!);
+    }
+
+    [HumansFact]
+    public async Task Edit_Post_WithDietary_WritesMealPrefAndAllergiesToProfile()
+    {
+        _applicationDecisionService.GetUserApplicationsAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        var model = MakeValidModel(MembershipTier.Volunteer);
+        model.DietaryPreference = "Vegan";
+        model.Allergies = ["Peanut", "Other"];
+        model.AllergyOtherText = "Kiwi";
+
+        await _controller.Edit(model);
+
+        // Meal-pref + allergies are persisted through the Profile save request.
+        await _profileEditorService.Received(1).SaveProfileAsync(
+            _userId,
+            Arg.Any<string>(),
+            Arg.Is<ProfileSaveRequest>(r =>
+                r.DietaryPreference == "Vegan"
+                && r.Allergies != null && r.Allergies.Contains("Peanut") && r.Allergies.Contains("Other")
+                && r.AllergyOtherText == "Kiwi"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [HumansFact]
+    public async Task Edit_Post_WithDietary_DoesNotTouchIntolerancesOrMedical()
+    {
+        // The Edit page owns only meal-pref + allergies (carried on ProfileSaveRequest,
+        // which has no intolerance/medical fields). Intolerances + medical are written
+        // only by the DietaryMedical page via SaveDietaryMedicalAsync — never from Edit.
+        _applicationDecisionService.GetUserApplicationsAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        var model = MakeValidModel(MembershipTier.Volunteer);
+        model.DietaryPreference = "Vegan";
+        model.Allergies = ["Peanut"];
+
+        await _controller.Edit(model);
+
+        await _profileEditorService.Received(1).SaveProfileAsync(
+            _userId, Arg.Any<string>(),
+            Arg.Is<ProfileSaveRequest>(r => r.DietaryPreference == "Vegan"),
+            Arg.Any<CancellationToken>());
+        await _profileEditorService.DidNotReceiveWithAnyArgs()
+            .SaveDietaryMedicalAsync(default, default!, default);
+    }
+
+    [HumansFact]
+    public async Task Edit_Post_AllergyOtherWithoutText_IsInvalidAndDoesNotSaveProfile()
+    {
+        _applicationDecisionService.GetUserApplicationsAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns([]);
+
+        var model = MakeValidModel(MembershipTier.Volunteer);
+        model.Allergies = ["Other"];
+        model.AllergyOtherText = "   "; // whitespace-only triggers the required rule
+
+        var result = await _controller.Edit(model);
+
+        result.Should().BeOfType<ViewResult>();
+        _controller.ModelState.IsValid.Should().BeFalse();
+        _controller.ModelState.ContainsKey(nameof(model.AllergyOtherText)).Should().BeTrue();
+        await _profileEditorService.DidNotReceiveWithAnyArgs()
+            .SaveProfileAsync(default, default!, default!, default);
+    }
+
+    [HumansFact]
+    public async Task Edit_Get_PopulatesDietaryFieldsFromProfile()
+    {
+        _userService.GetUserInfoAsync(_userId, Arg.Any<CancellationToken>())
+            .Returns(BuildUserInfo(new Profile
+            {
+                UserId = _userId,
+                BurnerName = "Burner",
+                FirstName = "First",
+                LastName = "Last",
+                DietaryPreference = "Pescatarian",
+                Allergies = ["Dairy", "Other"],
+                AllergyOtherText = "Mango",
+            }));
+
+        var result = await _controller.Edit();
+
+        var viewModel = result.Should().BeOfType<ViewResult>().Subject
+            .Model.Should().BeOfType<ProfileViewModel>().Subject;
+        viewModel.DietaryPreference.Should().Be("Pescatarian");
+        viewModel.Allergies.Should().BeEquivalentTo(["Dairy", "Other"]);
+        viewModel.AllergyOtherText.Should().Be("Mango");
     }
 
     private static ProfileViewModel MakeValidModel(

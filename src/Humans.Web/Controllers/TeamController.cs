@@ -24,8 +24,7 @@ namespace Humans.Web.Controllers;
 public class TeamController(
     ITeamService teamService,
     ITeamPageService teamPageService,
-    IProfileService profileService,
-    IUserService userService,
+    IUserServiceRead userService,
     INotificationService notificationService,
     IGoogleSyncService googleSyncService,
     ITeamResourceService teamResourceService,
@@ -35,8 +34,7 @@ public class TeamController(
     IClock clock,
     ILogger<TeamController> logger) : HumansControllerBase(userService)
 {
-    private readonly IProfileService _profileService = profileService;
-    private readonly IUserService _userService = userService;
+    private readonly IUserServiceRead _userService = userService;
     private readonly INotificationService _notificationService = notificationService;
 
     [AllowAnonymous]
@@ -48,8 +46,6 @@ public class TeamController(
             RoleAssignmentClaimsTransformation.HasProfileClaimType,
             RoleAssignmentClaimsTransformation.ActiveClaimValue);
         var directory = await teamService.GetTeamDirectoryAsync(hasProfile ? user?.Id : null, ct);
-
-        ViewBag.CanViewSync = RoleChecks.IsTeamsAdminBoardOrAdmin(User);
 
         var viewModel = new TeamIndexViewModel
         {

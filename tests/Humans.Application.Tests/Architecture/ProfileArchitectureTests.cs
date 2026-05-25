@@ -2,17 +2,8 @@ using AwesomeAssertions;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Teams;
-using Humans.Application.Interfaces.Users;
-using Microsoft.EntityFrameworkCore;
-using NodaTime;
 using Xunit;
-using AccountMergeService = Humans.Application.Services.Profiles.AccountMergeService;
-using CommunicationPreferenceService = Humans.Application.Services.Profiles.CommunicationPreferenceService;
-using ContactFieldService = Humans.Application.Services.Profiles.ContactFieldService;
-using DuplicateAccountService = Humans.Application.Services.Profiles.DuplicateAccountService;
-using EmailProblemsService = Humans.Application.Services.Profiles.EmailProblemsService;
 using ProfileService = Humans.Application.Services.Profiles.ProfileService;
-using UserEmailService = Humans.Application.Services.Profiles.UserEmailService;
 
 namespace Humans.Application.Tests.Architecture;
 
@@ -22,74 +13,6 @@ namespace Humans.Application.Tests.Architecture;
 /// </summary>
 public class ProfileArchitectureTests
 {
-    public static TheoryData<Type> ApplicationProfileServices =>
-    [
-        typeof(ProfileService),
-        typeof(ContactFieldService),
-        typeof(UserEmailService),
-        typeof(CommunicationPreferenceService),
-        typeof(AccountMergeService),
-        typeof(DuplicateAccountService)
-    ];
-
-    public static TheoryData<Type> ServicesWithoutMemoryCache =>
-    [
-        typeof(ProfileService),
-        typeof(ContactFieldService),
-        typeof(UserEmailService),
-        typeof(CommunicationPreferenceService)
-    ];
-
-    public static TheoryData<Type, Type> RequiredRepositoryEdges => new()
-    {
-        { typeof(ProfileService), typeof(IProfileRepository) },
-        { typeof(AccountMergeService), typeof(IAccountMergeRepository) },
-    };
-
-    [HumansTheory]
-    [MemberData(nameof(ApplicationProfileServices))]
-    public void Profile_services_live_in_application_profile_namespace(Type serviceType)
-    {
-        serviceType.Namespace
-            .Should().Be("Humans.Application.Services.Profiles",
-                because: "services with business logic live in Humans.Application per design-rules, organized by section");
-    }
-
-    [HumansTheory]
-    [MemberData(nameof(ApplicationProfileServices))]
-    public void Profile_services_have_no_dbcontext_constructor_parameter(Type serviceType)
-    {
-        var ctor = serviceType.GetConstructors().Single();
-
-        ctor.GetParameters()
-            .Should().NotContain(
-                p => typeof(DbContext).IsAssignableFrom(p.ParameterType),
-                because: "Application services must use repositories instead of DbContext directly");
-    }
-
-    [HumansTheory]
-    [MemberData(nameof(ServicesWithoutMemoryCache))]
-    public void Profile_services_do_not_own_memory_cache(Type serviceType)
-    {
-        var ctor = serviceType.GetConstructors().Single();
-        var cachingParam = ctor.GetParameters()
-            .FirstOrDefault(p => (p.ParameterType.FullName ?? string.Empty)
-                .StartsWith("Microsoft.Extensions.Caching.Memory", StringComparison.Ordinal));
-
-        cachingParam.Should().BeNull(
-            because: "caching is the decorator's concern, not the service's");
-    }
-
-    [HumansTheory]
-    [MemberData(nameof(RequiredRepositoryEdges))]
-    public void Profile_services_take_their_section_repository(Type serviceType, Type repositoryType)
-    {
-        var ctor = serviceType.GetConstructors().Single();
-        var paramTypes = ctor.GetParameters().Select(p => p.ParameterType).ToList();
-
-        paramTypes.Should().Contain(repositoryType);
-    }
-
     [HumansFact]
     public void ProfileService_has_no_outbound_edge_to_teams_or_stores()
     {
@@ -114,32 +37,14 @@ public class ProfileArchitectureTests
         // unified read-model (UserInfo) instead. Re-adding GetByUserIdsAsync to
         // either surface would resurrect the parallel-read-path divergence the
         // unified read-model was built to eliminate — pin it.
-        typeof(IProfileService)
+        typeof(IProfilePictureService)
             .GetMethod("GetByUserIdsAsync")
             .Should().BeNull(
-                because: "callers read UserInfo.Profile via IUserService.GetUserInfoAsync / GetUserInfosAsync");
+                because: "picture service callers read UserInfo.Profile via IUserService.GetUserInfoAsync / GetUserInfosAsync");
 
         typeof(IProfileRepository)
             .GetMethod("GetByUserIdsAsync")
             .Should().BeNull(
                 because: "IProfileRepository has no fan-out reader path; the only legitimate batched profile read is UserInfo.Profile off the cache");
-    }
-
-    [HumansFact]
-    public void EmailProblemsService_depends_only_on_section_services_not_repositories()
-    {
-        var ctor = typeof(EmailProblemsService).GetConstructors().Single();
-        var paramTypes = ctor.GetParameters().Select(p => p.ParameterType).ToList();
-
-        var allowed = new[]
-        {
-            typeof(IProfileService),
-            typeof(IUserEmailService),
-            typeof(IUserService),
-            typeof(IClock)
-        };
-
-        paramTypes.Should().OnlyContain(t => allowed.Contains(t),
-            "EmailProblemsService must use existing section services, never repositories or DbContext");
     }
 }

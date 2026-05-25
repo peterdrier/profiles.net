@@ -2763,6 +2763,137 @@ namespace Humans.Infrastructure.Migrations
                     b.ToTable("google_sync_outbox", (string)null);
                 });
 
+            modelBuilder.Entity("Humans.Domain.Entities.HoldedCategoryMap", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant?>("ArchivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("BudgetCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HoldedAccountId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("HoldedAccountNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BudgetCategoryId")
+                        .IsUnique();
+
+                    b.HasIndex("HoldedAccountNumber")
+                        .IsUnique();
+
+                    b.ToTable("holded_category_map", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.HoldedExpenseDoc", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Instant?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("BookedAccountId")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("BudgetCategoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<LocalDate>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DocNumber")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("HoldedDocId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Instant>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MatchSource")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("MatchStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<string>("RawPayload")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("TagsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal>("Tax")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("numeric");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BudgetCategoryId");
+
+                    b.HasIndex("Date");
+
+                    b.HasIndex("HoldedDocId")
+                        .IsUnique();
+
+                    b.HasIndex("MatchStatus");
+
+                    b.ToTable("holded_expense_docs", (string)null);
+                });
+
             modelBuilder.Entity("Humans.Domain.Entities.HoldedExpenseOutboxEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2800,6 +2931,45 @@ namespace Humans.Infrastructure.Migrations
                     b.HasIndex("ProcessedAt", "FailedPermanently");
 
                     b.ToTable("holded_expense_outbox_events", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.HoldedSyncState", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Instant?>("LastSyncAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LastSyncedDocCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Instant?>("StatusChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SyncStatus")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("holded_sync_states", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            LastSyncedDocCount = 0,
+                            SyncStatus = "Idle"
+                        });
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.Issue", b =>
@@ -3068,6 +3238,14 @@ namespace Humans.Infrastructure.Migrations
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
 
+                    b.Property<string>("Allergies")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("AllergyOtherText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Bio")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)");
@@ -3110,6 +3288,10 @@ namespace Humans.Infrastructure.Migrations
                     b.Property<LocalDate?>("DateOfBirth")
                         .HasColumnType("date");
 
+                    b.Property<string>("DietaryPreference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("EmergencyContactName")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -3131,6 +3313,14 @@ namespace Humans.Infrastructure.Migrations
                         .HasMaxLength(34)
                         .HasColumnType("character varying(34)");
 
+                    b.Property<string>("IntoleranceOtherText")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Intolerances")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
                     b.Property<bool>("IsApproved")
                         .HasColumnType("boolean");
 
@@ -3147,6 +3337,10 @@ namespace Humans.Infrastructure.Migrations
 
                     b.Property<double?>("Longitude")
                         .HasColumnType("double precision");
+
+                    b.Property<string>("MedicalConditions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
                     b.Property<string>("MembershipTier")
                         .IsRequired()

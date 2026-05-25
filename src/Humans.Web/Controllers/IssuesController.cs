@@ -7,14 +7,10 @@ using Humans.Application.Interfaces.Issues;
 using Humans.Application.Interfaces.Profiles;
 using Humans.Application.Interfaces.Users;
 using Humans.Domain.Constants;
-using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Authorization.Requirements;
 using Humans.Web.Helpers;
 using Humans.Web.Models;
-
-// Obsolete nav props (Reporter/Assignee/ResolvedByUser/SenderUser) stitched in-memory by IssuesService; see design-rules §15i.
-#pragma warning disable CS0618
 
 namespace Humans.Web.Controllers;
 
@@ -23,13 +19,11 @@ namespace Humans.Web.Controllers;
 public class IssuesController(
     IIssuesService issues,
     IAuthorizationService authorization,
-    IProfileService profiles,
     IUserServiceRead users,
     IUserServiceRead userService,
     IStringLocalizer<SharedResource> localizer,
     ILogger<IssuesController> logger) : HumansControllerBase(userService)
 {
-    private readonly IProfileService _profiles = profiles;
     private readonly IStringLocalizer<SharedResource> _localizer = localizer;
 
     // Roles from claims (RoleAssignment → claims-transformation), NOT UserManager.GetRolesAsync (misses CampAdmin etc.).
@@ -427,7 +421,7 @@ public class IssuesController(
     };
 
     private static IssueDetailViewModel MapDetailViewModel(
-        Issue i,
+        IssueDetail i,
         IReadOnlyList<IssueThreadEvent> thread,
         IReadOnlyDictionary<Guid, UserInfo> displayUsers,
         bool isHandler,
@@ -482,7 +476,7 @@ public class IssuesController(
         };
     }
 
-    private async Task<IReadOnlyDictionary<Guid, UserInfo>> GetIssueDisplayUsersAsync(Issue issue)
+    private async Task<IReadOnlyDictionary<Guid, UserInfo>> GetIssueDisplayUsersAsync(IssueDetail issue)
     {
         var ids = new HashSet<Guid> { issue.ReporterUserId };
         if (issue.AssigneeUserId is { } assigneeId) ids.Add(assigneeId);

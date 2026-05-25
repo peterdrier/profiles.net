@@ -442,14 +442,20 @@
                         Badges showing volunteer event profile info — skills, quirks, dietary, languages, optional medical.
                     </div>
                     @ParamsBlock(
-                        ("@@model", "<code>(VolunteerEventProfile? Profile, bool ShowMedical)</code> tuple")
+                        ("@@model", "<code>VolunteerBadgesViewModel</code> (skills from VEP; dietary/medical from Profile)")
                     )
                     @AuthLine("<code>ShowMedical=true</code> only when the viewer is allowed to see medical info — gate at the call site.")
                     <div class="wg-card-example @(Model.SampleVolunteerProfile is null ? "is-empty" : "")">
                         @if (Model.SampleVolunteerProfile is not null)
                         {
                             @await Html.PartialAsync("_VolunteerProfileBadges",
-                                (Model.SampleVolunteerProfile, ShowMedical: true))
+                                new Humans.Web.Models.VolunteerBadgesViewModel(
+                                    Model.SampleVolunteerProfile.Skills,
+                                    Model.SampleVolunteerProfile.Quirks,
+                                    Model.SampleVolunteerProfile.Languages,
+                                    DietaryPreference: null,
+                                    MedicalConditions: null,
+                                    ShowMedical: true))
                         }
                         else
                         {
@@ -473,7 +479,7 @@
                     </div>
                     <div class="wg-card-note">Renders one held ticket as a physical admission stub. Shared by the transfer wizard, the <code>/Profile/Me</code> ticket card, and the homepage. A pending outgoing transfer shows a diagonal "Transfer pending" stamp; voided tickets render muted with a struck name. The event label is currently a constant (open item to source from the active event).</div>
                     @ParamsBlock(
-                        ("stub", "<code>TicketStubInfo</code> — projection (attendee name + email, <code>VendorTicketId</code> serial, status, <code>HasPendingTransfer</code>, <code>PendingTransferRequestId</code>) from <code>ITicketQueryService</code>")
+                        ("stub", "<code>TicketStubInfo</code> — projection (attendee name + email, <code>VendorTicketId</code> serial, status, <code>HasPendingTransfer</code>, <code>PendingTransferRequestId</code>) from <code>ITicketServiceRead</code>")
                     )
                     <div class="wg-card-example" style="display:flex; gap:16px; flex-wrap:wrap;">
                         <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-001", Humans.Domain.Enums.TicketAttendeeStatus.Valid, false, null))" />
@@ -554,6 +560,26 @@
                     )
                     <div class="wg-card-example">
                         <vc:things-to-do user-id="@Model.CurrentUserId" is-volunteer-member="true" has-shift-signups="true" />
+                    </div>
+                </div>
+
+                <div class="wg-card">
+                    <div class="wg-card-header">
+                        <div>
+                            <span class="wg-card-name">&lt;vc:dietary-missing-banner&gt;</span>
+                            <span class="wg-card-kind kind-vc">ViewComponent</span>
+                        </div>
+                        <span class="wg-card-path">src/Humans.Web/ViewComponents/DietaryMissingBannerViewComponent.cs</span>
+                    </div>
+                    <div class="wg-card-note">
+                        Red dietary-info nudge shown on /Shifts and /Shifts/Mine. Self-gates: renders only when the user has a
+                        qualifying cantina signup but no dietary preference on file — so it's empty here unless your account matches.
+                    </div>
+                    @ParamsBlock(
+                        ("userId", "<code>Guid</code> — required")
+                    )
+                    <div class="wg-card-example">
+                        <vc:dietary-missing-banner user-id="@Model.CurrentUserId" />
                     </div>
                 </div>
             </section>

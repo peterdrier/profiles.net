@@ -25,7 +25,6 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
 {
     private readonly ApplicationRepository _repository;
     private readonly IUserService _userService;
-    private readonly IProfileService _profileService = Substitute.For<IProfileService>();
     private readonly IEmailService _emailService = Substitute.For<IEmailService>();
     private readonly INotificationService _notificationService = Substitute.For<INotificationService>();
     private readonly ISystemTeamSync _syncJob = Substitute.For<ISystemTeamSync>();
@@ -49,7 +48,6 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
         _service = new ApplicationDecisionService(
             _repository,
             _userService,
-            _profileService,
             _roleAssignmentService,
             AuditLog,
             _emailService,
@@ -236,14 +234,14 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
     }
 
     [HumansFact]
-    public async Task ApproveAsync_UpdatesProfileTierViaProfileService()
+    public async Task ApproveAsync_UpdatesProfileTierViaUserService()
     {
         var userId = Guid.NewGuid();
         var app = await SeedSubmittedApplicationAsync(userId, MembershipTier.Asociado);
 
         await _service.ApproveAsync(app.Id, Guid.NewGuid(), null, null);
 
-        await _profileService.Received().SetMembershipTierAsync(
+        await _userService.Received().SetMembershipTierAsync(
             userId, MembershipTier.Asociado, Arg.Any<CancellationToken>());
     }
 
@@ -491,7 +489,7 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
 
         await _service.RejectAsync(app.Id, Guid.NewGuid(), "reason", null);
 
-        await _profileService.DidNotReceive().SetMembershipTierAsync(
+        await _userService.DidNotReceive().SetMembershipTierAsync(
             Arg.Any<Guid>(), Arg.Any<MembershipTier>(), Arg.Any<CancellationToken>());
     }
 
@@ -524,7 +522,7 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
     // --- GetUserApplicationsAsync ---
 
     [HumansFact]
-    public async Task GetUserApplicationsAsync_ReturnsAllStatusesOrderedBySubmittedAtDesc()
+    public async Task GetUserApplicationsAsync_ReturnsAllStatusesForUser()
     {
         var userId = Guid.NewGuid();
         var app1 = new MemberApplication
@@ -561,10 +559,11 @@ public sealed class ApplicationDecisionServiceTests : ServiceTestHarness
 
         var result = await _service.GetUserApplicationsAsync(userId);
 
+        // Display ordering (SubmittedAt desc) now lives in the controller per the
+        // DisplaySortInControllers rule; the service returns all of the user's
+        // applications regardless of order.
         result.Should().HaveCount(3);
-        result[0].Id.Should().Be(app3.Id);
-        result[1].Id.Should().Be(app2.Id);
-        result[2].Id.Should().Be(app1.Id);
+        result.Select(a => a.Id).Should().BeEquivalentTo([app1.Id, app2.Id, app3.Id]);
     }
 
     [HumansFact]

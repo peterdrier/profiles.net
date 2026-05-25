@@ -1,7 +1,7 @@
-using System.Globalization;
 using Humans.Application.Extensions;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Auth;
+using Humans.Application.Interfaces.EarlyEntry;
 using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Governance;
 using Humans.Application.Interfaces.Notifications;
@@ -29,6 +29,7 @@ public sealed class ShiftSignupService(
     INotificationService notificationService,
     IAdminAuthorizationService adminAuthorization,
     IShiftViewInvalidator viewInvalidator,
+    IEarlyEntryInvalidator earlyEntryInvalidator,
     IServiceProvider serviceProvider,
     IClock clock,
     ILogger<ShiftSignupService> logger) : IShiftSignupService, IUserDataContributor, IUserMerge
@@ -101,8 +102,10 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(userId);
         viewInvalidator.InvalidateShift(shiftId);
+        if (autoConfirm && shift.IsEarlyEntry)
+            earlyEntryInvalidator.InvalidateUser(userId);
 
-        var shiftDate = FormatShiftDate(es.GateOpeningDate.PlusDays(shift.DayOffset));
+        var shiftDate = es.GateOpeningDate.PlusDays(shift.DayOffset).ToDisplayShiftDate();
         var statusSuffix = autoConfirm ? "confirmed" : "pending";
         await auditLogService.LogAsync(
             AuditAction.ShiftSignupCreated, nameof(ShiftSignup), signup.Id,
@@ -158,6 +161,8 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(signup.UserId);
         viewInvalidator.InvalidateShift(signup.ShiftId);
+        if (signup.Shift.IsEarlyEntry)
+            earlyEntryInvalidator.InvalidateUser(signup.UserId);
 
         await auditLogService.LogAsync(
             AuditAction.ShiftSignupConfirmed, nameof(ShiftSignup), signup.Id,
@@ -222,6 +227,8 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(signup.UserId);
         viewInvalidator.InvalidateShift(signup.ShiftId);
+        if (signup.Shift.IsEarlyEntry)
+            earlyEntryInvalidator.InvalidateUser(signup.UserId);
 
         await auditLogService.LogAsync(
             AuditAction.ShiftSignupBailed, nameof(ShiftSignup), signup.Id,
@@ -276,10 +283,12 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(userId);
         viewInvalidator.InvalidateShift(shiftId);
+        if (shift.IsEarlyEntry)
+            earlyEntryInvalidator.InvalidateUser(userId);
 
         await auditLogService.LogAsync(
             AuditAction.ShiftSignupVoluntold, nameof(ShiftSignup), signup.Id,
-            $"shift '{shift.Rota.Name}' on {FormatShiftDate(es.GateOpeningDate.PlusDays(shift.DayOffset))}",
+            $"shift '{shift.Rota.Name}' on {es.GateOpeningDate.PlusDays(shift.DayOffset).ToDisplayShiftDate()}",
             enrollerUserId,
             userId, nameof(User));
 
@@ -310,6 +319,11 @@ public sealed class ShiftSignupService(
         var rota = await repo.GetRotaWithShiftsAsync(rotaId);
         if (rota is null) return SignupResult.Fail("Rota not found.");
 
+        // Find all-day shifts in the range.
+        // TODO(#279): lift filter into PeekRangeShiftsAsync once the helper takes a
+        // pre-loaded Rota (or this method is restructured to avoid the extra
+        // GetRotaWithShiftsAsync round-trip a delegated call would introduce).
+        // Keep in lock-step with PeekRangeShiftsAsync manually until then.
         var shiftsInRange = rota.Shifts
             .Where(s => s.IsAllDay && s.DayOffset >= startDayOffset && s.DayOffset <= endDayOffset)
             .OrderBy(s => s.DayOffset)
@@ -398,12 +412,14 @@ public sealed class ShiftSignupService(
         viewInvalidator.InvalidateUser(userId);
         // Range affects every shift in the rota; cascade via the rota.
         viewInvalidator.InvalidateRota(rotaId);
+        if (assignable.Any(s => s.IsEarlyEntry))
+            earlyEntryInvalidator.InvalidateUser(userId);
 
         foreach (var (auditedSignup, dayOffset) in voluntoldForAudit)
         {
             await auditLogService.LogAsync(
                 AuditAction.ShiftSignupVoluntold, nameof(ShiftSignup), auditedSignup.Id,
-                $"'{rota.Name}' on {FormatShiftDate(es.GateOpeningDate.PlusDays(dayOffset))} (range)",
+                $"'{rota.Name}' on {es.GateOpeningDate.PlusDays(dayOffset).ToDisplayShiftDate()} (range)",
                 enrollerUserId,
                 userId, nameof(User));
         }
@@ -470,6 +486,8 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(signup.UserId);
         viewInvalidator.InvalidateShift(signup.ShiftId);
+        if (signup.Shift.IsEarlyEntry)
+            earlyEntryInvalidator.InvalidateUser(signup.UserId);
 
         await auditLogService.LogAsync(
             AuditAction.ShiftSignupCancelled, nameof(ShiftSignup), signup.Id,
@@ -483,6 +501,22 @@ public sealed class ShiftSignupService(
         await CheckAndNotifyCoverageGapAsync(signup, signup.Shift);
 
         return SignupResult.Ok(signup);
+    }
+
+    public async Task<IReadOnlyList<Shift>> PeekRangeShiftsAsync(
+        Guid rotaId,
+        int startDayOffset,
+        int endDayOffset,
+        CancellationToken ct = default)
+    {
+        var rota = await repo.GetRotaWithShiftsAsync(rotaId, ct);
+        if (rota is null) return Array.Empty<Shift>();
+
+        return rota.Shifts
+            .Where(s => s.IsAllDay
+                        && s.DayOffset >= startDayOffset
+                        && s.DayOffset <= endDayOffset)
+            .ToList();
     }
 
     public async Task<SignupResult> SignUpRangeAsync(Guid userId, Guid rotaId, int startDayOffset, int endDayOffset, Guid? actorUserId = null, bool isPrivileged = false, bool skipConflicts = false)
@@ -500,6 +534,11 @@ public sealed class ShiftSignupService(
         if (rota.Period == RotaPeriod.Build && es.EarlyEntryClose.HasValue && now >= es.EarlyEntryClose.Value && !isPrivileged)
             return SignupResult.Fail("Early entry signups are closed.");
 
+        // Find all-day shifts in the range.
+        // TODO(#279): lift filter into PeekRangeShiftsAsync once the helper takes a
+        // pre-loaded Rota (or this method is restructured to avoid the extra
+        // GetRotaWithShiftsAsync round-trip a delegated call would introduce).
+        // Keep in lock-step with PeekRangeShiftsAsync manually until then.
         var shiftsInRange = rota.Shifts
             .Where(s => s.IsAllDay && s.DayOffset >= startDayOffset && s.DayOffset <= endDayOffset)
             .OrderBy(s => s.DayOffset)
@@ -527,7 +566,7 @@ public sealed class ShiftSignupService(
                 .Select(s => s.DayOffset)
                 .ToList();
             var dayList = string.Join(", ", alreadySignedUpDays.Select(offset =>
-                FormatShiftDate(es.GateOpeningDate.PlusDays(offset))));
+                es.GateOpeningDate.PlusDays(offset).ToDisplayShiftDate()));
             skipMessages.Add($"Already signed up for day(s): {dayList}.");
 
             shiftsInRange = shiftsInRange.Where(s => !activeShiftIds.Contains(s.Id)).ToList();
@@ -556,7 +595,7 @@ public sealed class ShiftSignupService(
         if (conflictingDays.Count > 0)
         {
             var dayList = string.Join(", ", conflictingDays.Select(offset =>
-                FormatShiftDate(es.GateOpeningDate.PlusDays(offset))));
+                es.GateOpeningDate.PlusDays(offset).ToDisplayShiftDate()));
 
             if (!skipConflicts)
                 return SignupResult.Fail($"Time conflict on day(s): {dayList}.");
@@ -591,7 +630,7 @@ public sealed class ShiftSignupService(
         if (fullDays.Count > 0)
         {
             var dayList = string.Join(", ", fullDays.Select(offset =>
-                FormatShiftDate(es.GateOpeningDate.PlusDays(offset))));
+                es.GateOpeningDate.PlusDays(offset).ToDisplayShiftDate()));
             var capacityWarning = $"Day(s) {dayList} are at capacity.";
             warning = warning is null ? capacityWarning : $"{warning} {capacityWarning}";
         }
@@ -613,7 +652,7 @@ public sealed class ShiftSignupService(
             if (fullEeDays.Count > 0)
             {
                 var eeDayList = string.Join(", ", fullEeDays.Select(offset =>
-                    FormatShiftDate(es.GateOpeningDate.PlusDays(offset))));
+                    es.GateOpeningDate.PlusDays(offset).ToDisplayShiftDate()));
                 var eeWarning = $"Early entry capacity reached for day(s): {eeDayList}.";
                 warning = warning is null ? eeWarning : $"{warning} {eeWarning}";
             }
@@ -655,6 +694,8 @@ public sealed class ShiftSignupService(
         await repo.SaveChangesAsync();
         viewInvalidator.InvalidateUser(userId);
         viewInvalidator.InvalidateRota(rotaId);
+        if (autoConfirm && availableShifts.Any(s => s.IsEarlyEntry))
+            earlyEntryInvalidator.InvalidateUser(userId);
 
         var statusSuffix = autoConfirm ? "confirmed" : "pending";
         foreach (var (auditedSignup, dayOffset) in rangeSignupsForAudit)
@@ -662,7 +703,7 @@ public sealed class ShiftSignupService(
             await auditLogService.LogAsync(
                 AuditAction.ShiftSignupCreated,
                 nameof(ShiftSignup), auditedSignup.Id,
-                $"'{rota.Name}' on {FormatShiftDate(es.GateOpeningDate.PlusDays(dayOffset))} (range, {statusSuffix})",
+                $"'{rota.Name}' on {es.GateOpeningDate.PlusDays(dayOffset).ToDisplayShiftDate()} (range, {statusSuffix})",
                 userId,
                 userId, nameof(User));
         }
@@ -713,6 +754,8 @@ public sealed class ShiftSignupService(
             }
 
             signup.Confirm(reviewerUserId, clock);
+            if (signup.Shift.IsEarlyEntry)
+                earlyEntryInvalidator.InvalidateUser(signup.UserId);
             approved.Add(signup);
         }
 
@@ -828,6 +871,8 @@ public sealed class ShiftSignupService(
         foreach (var signup in signups)
         {
             signup.Bail(actorUserId, clock, reason);
+            if (signup.Shift.IsEarlyEntry)
+                earlyEntryInvalidator.InvalidateUser(signup.UserId);
         }
 
         await repo.SaveChangesAsync();
@@ -1011,7 +1056,7 @@ public sealed class ShiftSignupService(
 
             var es = rota.EventSettings;
             var shiftDate = es.GateOpeningDate.PlusDays(shift.DayOffset);
-            var enrichedDescription = $"{changeDescription} ({rotaName}, {FormatShiftDate(shiftDate)})";
+            var enrichedDescription = $"{changeDescription} ({rotaName}, {shiftDate.ToDisplayShiftDate()})";
 
             var team = await TeamService.GetTeamAsync(teamId);
             var coordinatorIds = team?.Members
@@ -1037,10 +1082,6 @@ public sealed class ShiftSignupService(
             logger.LogError(ex, "Failed to dispatch ShiftSignupChange notification for signup {SignupId}", signup.Id);
         }
     }
-
-    // Mirrors the Web-layer ToDisplayShiftDate() extension. Format: "Wed Jul 1".
-    private static string FormatShiftDate(LocalDate date) =>
-        date.DayOfWeek.ToString()[..3] + " " + date.ToString("MMM d", CultureInfo.InvariantCulture);
 
     public async Task<IReadOnlyList<UserDataSlice>> ContributeForUserAsync(Guid userId, CancellationToken ct)
     {
@@ -1075,17 +1116,13 @@ public sealed class ShiftSignupService(
             ReviewedAt = ss.ReviewedAt.ToInvariantInstantString()
         }).ToList());
 
+        // Dietary + medical moved to Profile — they are exported by the Profiles
+        // data contributor now. The Shifts VEP slice carries only shift-matching data.
         var vepSlice = new UserDataSlice(GdprExportSections.VolunteerEventProfiles, volunteerEventProfiles.Select(vep => new
         {
             vep.Skills,
             vep.Quirks,
             vep.Languages,
-            vep.DietaryPreference,
-            vep.Allergies,
-            vep.Intolerances,
-            vep.AllergyOtherText,
-            vep.IntoleranceOtherText,
-            vep.MedicalConditions,
             CreatedAt = vep.CreatedAt.ToInvariantInstantString(),
             UpdatedAt = vep.UpdatedAt.ToInvariantInstantString()
         }).ToList());
@@ -1112,6 +1149,7 @@ public sealed class ShiftSignupService(
         viewInvalidator.InvalidateUser(userId);
         foreach (var (_, shiftId) in cancelled)
             viewInvalidator.InvalidateShift(shiftId);
+        earlyEntryInvalidator.InvalidateUser(userId);
         return cancelled;
     }
 
@@ -1129,6 +1167,8 @@ public sealed class ShiftSignupService(
             foreach (var userId in userIds)
                 viewInvalidator.InvalidateUser(userId);
         }
+        foreach (var userId in userIds)
+            earlyEntryInvalidator.InvalidateUser(userId);
         return deleted;
     }
 
@@ -1176,6 +1216,9 @@ public sealed class ShiftSignupService(
 
         if (movedCount > 0)
         {
+            earlyEntryInvalidator.InvalidateUser(sourceUserId);
+            earlyEntryInvalidator.InvalidateUser(targetUserId);
+
             await auditLogService.LogAsync(
                 AuditAction.ShiftSignupReassigned, nameof(User), targetUserId,
                 $"Reassigned {movedCount} shift signup(s) from merged source user {sourceUserId}",

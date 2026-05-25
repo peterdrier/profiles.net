@@ -8,6 +8,8 @@ using Humans.Application.Interfaces.Shifts;
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Tickets;
 using Humans.Application.Interfaces.Users;
+using Humans.Application.Interfaces;
+using Humans.Application.Services.Profiles;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -23,8 +25,8 @@ public sealed class AccountDeletionService(
     IRoleAssignmentService roleAssignmentService,
     IShiftSignupService shiftSignupService,
     IShiftManagementService shiftManagementService,
-    IProfileService profileService,
-    ITicketQueryService ticketQueryService,
+    IFileStorage fileStorage,
+    ITicketServiceRead ticketQueryService,
     IRoleAssignmentClaimsCacheInvalidator roleAssignmentClaimsInvalidator,
     IShiftAuthorizationInvalidator shiftAuthorizationInvalidator,
     IShiftViewInvalidator shiftViewInvalidator,
@@ -49,9 +51,10 @@ public sealed class AccountDeletionService(
 
         // Ticket hold: held until after the event so the ticket remains usable.
         Instant? eligibleAfter = null;
-        if (await ticketQueryService.HasCurrentEventTicketAsync(userId, ct))
+        var ticketHoldings = await ticketQueryService.GetUserTicketHoldingsAsync(userId, ct);
+        if (ticketHoldings.HasCurrentEventTicket)
         {
-            eligibleAfter = await ticketQueryService.GetPostEventHoldDateAsync(ct);
+            eligibleAfter = ticketHoldings.PostEventHoldDate;
         }
 
         // 1. Persist deletion-pending fields on User.
@@ -172,8 +175,24 @@ public sealed class AccountDeletionService(
         // 2. End governance roles.
         await roleAssignmentService.RevokeAllActiveAsync(userId, ct);
 
-        // 3. Anonymize profile + contact fields + volunteer history.
-        await profileService.AnonymizeExpiredProfileAsync(userId, ct);
+        // 3. Anonymize profile + contact fields + volunteer history, then remove stale profile-picture bytes.
+        var profileAnonymization = await userService.AnonymizeProfileForDeletionAsync(userId, ct);
+        if (profileAnonymization.Anonymized &&
+            profileAnonymization.ProfileId is { } profileId &&
+            profileAnonymization.PreviousProfilePictureContentType is { } contentType)
+        {
+            try
+            {
+                await fileStorage.DeleteAsync(
+                    ProfilePictureStorageKeys.ProfilePictureKey(profileId, contentType),
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Failed to delete profile picture during expired account anonymization for user {UserId}", userId);
+            }
+        }
 
         // 4. Cancel active shift signups.
         var cancelledSignupIds = await shiftSignupService.CancelActiveSignupsForUserAsync(

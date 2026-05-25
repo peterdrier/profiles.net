@@ -1,5 +1,7 @@
 using Humans.Application.DTOs;
+using Humans.Application.DTOs.Shifts;
 using Humans.Application.Enums;
+using Humans.Application.Extensions;
 using Humans.Application.Interfaces.AuditLog;
 using Humans.Application.Interfaces.Auth;
 using Humans.Application.Interfaces.Repositories;
@@ -52,7 +54,7 @@ public sealed class ShiftManagementService(
     // Lazy-resolved to break DI cycles (TeamService → this → TeamService etc.).
     private ITeamService TeamService => serviceProvider.GetRequiredService<ITeamService>();
     private IRoleAssignmentService RoleAssignmentService => serviceProvider.GetRequiredService<IRoleAssignmentService>();
-    private ITicketQueryService TicketQueryService => serviceProvider.GetRequiredService<ITicketQueryService>();
+    private ITicketServiceRead TicketQueryService => serviceProvider.GetRequiredService<ITicketServiceRead>();
     private IUserServiceRead UserService => serviceProvider.GetRequiredService<IUserServiceRead>();
 
     public async Task<bool> IsDeptCoordinatorAsync(Guid userId, Guid departmentTeamId)
@@ -823,7 +825,7 @@ public sealed class ShiftManagementService(
             var dayStart = dayDate.AtStartOfDayInZone(tz).ToInstant();
             var dayEnd = dayDate.PlusDays(1).AtStartOfDayInZone(tz).ToInstant();
             var periodLabel = dayOffset < 0 ? "Set-up" : dayOffset <= es.EventEndOffset ? "Event" : "Strike";
-            var dateLabel = dayDate.DayOfWeek.ToString()[..3] + " " + dayDate.ToString("MMM d", null);
+            var dateLabel = dayDate.ToDisplayShiftDate();
 
             var overlapping = shifts.Where(s =>
             {
@@ -864,7 +866,7 @@ public sealed class ShiftManagementService(
             var dayDate = es.GateOpeningDate.PlusDays(dayOffset);
             var dayStart = dayDate.AtStartOfDayInZone(tz).ToInstant();
             var dayEnd = dayDate.PlusDays(1).AtStartOfDayInZone(tz).ToInstant();
-            var dateLabel = dayDate.DayOfWeek.ToString()[..3] + " " + dayDate.ToString("MMM d", null);
+            var dateLabel = dayDate.ToDisplayShiftDate();
 
             var overlapping = shifts.Where(s =>
             {
@@ -1103,8 +1105,11 @@ public sealed class ShiftManagementService(
                 Pct(perPeriod, ShiftPeriod.Strike));
         }
 
-        var ticketHolderIds = await TicketQueryService.GetMatchedUserIdsForPaidOrdersAsync();
-        var ticketHolders = ticketHolderIds as HashSet<Guid> ?? ticketHolderIds.ToHashSet();
+        var ticketOrders = await TicketQueryService.GetTicketOrdersAsync();
+        var ticketHolders = ticketOrders
+            .Where(o => o.PaymentStatus == TicketPaymentStatus.Paid && o.MatchedUserId.HasValue)
+            .Select(o => o.MatchedUserId!.Value)
+            .ToHashSet();
 
         var engagedUserIds = await repo.GetEngagedUserIdsForShiftsAsync(shiftIds);
         var engaged = engagedUserIds.ToHashSet();
@@ -1451,7 +1456,12 @@ public sealed class ShiftManagementService(
         var signupsInWindow = await repo.GetSignupCreatedAtsInWindowAsync(
             eventSettingsId, startInstant, endInstant, minDayOffset, maxDayOffset);
 
-        var ticketsInWindow = await TicketQueryService.GetPaidOrderDatesInWindowAsync(startInstant, endInstant);
+        var ticketsInWindow = (await TicketQueryService.GetTicketOrdersAsync())
+            .Where(o => o.PaymentStatus == TicketPaymentStatus.Paid
+                && o.PurchasedAt >= startInstant
+                && o.PurchasedAt < endInstant)
+            .Select(o => o.PurchasedAt)
+            .ToList();
         var loginsInWindow = (await UserService.GetAllUserInfosAsync().ConfigureAwait(false))
             .Where(u => u.LastLoginAt >= startInstant && u.LastLoginAt < endInstant)
             .Select(u => u.LastLoginAt!.Value)
@@ -1517,7 +1527,7 @@ public sealed class ShiftManagementService(
             var dayDate = es.GateOpeningDate.PlusDays(dayOffset);
             var dayStart = dayDate.AtStartOfDayInZone(tz).ToInstant();
             var dayEnd = dayDate.PlusDays(1).AtStartOfDayInZone(tz).ToInstant();
-            var dateLabel = dayDate.DayOfWeek.ToString()[..3] + " " + dayDate.ToString("MMM d", null);
+            var dateLabel = dayDate.ToDisplayShiftDate();
 
             var overlapping = shifts.Where(s =>
             {
@@ -1575,7 +1585,7 @@ public sealed class ShiftManagementService(
             .Select(off =>
             {
                 var date = es.GateOpeningDate.PlusDays(off);
-                var label = date.DayOfWeek.ToString()[..3] + " " + date.ToString("MMM d", null);
+                var label = date.ToDisplayShiftDate();
                 var dayPeriod = off < 0 ? ShiftPeriod.Build : off <= es.EventEndOffset ? ShiftPeriod.Event : ShiftPeriod.Strike;
                 return new CoverageHeatmapDay(off, date, label, dayPeriod);
             })
@@ -1795,17 +1805,31 @@ public sealed class ShiftManagementService(
         viewInvalidator.InvalidateUser(profile.UserId);
     }
 
-    public async Task<VolunteerEventProfile?> GetShiftProfileAsync(Guid userId, bool includeMedical)
+    public Task<VolunteerEventProfile?> GetShiftProfileAsync(Guid userId) =>
+        repo.GetVolunteerEventProfileAsync(userId);
+
+    public async Task<bool> HasQualifyingCantinaSignupAsync(
+        Guid userId,
+        CancellationToken ct = default)
     {
-        var profile = await repo.GetVolunteerEventProfileAsync(userId);
+        // Fail closed when no event is active — the nudge would be meaningless
+        // (no shifts to attend means no cantina meals to plan for).
+        var eventSettings = await repo.GetActiveEventSettingsAsync(ct);
+        if (eventSettings is null)
+            return false;
 
-        if (profile is not null && !includeMedical)
-        {
-            profile.MedicalConditions = null;
-        }
+        var now = clock.GetCurrentInstant();
+        var signups = await repo.GetUserActiveSignupsForCantinaGateAsync(userId, eventSettings.Id, ct);
 
-        return profile;
+        return signups.Any(s =>
+            s.Shift is not null
+            && s.Shift.QualifiesForCantinaMeal()
+            && s.Shift.GetAbsoluteEnd(eventSettings) > now);
     }
+
+    public Task<IReadOnlyList<Guid>> GetOnSiteUserIdsForDayAsync(
+        int dayOffset, CancellationToken ct = default) =>
+        repo.GetOnSiteUserIdsForDayAsync(dayOffset, ct);
 
     public async Task<int> DeleteShiftProfilesForUserAsync(
         Guid userId, CancellationToken ct = default)

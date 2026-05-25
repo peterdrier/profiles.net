@@ -1,6 +1,9 @@
 using Humans.Application.Interfaces.Caching;
+using Humans.Application.Interfaces.EarlyEntry;
+using Humans.Application.Interfaces.Cantina;
 using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Repositories;
+using CantinaRosterServiceImpl = Humans.Application.Services.Cantina.CantinaRosterService;
 using ShiftsShiftManagementService = Humans.Application.Services.Shifts.ShiftManagementService;
 using ShiftsShiftSignupService = Humans.Application.Services.Shifts.ShiftSignupService;
 using ShiftsGeneralAvailabilityService = Humans.Application.Services.Shifts.GeneralAvailabilityService;
@@ -14,6 +17,7 @@ using Humans.Application.Interfaces.Users;
 using Humans.Infrastructure.Repositories.Shifts;
 using Humans.Infrastructure.Services.Shifts;
 using Humans.Web.Models.Shifts;
+using Humans.Web.Models.VolunteerTracking;
 
 namespace Humans.Web.Extensions.Sections;
 
@@ -31,6 +35,12 @@ internal static class ShiftsSectionExtensions
         // Cross-section DTO supplier so Events/Camps/Tickets/Notifications consume BurnSettingsInfo without Shifts-internal EventSettings — see #719.
         services.AddScoped<IBurnSettingsService, ShiftsBurnSettingsService>();
 
+        // Cantina Daily Roster — read-only service that stitches the on-site
+        // cohort + dietary breakdown for the /Cantina/Roster page (feature #36 —
+        // docs/features/cantina/daily-roster.md). Access is gated by the
+        // CantinaAdminOrAdmin authorization policy, not a bespoke service.
+        services.AddScoped<ICantinaRosterService, CantinaRosterServiceImpl>();
+
         // ShiftSignup — see #541b. Repository is Scoped so multi-step mutation transactions share one change-tracker.
         services.AddScoped<IShiftSignupRepository, ShiftSignupRepository>();
         services.AddScoped<ShiftsShiftSignupService>();
@@ -47,6 +57,12 @@ internal static class ShiftsSectionExtensions
         // VolunteerTracking — Scoped repository so multi-step camp-setup + blocked-day mutations share one change-tracker.
         services.AddScoped<IVolunteerTrackingRepository, VolunteerTrackingRepository>();
         services.AddScoped<IVolunteerTrackingService, ShiftsVolunteerTrackingService>();
+        services.AddScoped<Humans.Application.Services.Shifts.VolunteerTrackingExportService>();
+        services.AddScoped<IVolunteerTrackingExportService>(sp =>
+            sp.GetRequiredService<Humans.Application.Services.Shifts.VolunteerTrackingExportService>());
+        services.AddScoped<IEarlyEntryProvider>(sp =>
+            sp.GetRequiredService<Humans.Application.Services.Shifts.VolunteerTrackingExportService>());
+        services.AddScoped<VolunteerTrackingXlsxBuilder>();
 
         // ShiftView — see #720. Singleton decorator over keyed-Scoped inner, mirrors CachingUserService/CachingTeamService.
         services.AddKeyedScoped<IShiftView, ShiftsShiftViewService>(CachingShiftViewService.InnerServiceKey);

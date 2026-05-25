@@ -1,13 +1,12 @@
 using Humans.Application.Interfaces.Teams;
 using Humans.Application.Interfaces.Budget;
-using Humans.Domain.Entities;
 using NodaTime;
 
 namespace Humans.Web.Models;
 
 public class FinanceOverviewViewModel
 {
-    public required BudgetYear Year { get; init; }
+    public required BudgetYearDetail Year { get; init; }
     public required IReadOnlyList<BudgetYearSummarySnapshot> AllYears { get; init; }
 
     // Summary data (same logic as public summary, but includes restricted groups)
@@ -16,6 +15,10 @@ public class FinanceOverviewViewModel
     public decimal NetBalance { get; init; }
     public required IReadOnlyList<BudgetSlice> IncomeSlices { get; init; }
     public required IReadOnlyList<BudgetSlice> ExpenseSlices { get; init; }
+
+    /// <summary>Holded actual spend per budget category (keyed by BudgetCategoryId).</summary>
+    public IReadOnlyDictionary<Guid, decimal> HoldedActualsByCategory { get; init; } =
+        new Dictionary<Guid, decimal>();
 }
 
 public class TicketingProjectionUpdateForm
@@ -34,7 +37,7 @@ public class TicketingProjectionUpdateForm
 
 public class CoordinatorBudgetViewModel
 {
-    public required BudgetYear Year { get; init; }
+    public required BudgetYearDetail Year { get; init; }
     public required HashSet<Guid> EditableTeamIds { get; init; }
     public bool IsFinanceAdmin { get; init; }
 }

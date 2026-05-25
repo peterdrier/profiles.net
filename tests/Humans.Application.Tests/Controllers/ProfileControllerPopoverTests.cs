@@ -40,7 +40,7 @@ public class ProfileControllerPopoverTests
 {
     private readonly IUserService _userService = Substitute.For<IUserService>();
     private readonly IUserEmailService _userEmailService = Substitute.For<IUserEmailService>();
-    private readonly IProfileService _profileService = Substitute.For<IProfileService>();
+    private readonly IProfilePictureService _profilePictureService = Substitute.For<IProfilePictureService>();
     private readonly ITeamService _teamService = Substitute.For<ITeamService>();
     private readonly IAuthorizationService _authorizationService = Substitute.For<IAuthorizationService>();
     private readonly ProfileController _controller;
@@ -68,7 +68,8 @@ public class ProfileControllerPopoverTests
         _controller = new ProfileController(
             _userService,
             userManager,
-            _profileService,
+            _profilePictureService,
+            Substitute.For<IProfileEditorService>(),
             Substitute.For<IContactFieldService>(),
             Substitute.For<IEmailService>(),
             _userEmailService,
@@ -85,7 +86,7 @@ public class ProfileControllerPopoverTests
             new ConfigurationRegistry(),
             NullLogger<ProfileController>.Instance,
             localizer,
-            Substitute.For<ITicketQueryService>(),
+            Substitute.For<ITicketService>(),
             _teamService,
             Substitute.For<ICampaignService>(),
             Substitute.For<IEmailOutboxService>(),
@@ -95,7 +96,6 @@ public class ProfileControllerPopoverTests
             Substitute.For<IApplicationDecisionService>(),
             Substitute.For<IAccountDeletionService>(),
             Substitute.For<IMembershipCalculator>(),
-            Substitute.For<IHttpClientFactory>(),
             signInManager,
             Options.Create(new GoogleWorkspaceOptions()));
 

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Localization;
 using Humans.Application;
 using Humans.Application.DTOs;
 using Humans.Application.Interfaces.Gdpr;
+using Humans.Domain.Constants;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
 using Humans.Web.Authorization;
@@ -47,7 +48,8 @@ namespace Humans.Web.Controllers;
 public class ProfileController(
     IUserService userService,
     UserManager<User> userManager,
-    IProfileService profileService,
+    IProfilePictureService profilePictureService,
+    IProfileEditorService profileEditorService,
     IContactFieldService contactFieldService,
     IEmailService emailService,
     IUserEmailService userEmailService,
@@ -64,7 +66,7 @@ public class ProfileController(
     ConfigurationRegistry configRegistry,
     ILogger<ProfileController> logger,
     IStringLocalizer<SharedResource> localizer,
-    ITicketQueryService ticketQueryService,
+    ITicketServiceRead ticketQueryService,
     ITeamServiceRead teamService,
     ICampaignService campaignService,
     IEmailOutboxService emailOutboxService,
@@ -74,17 +76,14 @@ public class ProfileController(
     IApplicationDecisionService applicationDecisionService,
     IAccountDeletionService accountDeletionService,
     IMembershipCalculator membershipCalculator,
-    IHttpClientFactory httpClientFactory,
     SignInManager<User> signInManager,
     IOptions<GoogleWorkspaceOptions> googleWorkspaceOptions) : HumansControllerBase(userService)
 {
-    private readonly ITicketQueryService _ticketQueryService = ticketQueryService;
+    private readonly ITicketServiceRead _ticketQueryService = ticketQueryService;
     private readonly IUserService _userService = userService;
     private readonly GoogleWorkspaceOptions _googleWorkspaceOptions = googleWorkspaceOptions.Value;
 
     private const int MaxProfilePictureUploadBytes = 20 * 1024 * 1024; // 20MB upload limit
-    private const int MaxGooglePhotoDownloadBytes = 20 * 1024 * 1024; // 20MB hard ceiling for Google avatar fetch
-    private const string GoogleAvatarHttpClientName = "GoogleAvatar";
     private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         "image/jpeg",
@@ -160,7 +159,7 @@ public class ProfileController(
         var pendingConsentCount = snapshot.PendingConsentCount;
 
         var applications = await applicationDecisionService.GetUserApplicationsAsync(info.Id, ct);
-        var latestApplication = applications.Count > 0 ? applications[0] : null;
+        var latestApplication = applications.MaxBy(a => a.SubmittedAt);
 
         var campaignGrants = await campaignService.GetActiveOrCompletedGrantsForUserAsync(info.Id, ct);
 
@@ -221,16 +220,20 @@ public class ProfileController(
         var preferredShiftTags = userShiftView.TagPreferences
             .Select(p => new ShiftTagPreferenceSummary(p.ShiftTagId, p.ShiftTag?.Name ?? string.Empty))
             .ToList();
-        var externalLogins = await userManager.GetLoginsAsync(user);
-
         var viewModel = ProfileEditViewModelBuilder.Build(
             info,
             applications,
             allShiftTags,
             preferredShiftTags,
             preview,
-            externalLogins.Any(l => string.Equals(l.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase)),
             p => Url.Action(nameof(Picture), new { id = p.Id, v = p.UpdatedAt.ToUnixTimeTicks() }));
+
+        // Meal preference + allergies are Profile fields, surfaced on Edit as a
+        // second entry point alongside the dedicated DietaryMedical page (which owns
+        // intolerances + medical). Read straight off the UserInfo we already loaded.
+        viewModel.DietaryPreference = info.Profile?.DietaryPreference ?? string.Empty;
+        viewModel.Allergies = info.Profile is null ? [] : [.. info.Profile.Allergies];
+        viewModel.AllergyOtherText = info.Profile?.AllergyOtherText;
 
         ViewData["GoogleMapsApiKey"] = configuration.GetRequiredSetting(configRegistry, "GoogleMaps:ApiKey", "Google Maps", isSensitive: true);
         return View(viewModel);
@@ -270,6 +273,15 @@ public class ProfileController(
         {
             ModelState.AddModelError(nameof(model.EmergencyContactPhone),
                 localizer["Validation_PhoneE164", localizer["Profile_EmergencyContactPhone"].Value].Value);
+        }
+
+        // Allergy "Other" requires accompanying free text (mirrors DietaryMedical POST).
+        // Validated here, before any persistence, so a bad submit can't half-save
+        // (main profile written but shift profile rejected, or vice versa).
+        if (model.Allergies.Contains(DietaryOptions.OtherOption) && string.IsNullOrWhiteSpace(model.AllergyOtherText))
+        {
+            ModelState.AddModelError(nameof(model.AllergyOtherText),
+                localizer["Profile_DietaryMedical_AllergyOther_Required"].Value);
         }
 
         if (ModelState.ErrorCount > 0)
@@ -363,11 +375,14 @@ public class ProfileController(
             NoPriorBurnExperience: model.NoPriorBurnExperience,
             ProfilePictureData: pictureUpload.Data,
             ProfilePictureContentType: pictureUpload.ContentType,
-            RemoveProfilePicture: model.RemoveProfilePicture);
+            RemoveProfilePicture: model.RemoveProfilePicture,
+            // Meal pref + allergies (the DietaryMedical page owns intolerances + medical).
+            DietaryPreference: string.IsNullOrWhiteSpace(model.DietaryPreference) ? null : model.DietaryPreference,
+            Allergies: [.. model.Allergies.Where(a => DietaryOptions.AllergyOptions.Contains(a, StringComparer.Ordinal))],
+            AllergyOtherText: model.Allergies.Contains(DietaryOptions.OtherOption) ? model.AllergyOtherText?.Trim() : null);
 
-        var profileId = await profileService.SaveProfileAsync(
-            user.Id, model.BurnerName, saveRequest,
-            CultureInfo.CurrentUICulture.TwoLetterISOLanguageName);
+        var profileId = await profileEditorService.SaveProfileAsync(
+            user.Id, model.BurnerName, saveRequest);
 
         // Peer-call into Onboarding; ProfileService doesn't.
         await onboardingService.SetConsentCheckPendingIfEligibleAsync(user.Id);
@@ -447,7 +462,7 @@ public class ProfileController(
             ))
             .ToList();
 
-        await profileService.SaveCVEntriesAsync(user.Id, cvEntries);
+        await _userService.SaveProfileVolunteerHistoryAsync(user.Id, cvEntries);
 
         // Languages: remove-and-replace.
         var newLanguages = model.EditableLanguages
@@ -461,9 +476,13 @@ public class ProfileController(
             })
             .ToList();
 
-        await profileService.SaveProfileLanguagesAsync(profileId, newLanguages);
+        await _userService.SaveProfileLanguagesAsync(profileId, newLanguages);
 
         await shiftMgmt.SetVolunteerTagPreferencesAsync(user.Id, model.EditableShiftTagIds);
+
+        // Meal pref + allergies were persisted as part of the ProfileSaveRequest
+        // above (Profile now owns dietary). Intolerances + medical are untouched —
+        // they're owned by the DietaryMedical page.
 
         SetSuccess(localizer["Profile_Updated"].Value);
         return RedirectToAction(nameof(Me));
@@ -1514,7 +1533,8 @@ public class ProfileController(
         {
             var user = await GetCurrentUserInfoAsync();
             if (user is null)
-                return NotFound(); var profile = await shiftMgmt.GetShiftProfileAsync(user.Id, includeMedical: false);
+                return NotFound();
+            var profile = await shiftMgmt.GetShiftProfileAsync(user.Id);
             return View(ShiftInfoViewModel.FromProfile(profile));
         }
         catch (Exception ex)
@@ -1553,6 +1573,129 @@ public class ProfileController(
         {
             logger.LogError(ex, "Failed to save shift info for user");
             SetError("Failed to save shift info.");
+            return View(model);
+        }
+    }
+
+    [HttpGet("Me/DietaryMedical")]
+    public async Task<IActionResult> DietaryMedical(
+        string? returnAction = null,
+        Guid? shiftId = null,
+        Guid? rotaId = null,
+        int? startDayOffset = null,
+        int? endDayOffset = null)
+    {
+        try
+        {
+            var user = await GetCurrentUserInfoAsync();
+            if (user is null)
+                return NotFound();
+
+            // Dietary + medical are Profile fields now. The owner sees their own
+            // medical here (allowed); the data comes from the cached UserInfo.
+            var vm = user.Profile is null
+                ? new DietaryMedicalViewModel()
+                : DietaryMedicalViewModel.FromProfile(user.Profile);
+
+            // Carryover from the dietary-gate redirect (ShiftsController.SignUp/SignUpRange).
+            // The POST handler reads these to replay the original signup after a successful save.
+            vm.ReturnAction = returnAction;
+            vm.ShiftId = shiftId;
+            vm.RotaId = rotaId;
+            vm.StartDayOffset = startDayOffset;
+            vm.EndDayOffset = endDayOffset;
+
+            return View(vm);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load dietary/medical info for user");
+            SetError(localizer["Profile_DietaryMedical_LoadFailed"].Value);
+            return RedirectToAction(nameof(Me));
+        }
+    }
+
+    [HttpPost("Me/DietaryMedical")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DietaryMedical(DietaryMedicalViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return View(model);
+
+        // Server-side validation for the "Other text required iff Other selected" rule
+        // (DataAnnotations can't express the conditional requirement cleanly).
+        if (model.Allergies.Contains(DietaryMedicalViewModel.OtherOption) && string.IsNullOrWhiteSpace(model.AllergyOtherText))
+        {
+            ModelState.AddModelError(nameof(model.AllergyOtherText), localizer["Profile_DietaryMedical_AllergyOther_Required"].Value);
+            return View(model);
+        }
+        if (model.Intolerances.Contains(DietaryMedicalViewModel.OtherOption) && string.IsNullOrWhiteSpace(model.IntoleranceOtherText))
+        {
+            ModelState.AddModelError(nameof(model.IntoleranceOtherText), localizer["Profile_DietaryMedical_IntoleranceOther_Required"].Value);
+            return View(model);
+        }
+
+        try
+        {
+            var user = await GetCurrentUserInfoAsync();
+            if (user is null)
+                return NotFound();
+
+            // Owner editing their own dietary + medical — write the six Profile
+            // columns (the editor leaves all other profile fields untouched).
+            await profileEditorService.SaveDietaryMedicalAsync(user.Id, model.ToCommand());
+
+            // Signup-replay branches — the user was bounced here from
+            // ShiftsController.SignUp/SignUpRange by the dietary gate. After a
+            // successful save we re-run the original signup and land them on
+            // /Shifts with the appropriate flash. See
+            // docs/superpowers/specs/2026-05-25-dietary-prompt-tightening-design.md.
+            // Replay failure does NOT roll back the dietary save — the user can
+            // retry the signup directly from /Shifts without re-entering it.
+            // The inline flash-mapping duplicates ShiftsController's two existing
+            // inline copies; extract on the third call site per project doctrine.
+            switch (model.ReturnAction)
+            {
+                case "signup" when model.ShiftId is { } sid:
+                    {
+                        var privileged = ShiftRoleChecks.IsPrivilegedSignupApprover(User);
+                        var result = await shiftSignupService.SignUpAsync(
+                            user.Id, sid, actorUserId: null, isPrivileged: privileged);
+                        if (!result.Success)
+                            SetError(result.Error ?? "Shift signup failed.");
+                        else
+                            SetSuccess(result.Warning is not null
+                                ? $"Signed up successfully. Note: {result.Warning}"
+                                : "Signed up successfully!");
+                        return RedirectToAction("Index", "Shifts");
+                    }
+                case "signuprange" when model.RotaId is { } rid
+                                         && model.StartDayOffset is { } sd
+                                         && model.EndDayOffset is { } ed:
+                    {
+                        var privileged = ShiftRoleChecks.IsPrivilegedSignupApprover(User);
+                        var result = await shiftSignupService.SignUpRangeAsync(
+                            user.Id, rid, sd, ed, actorUserId: null, isPrivileged: privileged, skipConflicts: true);
+                        if (!result.Success)
+                            SetError(result.Error ?? "Shift range signup failed.");
+                        else
+                            SetSuccess(result.Warning is not null
+                                ? $"Signed up for date range. Note: {result.Warning}"
+                                : "Signed up for date range!");
+                        return RedirectToAction("Index", "Shifts");
+                    }
+                case "shifts":
+                    SetSuccess(localizer["Profile_DietaryMedical_Saved"].Value);
+                    return RedirectToAction("Index", "Shifts");
+                default:
+                    SetSuccess(localizer["Profile_DietaryMedical_Saved"].Value);
+                    return RedirectToAction("Index", "Home");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to save dietary/medical info");
+            SetError(localizer["Profile_DietaryMedical_SaveFailed"].Value);
             return View(model);
         }
     }
@@ -1642,8 +1785,8 @@ public class ProfileController(
     [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Client)]
     public async Task<IActionResult> Picture(Guid id, CancellationToken ct)
     {
-        // §2: controller routes through IProfileService (owns FS-first/DB-fallback + GDPR gate, see #527).
-        var result = await profileService.GetProfilePictureAsync(id, ct);
+        // §2: controller routes through the profile-picture service (owns FS read path + GDPR gate, see #527).
+        var result = await profilePictureService.GetProfilePictureAsync(id, ct);
         if (result is null)
         {
             return NotFound();
@@ -1652,130 +1795,6 @@ public class ProfileController(
         return File(result.Value.Data, result.Value.ContentType);
     }
 
-    [HttpPost("Me/ImportGooglePhoto")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> ImportGooglePhoto(CancellationToken ct)
-    {
-        var user = await userManager.GetUserAsync(User);
-        if (user is null)
-        {
-            return NotFound();
-        }
-
-        var externalLogins = await userManager.GetLoginsAsync(user);
-        if (!HasGoogleAvatarSource(user, externalLogins))
-        {
-            SetError(localizer["Profile_ImportGooglePhoto_Unavailable"].Value);
-            return RedirectToAction(nameof(Edit));
-        }
-
-        var info = await _userService.GetUserInfoAsync(user.Id, ct);
-        if (info?.Profile is null)
-        {
-            SetError(localizer["Profile_ImportGooglePhoto_NoProfile"].Value);
-            return RedirectToAction(nameof(Edit));
-        }
-        if (info.Profile.HasCustomPicture)
-        {
-            SetError(localizer["Profile_ImportGooglePhoto_AlreadyHasCustom"].Value);
-            return RedirectToAction(nameof(Edit));
-        }
-
-        if (!TryGetTrustedGoogleAvatarUri(user, out var pictureUri))
-        {
-            SetError(localizer["Profile_ImportGooglePhoto_NotGoogleUrl"].Value);
-            return RedirectToAction(nameof(Edit));
-        }
-
-        var rawBytes = await FetchGoogleAvatarBytesAsync(pictureUri, user.Id, ct);
-        if (rawBytes is null)
-        {
-            return RedirectToAction(nameof(Edit));
-        }
-
-        var resized = Helpers.ProfilePictureProcessor.ResizeProfilePicture(rawBytes, logger);
-        if (resized is null)
-        {
-            SetError(localizer["Profile_ImportGooglePhoto_InvalidFormat"].Value);
-            return RedirectToAction(nameof(Edit));
-        }
-
-        await profileService.SetProfilePictureAsync(user.Id, resized.Value.Data, resized.Value.ContentType, ct);
-
-        logger.LogInformation("Imported Google avatar for user {UserId}", user.Id);
-        SetSuccess(localizer["Profile_ImportGooglePhoto_Success"].Value);
-        return RedirectToAction(nameof(Edit));
-    }
-
-
-    private static bool HasGoogleAvatarSource(User user, IEnumerable<UserLoginInfo> externalLogins) =>
-        !string.IsNullOrEmpty(user.ProfilePictureUrl)
-        && externalLogins.Any(l => string.Equals(l.LoginProvider, "Google", StringComparison.OrdinalIgnoreCase));
-
-    private bool TryGetTrustedGoogleAvatarUri(User user, out Uri pictureUri)
-    {
-        if (Uri.TryCreate(user.ProfilePictureUrl, UriKind.Absolute, out pictureUri!)
-            && string.Equals(pictureUri.Scheme, Uri.UriSchemeHttps, StringComparison.Ordinal)
-            && pictureUri.Host.EndsWith(".googleusercontent.com", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        logger.LogWarning(
-            "Refusing to import Google photo for user {UserId}: URL is not a trusted Google host",
-            user.Id);
-        return false;
-    }
-
-    private async Task<byte[]?> FetchGoogleAvatarBytesAsync(Uri pictureUri, Guid userId, CancellationToken ct)
-    {
-        try
-        {
-            var httpClient = httpClientFactory.CreateClient(GoogleAvatarHttpClientName);
-            using var response = await httpClient.GetAsync(pictureUri, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                logger.LogWarning(
-                    "Google avatar fetch for user {UserId} returned {StatusCode}",
-                    userId, (int)response.StatusCode);
-                SetError(localizer["Profile_ImportGooglePhoto_FetchFailed"].Value);
-                return null;
-            }
-
-            var fetchedContentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-            if (!AllowedImageContentTypes.Contains(fetchedContentType))
-            {
-                logger.LogWarning(
-                    "Google avatar for user {UserId} returned unsupported content type {ContentType}",
-                    userId, fetchedContentType);
-                SetError(localizer["Profile_ImportGooglePhoto_InvalidFormat"].Value);
-                return null;
-            }
-
-            var rawBytes = await response.Content.ReadAsByteArrayAsync(ct);
-            if (rawBytes.Length == 0 || rawBytes.Length > MaxGooglePhotoDownloadBytes)
-            {
-                logger.LogWarning(
-                    "Google avatar for user {UserId} had invalid size {Bytes}", userId, rawBytes.Length);
-                SetError(localizer["Profile_ImportGooglePhoto_FetchFailed"].Value);
-                return null;
-            }
-
-            return rawBytes;
-        }
-        catch (HttpRequestException ex)
-        {
-            logger.LogWarning(ex, "Google avatar fetch failed for user {UserId}", userId);
-            SetError(localizer["Profile_ImportGooglePhoto_FetchFailed"].Value);
-            return null;
-        }
-        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
-        {
-            logger.LogWarning(ex, "Google avatar fetch timed out for user {UserId}", userId);
-            SetError(localizer["Profile_ImportGooglePhoto_FetchFailed"].Value);
-            return null;
-        }
-    }
     // ─── View Another Profile ────────────────────────────────────────
 
     [HttpGet("{id:guid}")]
@@ -2378,7 +2397,7 @@ public class ProfileController(
         if (pendingEmail is not null)
         {
             var (cooldownCanAdd, cooldownMinutes, _) =
-                await profileService.GetEmailCooldownInfoAsync(pendingEmail.Id, ct);
+                await userEmailService.GetEmailCooldownInfoAsync(pendingEmail.Id, ct);
             canAdd = cooldownCanAdd;
             minutesUntilResend = cooldownMinutes;
         }
@@ -2454,15 +2473,18 @@ public class ProfileController(
 
         // see nobodies-collective/Humans#758 — addresses linked to the user's event ticket.
         // The grid hides Delete for these rows; UserEmailService.DeleteEmailAsync re-validates.
-        var ticketExport = await _ticketQueryService.GetUserTicketExportDataAsync(user.Id, ct);
-        var ticketEmails = ticketExport.Orders.Select(o => o.BuyerEmail)
-            .Concat(ticketExport.Attendees.Select(a => a.AttendeeEmail))
-            .Where(addr => !string.IsNullOrWhiteSpace(addr))
-            .Select(addr => Humans.Domain.Helpers.EmailNormalization.NormalizeForComparison(addr!))
-            .ToHashSet(StringComparer.Ordinal);
+        var ticketOrders = await _ticketQueryService.GetTicketOrdersAsync(ct);
+        var ticketEmails = ticketOrders
+            .Where(o => o.MatchedUserId == user.Id && !string.IsNullOrWhiteSpace(o.BuyerEmail))
+            .Select(o => o.BuyerEmail!)
+            .Concat(ticketOrders
+                .SelectMany(o => o.Attendees)
+                .Where(a => a.MatchedUserId == user.Id && !string.IsNullOrWhiteSpace(a.AttendeeEmail))
+                .Select(a => a.AttendeeEmail!))
+            .ToList();
 
         bool RowIsTicketLinked(string address) =>
-            ticketEmails.Contains(Humans.Domain.Helpers.EmailNormalization.NormalizeForComparison(address));
+            ticketEmails.Any(ticketEmail => Humans.Domain.Helpers.EmailNormalization.EmailsMatch(address, ticketEmail));
 
         bool RowHasOrphanProviderTag(string? provider, string? providerKey) =>
             isAdminContext
@@ -2531,8 +2553,3 @@ public class ProfileController(
     }
 
 }
-
-
-
-
-

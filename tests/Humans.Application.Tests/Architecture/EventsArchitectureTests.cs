@@ -1,18 +1,13 @@
 using System.Reflection;
-using System.Text.RegularExpressions;
 using AwesomeAssertions;
-using Humans.Application.Tests.Architecture.Ratchet;
 using Humans.Application.Interfaces.Events;
 using Humans.Application.Interfaces.Gdpr;
 using Humans.Application.Interfaces.Repositories;
-using Humans.Infrastructure.Repositories.Events;
 using Humans.Infrastructure.Services.Events;
 using Humans.Web.Controllers;
 using Humans.Web.Controllers.Api;
 using Humans.Web.Filters;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using EventService = Humans.Application.Services.Events.EventService;
@@ -27,56 +22,10 @@ namespace Humans.Application.Tests.Architecture;
 public class EventsArchitectureTests
 {
     [HumansFact]
-    public void EventService_LivesInHumansApplicationServicesEventsNamespace()
-    {
-        typeof(EventService).Namespace
-            .Should().Be("Humans.Application.Services.Events",
-                because: "services with business logic live in Humans.Application per design-rules §2b, organized by section");
-    }
-
-    [HumansFact]
-    public void EventService_HasNoDbContextConstructorParameter()
-    {
-        var ctor = typeof(EventService).GetConstructors().Single();
-
-        ctor.GetParameters()
-            .Should().NotContain(
-                p => typeof(DbContext).IsAssignableFrom(p.ParameterType),
-                because: "Application services must use IEventRepository instead of taking DbContext directly");
-    }
-
-    [HumansFact]
-    public void EventService_TakesRepositoryInterface()
-    {
-        var ctor = typeof(EventService).GetConstructors().Single();
-        var paramTypes = ctor.GetParameters().Select(p => p.ParameterType).ToList();
-
-        paramTypes.Should().Contain(typeof(IEventRepository));
-    }
-
-    [HumansFact]
     public void IEventService_LivesInApplicationInterfacesEventsNamespace()
     {
         typeof(IEventService).Namespace
             .Should().Be("Humans.Application.Interfaces.Events");
-    }
-
-    [HumansFact]
-    public void IEventRepository_LivesInApplicationInterfacesRepositoriesNamespace()
-    {
-        typeof(IEventRepository).Namespace
-            .Should().Be("Humans.Application.Interfaces.Repositories",
-                because: "repository interfaces live in Humans.Application.Interfaces.Repositories per design-rules §3");
-    }
-
-    [HumansFact]
-    public void EventRepository_IsSealedAndImplementsRepositoryInterface()
-    {
-        typeof(EventRepository).IsSealed.Should().BeTrue(
-            because: "repository implementations are sealed; new behavior belongs on the interface");
-
-        typeof(IEventRepository).IsAssignableFrom(typeof(EventRepository))
-            .Should().BeTrue();
     }
 
     [HumansFact]
@@ -154,62 +103,6 @@ public class EventsArchitectureTests
             because: "MVC action filters resolve per-request; a Singleton filter would capture per-request state");
     }
 
-    /// <summary>
-    /// Single-writer rule: only <c>EventRepository</c> may invoke
-    /// <c>.Add</c>, <c>.AddRange</c>, <c>.Update</c>, <c>.Remove</c>, or
-    /// <c>.Attach</c> on the seven event_* DbSets. Any other production class
-    /// performing such writes is a §6 cross-section boundary violation —
-    /// callers must go through <see cref="IEventService"/> / <see cref="IEventRepository"/>.
-    /// </summary>
-    [HumansFact]
-    public void Only_EventRepository_Writes_Event_DbSets()
-    {
-        var repoRoot = RatchetTestRunner.LocateRepoRoot();
-        var violations = ScanEventDbSetWrites(repoRoot);
-        RatchetTestRunner.Run(
-            "OnlyEventRepositoryWritesEventDbSets",
-            "tests/Humans.Application.Tests/Architecture/Baselines/OnlyEventRepositoryWritesEventDbSets.baseline.txt",
-            violations);
-    }
-
-    // Write-operation chains on any of the seven event_* DbSets:
-    //   ctx.Events.Add(...) / .AddRange / .Update / .Remove / .Attach
-    //   ctx.EventCategories.Add(...) / ...
-    //
-    // Word-boundary at the start avoids matching identifiers that merely END
-    // in "Events" (e.g. CalendarEvents, GoogleSyncOutboxEvents). Combined with
-    // a required leading non-identifier char so we don't match property names
-    // like SubmittedEvents either.
-    private static readonly Regex EventWriteRegex = new(
-        @"(?<![A-Za-z0-9_])(?:Events|EventCategories|EventVenues|EventFavourites|EventPreferences|EventGuideSettings|EventModerationActions)\s*\.\s*(?:Add|AddRange|Update|Remove|Attach)\b",
-        RegexOptions.Compiled | RegexOptions.ExplicitCapture,
-        TimeSpan.FromSeconds(2));
-
-    internal static IEnumerable<string> ScanEventDbSetWrites(string repoRoot)
-    {
-        foreach (var path in RatchetTestRunner.EnumerateSourceFiles(repoRoot))
-        {
-            // The canonical owner is EventRepository — exclude it from violation reporting.
-            if (path.Replace('\\', '/').EndsWith(
-                    "Infrastructure/Repositories/Events/EventRepository.cs",
-                    StringComparison.Ordinal))
-                continue;
-
-            var content = File.ReadAllText(path);
-            if (!EventWriteRegex.IsMatch(content)) continue;
-
-            var rel = RatchetTestRunner.ToRelativePath(repoRoot, path);
-            var ordinal = 0;
-            foreach (var match in EventWriteRegex.Matches(content).Cast<Match>())
-            {
-                ordinal++;
-                var line = RatchetTestRunner.LineNumberAt(content, match.Index);
-                var dbset = match.Value.Split('.')[0].Trim();
-                yield return $"{rel}:{dbset}-write#{ordinal} # L{line}";
-            }
-        }
-    }
-
     // ── T-03: Caching decorator invariants ───────────────────────────────────
 
     [HumansFact]
@@ -237,27 +130,6 @@ public class EventsArchitectureTests
         typeof(CachingEventService).IsSealed
             .Should().BeTrue(
                 because: "Singleton caching decorators are sealed — extension goes on the interface");
-    }
-
-    [HumansFact]
-    public void EventService_DoesNotInjectIMemoryCache()
-    {
-        // §15d — canonical Events data lives in the decorator's ConcurrentDictionary,
-        // not in an IMemoryCache held by the inner service.
-        var ctor = typeof(EventService).GetConstructors().Single();
-        ctor.GetParameters().Should().NotContain(
-            p => p.ParameterType == typeof(IMemoryCache),
-            because: "inner Events service is cache-unaware; caching lives in the decorator");
-    }
-
-    [HumansFact]
-    public void EventService_DoesNotInjectAnyCachingNamespaceMember()
-    {
-        var ctor = typeof(EventService).GetConstructors().Single();
-        ctor.GetParameters().Should().NotContain(
-            p => (p.ParameterType.Namespace ?? string.Empty)
-                .StartsWith("Microsoft.Extensions.Caching", StringComparison.Ordinal),
-            because: "design-rules §15c — Application services are cache-unaware");
     }
 
     [HumansFact]

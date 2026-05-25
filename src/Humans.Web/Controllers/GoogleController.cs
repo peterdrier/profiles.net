@@ -36,7 +36,11 @@ public class GoogleController(
         [FromServices] ISyncSettingsService syncSettingsService,
         [FromServices] IUserServiceRead userService)
     {
-        var settings = await syncSettingsService.GetAllAsync();
+        var settings = (await syncSettingsService.GetAllAsync())
+            // Sort by the enum's string name to match the prior EF ordering
+            // (ServiceType is stored via .HasConversion<string>()).
+            .OrderBy(s => s.ServiceType.ToString(), StringComparer.Ordinal)
+            .ToList();
 
         // In-memory join: resolve UpdatedByUser display names via IUserServiceRead
         // rather than an EF .Include across the section boundary (design-rules §6).
@@ -279,11 +283,7 @@ public class GoogleController(
     [Authorize(Policy = PolicyNames.TeamsAdminBoardOrAdmin)]
     public IActionResult Sync()
     {
-        var viewModel = new TeamSyncViewModel
-        {
-            CanExecuteActions = RoleChecks.IsAdmin(User)
-        };
-        return View(viewModel);
+        return View(new TeamSyncViewModel());
     }
 
     [HttpGet("Sync/Preview/{resourceType}")]
@@ -311,9 +311,7 @@ public class GoogleController(
         var viewModel = new SyncTabContentViewModel
         {
             Result = result,
-            ResourceType = resourceType.ToString(),
-            CanExecuteActions = RoleChecks.IsAdmin(User),
-            CanViewAudit = RoleChecks.IsAdminOrBoard(User)
+            ResourceType = resourceType.ToString()
         };
 
         return PartialView("_SyncTabContent", viewModel);

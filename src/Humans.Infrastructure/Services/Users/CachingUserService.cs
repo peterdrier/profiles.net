@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 using NodaTime;
 using Humans.Application;
 using Humans.Application.DTOs;
+using Humans.Application.Interfaces.Onboarding;
 using Humans.Application.Interfaces.Caching;
-using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Profiles;
 using Humans.Domain.Entities;
@@ -26,28 +26,21 @@ namespace Humans.Infrastructure.Services.Users;
 /// synchronously, cache miss refills via the inner Scoped
 /// <see cref="IUserService"/>, every write through this surface delegates and
 /// then refreshes the affected entry. Identity-machinery write paths
-/// (<c>UserManager.UpdateAsync</c>, sign-in <c>LastLoginAt</c> bumps, OAuth
-/// callback <c>UserEmail</c> writes) are caught by
-/// <c>UserInfoSaveChangesInterceptor</c> in Infrastructure, which invokes
-/// <see cref="IUserInfoInvalidator.InvalidateAsync"/> for every userId
-/// touched by the affected entity set.
+/// (<c>UserManager.UpdateAsync</c>, sign-in <c>LastLoginAt</c> bumps) are
+/// caught by <c>UserInfoSaveChangesInterceptor</c> in Infrastructure, which
+/// invokes <see cref="IUserInfoInvalidator.InvalidateAsync"/> for every
+/// touched userId.
 /// </para>
 /// <para>
 /// Registered as Singleton so the dict persists across requests. Scoped
 /// dependencies (the inner <see cref="IUserService"/>) are resolved per-call
 /// via <see cref="IServiceScopeFactory"/> to avoid the captured-scoped
-/// anti-pattern. <see cref="IUserRepository"/>, <see cref="IUserEmailRepository"/>,
-/// <see cref="IProfileRepository"/>, and <see cref="IContactFieldRepository"/>
-/// are injected directly because they are also Singleton
-/// (<c>IDbContextFactory</c>-based).
+/// anti-pattern. Cache warm and miss paths also go through the keyed inner
+/// service so the decorator does not bypass the repository-owning
+/// application service.
 /// </para>
 /// </remarks>
 public sealed class CachingUserService(
-    IUserRepository userRepository,
-    IUserEmailRepository userEmailRepository,
-    IProfileRepository profileRepository,
-    IContactFieldRepository contactFieldRepository,
-    ICommunicationPreferenceRepository communicationPreferenceRepository,
     IServiceScopeFactory scopeFactory,
     ILogger<CachingUserService> logger) : TrackedCache<Guid, UserInfo>("User.UserInfo", warmOnStartup: true, logger),
     IUserService, IUserMerge, IUserInfoInvalidator, IUserInfoSliceRefresher
@@ -272,38 +265,7 @@ public sealed class CachingUserService(
     /// </summary>
     private async Task RefreshEntryAsync(Guid userId, CancellationToken ct)
     {
-        var user = await userRepository.GetByIdAsync(userId, ct);
-        if (user is null)
-        {
-            DeleteKey(userId);
-            return;
-        }
-
-        var userEmails = await userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        var participations = await userRepository.GetEventParticipationsByUserIdAsync(userId, ct);
-        var loginsMap = await userRepository.GetExternalLoginsByUserIdsAsync([userId], ct);
-        var externalLogins = loginsMap.TryGetValue(userId, out var logins)
-            ? logins
-            : [];
-
-        var profile = await profileRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        IReadOnlyList<ContactField> contactFields = [];
-        IReadOnlyList<ProfileLanguage> languages = [];
-        IReadOnlyList<VolunteerHistoryEntry> volunteerHistory = [];
-        if (profile is not null)
-        {
-            contactFields = await contactFieldRepository.GetByProfileIdReadOnlyAsync(profile.Id, ct);
-            languages = profile.Languages.ToList();
-            volunteerHistory = profile.VolunteerHistory.ToList();
-        }
-
-        var communicationPreferences = await communicationPreferenceRepository
-            .GetByUserIdReadOnlyAsync(userId, ct);
-
-        Set(userId, UserInfo.Create(
-            user, userEmails, participations, externalLogins,
-            profile, contactFields, languages, volunteerHistory,
-            communicationPreferences));
+        await ReplaceAsync(userId, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -322,63 +284,9 @@ public sealed class CachingUserService(
     /// </remarks>
     protected override async Task WarmAllAsync(CancellationToken ct)
     {
-        var users = await userRepository.GetAllAsync(ct);
-        if (users.Count == 0) return;
-
-        var userIds = users.Select(u => u.Id).ToList();
-
-        var allEmails = await userEmailRepository.GetAllAsync(ct);
-        var emailsByUser = allEmails
-            .GroupBy(e => e.UserId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<UserEmail>)g.ToList());
-
-        var loginsByUser = await userRepository.GetExternalLoginsByUserIdsAsync(userIds, ct);
-
-        var profiles = await profileRepository.GetAllAsync(ct);
-        var profileByUser = profiles.ToDictionary(p => p.UserId);
-
-        var allContactFields = await contactFieldRepository.GetAllAsync(ct);
-        var contactFieldsByProfile = allContactFields
-            .GroupBy(c => c.ProfileId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<ContactField>)g.ToList());
-
-        var participationsByUser = await userRepository
-            .GetEventParticipationsByUserIdsAsync(userIds, ct);
-
-        var allPreferences = await communicationPreferenceRepository.GetAllAsync(ct);
-        var preferencesByUser = allPreferences
-            .GroupBy(p => p.UserId)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<CommunicationPreference>)g.ToList());
-
+        var users = await WithInnerAsync(inner => inner.GetAllUserInfosAsync(ct));
         foreach (var user in users)
-        {
-            var emails = emailsByUser.TryGetValue(user.Id, out var es)
-                ? es : [];
-            var logins = loginsByUser.TryGetValue(user.Id, out var ls)
-                ? ls : [];
-            var participations = participationsByUser.TryGetValue(user.Id, out var ps)
-                ? ps : (IReadOnlyList<EventParticipation>)[];
-
-            profileByUser.TryGetValue(user.Id, out var profile);
-            IReadOnlyList<ContactField> contactFields = [];
-            IReadOnlyList<ProfileLanguage> languages = [];
-            IReadOnlyList<VolunteerHistoryEntry> volunteerHistory = [];
-            if (profile is not null)
-            {
-                contactFields = contactFieldsByProfile.TryGetValue(profile.Id, out var cf)
-                    ? cf : [];
-                languages = profile.Languages.ToList();
-                volunteerHistory = profile.VolunteerHistory.ToList();
-            }
-
-            var preferences = preferencesByUser.TryGetValue(user.Id, out var pp)
-                ? pp : [];
-
-            Set(user.Id, UserInfo.Create(
-                user, emails, participations, logins,
-                profile, contactFields, languages, volunteerHistory,
-                preferences));
-        }
+            Set(user.Id, user);
     }
 
     // ==========================================================================
@@ -458,14 +366,7 @@ public sealed class CachingUserService(
             "UserInfo refresh user-emails userId={UserId} caller={CallerMember} file={CallerFile}",
             userId, memberName, Path.GetFileName(filePath));
 
-        if (!TryGet(userId, out var current))
-        {
-            await ReplaceAsync(userId, ct).ConfigureAwait(false);
-            return;
-        }
-
-        var rows = await userEmailRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        Replace(userId, current with { UserEmails = ToUserEmailInfos(rows) });
+        await ReplaceAsync(userId, ct).ConfigureAwait(false);
     }
 
     public async Task RefreshEventParticipationsAsync(
@@ -478,14 +379,7 @@ public sealed class CachingUserService(
             "UserInfo refresh event-participations userId={UserId} caller={CallerMember} file={CallerFile}",
             userId, memberName, Path.GetFileName(filePath));
 
-        if (!TryGet(userId, out var current))
-        {
-            await ReplaceAsync(userId, ct).ConfigureAwait(false);
-            return;
-        }
-
-        var rows = await userRepository.GetEventParticipationsByUserIdAsync(userId, ct);
-        Replace(userId, current with { EventParticipations = ToEventParticipationInfos(rows) });
+        await ReplaceAsync(userId, ct).ConfigureAwait(false);
     }
 
     public async Task RefreshExternalLoginsAsync(
@@ -498,15 +392,7 @@ public sealed class CachingUserService(
             "UserInfo refresh external-logins userId={UserId} caller={CallerMember} file={CallerFile}",
             userId, memberName, Path.GetFileName(filePath));
 
-        if (!TryGet(userId, out var current))
-        {
-            await ReplaceAsync(userId, ct).ConfigureAwait(false);
-            return;
-        }
-
-        var loginsByUser = await userRepository.GetExternalLoginsByUserIdsAsync([userId], ct);
-        var rows = loginsByUser.TryGetValue(userId, out var logins) ? logins : [];
-        Replace(userId, current with { ExternalLogins = ToExternalLoginInfos(rows) });
+        await ReplaceAsync(userId, ct).ConfigureAwait(false);
     }
 
     public async Task RefreshCommunicationPreferencesAsync(
@@ -519,14 +405,7 @@ public sealed class CachingUserService(
             "UserInfo refresh communication-preferences userId={UserId} caller={CallerMember} file={CallerFile}",
             userId, memberName, Path.GetFileName(filePath));
 
-        if (!TryGet(userId, out var current))
-        {
-            await ReplaceAsync(userId, ct).ConfigureAwait(false);
-            return;
-        }
-
-        var rows = await communicationPreferenceRepository.GetByUserIdReadOnlyAsync(userId, ct);
-        Replace(userId, current with { CommunicationPreferences = ToCommunicationPreferenceInfos(rows) });
+        await ReplaceAsync(userId, ct).ConfigureAwait(false);
     }
 
     private static IReadOnlyList<UserEmailInfo> ToUserEmailInfos(IEnumerable<UserEmail> rows) =>
@@ -630,7 +509,9 @@ public sealed class CachingUserService(
     {
         if (TryGet(userId, out var info))
             return RehydrateUser(info);
-        return await WithInnerAsync(inner => inner.GetByIdAsync(userId, ct));
+
+        var users = await WithInnerAsync(inner => inner.GetByIdsAsync([userId], ct));
+        return users.TryGetValue(userId, out var user) ? user : null;
     }
 
     public async Task<IReadOnlyDictionary<Guid, User>> GetByIdsAsync(
@@ -667,7 +548,7 @@ public sealed class CachingUserService(
     /// <see cref="User.UserEmails"/> collection. Identity-machinery fields
     /// (PasswordHash, SecurityStamp, lockout, phone) are not carried in
     /// UserInfo and therefore not rehydrated; callers reading those go
-    /// through UserManager / IUserRepository directly, not IUserService.
+    /// through UserManager / the repository directly, not IUserService.
     /// </summary>
     private static User RehydrateUser(UserInfo info)
     {
@@ -840,6 +721,180 @@ public sealed class CachingUserService(
         return updated;
     }
 
+    public async Task<bool> EnsureStubProfileAsync(Guid userId, CancellationToken ct = default)
+    {
+        var created = await WithInnerAsync(inner => inner.EnsureStubProfileAsync(userId, ct));
+        if (created) await RefreshEntryAsync(userId, ct);
+        return created;
+    }
+
+    public async Task<bool> SetMembershipTierAsync(
+        Guid userId,
+        MembershipTier tier,
+        CancellationToken ct = default)
+    {
+        var updated = await WithInnerAsync(inner => inner.SetMembershipTierAsync(userId, tier, ct));
+        if (updated) await RefreshEntryAsync(userId, ct);
+        return updated;
+    }
+
+    public async Task<OnboardingResult> ApplyProfileOnboardingMutationAsync(
+        Guid userId,
+        UserProfileOnboardingCommand command,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.ApplyProfileOnboardingMutationAsync(userId, command, ct));
+        if (result.Success) await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
+    public async Task<UserProfileSaveResult> SaveProfileAsync(
+        Guid userId,
+        UserProfileSaveCommand command,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.SaveProfileAsync(userId, command, ct));
+        await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
+    public async Task SaveDietaryMedicalAsync(
+        Guid userId,
+        UserProfileDietaryMedicalCommand command,
+        CancellationToken ct = default)
+    {
+        await WithInnerAsync(async inner =>
+        {
+            await inner.SaveDietaryMedicalAsync(userId, command, ct);
+            return true;
+        });
+        await RefreshEntryAsync(userId, ct);
+    }
+
+    public async Task<UserProfilePictureContentTypeResult> SetProfilePictureContentTypeAsync(
+        Guid userId,
+        string contentType,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.SetProfilePictureContentTypeAsync(userId, contentType, ct));
+        if (result.Saved) await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
+    public async Task<UserProfileAnonymizeResult> AnonymizeProfileForDeletionAsync(
+        Guid userId,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.AnonymizeProfileForDeletionAsync(userId, ct));
+        if (result.Anonymized) await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
+    public async Task<bool> SaveProfileVolunteerHistoryAsync(
+        Guid userId,
+        IReadOnlyList<CVEntry> entries,
+        CancellationToken ct = default)
+    {
+        var saved = await WithInnerAsync(inner =>
+            inner.SaveProfileVolunteerHistoryAsync(userId, entries, ct));
+        if (saved) await RefreshEntryAsync(userId, ct);
+        return saved;
+    }
+
+    public async Task<UserProfileLanguagesSaveResult> SaveProfileLanguagesAsync(
+        Guid profileId,
+        IReadOnlyList<ProfileLanguage> languages,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner =>
+            inner.SaveProfileLanguagesAsync(profileId, languages, ct));
+        if (result.UserId is { } userId)
+            await RefreshEntryAsync(userId, ct);
+        return result;
+    }
+
+    public async Task<bool> SetProfileIbanAsync(Guid userId, string? iban, CancellationToken ct = default)
+    {
+        var updated = await WithInnerAsync(inner => inner.SetProfileIbanAsync(userId, iban, ct));
+        if (updated) await RefreshEntryAsync(userId, ct);
+        return updated;
+    }
+
+    public async Task<IReadOnlySet<Guid>> SuspendProfilesForMissingConsentAsync(
+        IReadOnlyCollection<Guid> userIds,
+        Instant now,
+        CancellationToken ct = default)
+    {
+        var mutated = await WithInnerAsync(inner =>
+            inner.SuspendProfilesForMissingConsentAsync(userIds, now, ct));
+        foreach (var userId in mutated)
+            await RefreshEntryAsync(userId, ct);
+        return mutated;
+    }
+
+    public async Task<IReadOnlyList<(Guid UserId, MembershipTier NewTier)>>
+        DowngradeMembershipTierForExpiredAsync(
+            MembershipTier currentTier,
+            IReadOnlyCollection<Guid> userIdsToKeep,
+            IReadOnlyDictionary<Guid, MembershipTier> fallbackTierByUser,
+            Instant now,
+            CancellationToken ct = default)
+    {
+        var downgrades = await WithInnerAsync(inner =>
+            inner.DowngradeMembershipTierForExpiredAsync(
+                currentTier, userIdsToKeep, fallbackTierByUser, now, ct));
+        foreach (var (userId, _) in downgrades)
+            await RefreshEntryAsync(userId, ct);
+        return downgrades;
+    }
+
+    public async Task<UserEmailAddResult> AddUserEmailAsync(
+        Guid userId,
+        UserEmailAddCommand command,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner => inner.AddUserEmailAsync(userId, command, ct));
+        if (result.Added) await RefreshUserEmailsAsync(userId, ct);
+        return result;
+    }
+
+    public async Task<bool> UpdateUserEmailAsync(
+        Guid userId,
+        Guid emailId,
+        UserEmailUpdateCommand command,
+        CancellationToken ct = default)
+    {
+        var updated = await WithInnerAsync(inner => inner.UpdateUserEmailAsync(userId, emailId, command, ct));
+        if (updated) await RefreshUserEmailsAsync(userId, ct);
+        return updated;
+    }
+
+    public async Task<bool> RemoveUserEmailAsync(
+        Guid userId,
+        Guid emailId,
+        UserEmailRemoveCommand command,
+        CancellationToken ct = default)
+    {
+        var removed = await WithInnerAsync(inner => inner.RemoveUserEmailAsync(userId, emailId, command, ct));
+        if (removed) await RefreshUserEmailsAsync(userId, ct);
+        return removed;
+    }
+
+    public async Task<UserEmailReconcilePlanResult> ApplyUserEmailReconcilePlanAsync(
+        Guid userId,
+        UserEmailReconcilePlanCommand command,
+        CancellationToken ct = default)
+    {
+        var result = await WithInnerAsync(inner => inner.ApplyUserEmailReconcilePlanAsync(userId, command, ct));
+        foreach (var mutatedUserId in result.MutatedUserIds)
+            await RefreshUserEmailsAsync(mutatedUserId, ct);
+        return result;
+    }
+
     public Task SetLastConsentReminderSentAsync(
         Guid userId, Instant sentAt, CancellationToken ct = default) =>
         WithInnerAsync(async inner =>
@@ -891,14 +946,13 @@ public sealed class CachingUserService(
     public async Task<string?> PurgeOwnDataAsync(Guid userId, CancellationToken ct = default)
     {
         var result = await WithInnerAsync(inner => inner.PurgeOwnDataAsync(userId, ct));
-        // Inner already invoked IUserInfoInvalidator on success; we refresh
-        // our own dict whether or not the row existed (RefreshEntryAsync removes
-        // the entry when the user is gone).
+        // Refresh whether or not the row existed; RefreshEntryAsync removes
+        // the entry when the user is gone.
         await RefreshEntryAsync(userId, ct);
         return result;
     }
 
-    public async Task<ExpiredDeletionAnonymizationResult?> ApplyExpiredDeletionAnonymizationAsync(
+    public async Task<Humans.Application.Interfaces.Repositories.ExpiredDeletionAnonymizationResult?> ApplyExpiredDeletionAnonymizationAsync(
         Guid userId, CancellationToken ct = default)
     {
         var result = await WithInnerAsync(inner => inner.ApplyExpiredDeletionAnonymizationAsync(userId, ct));

@@ -16,19 +16,16 @@ namespace Humans.Web.Controllers;
 [Authorize(Policy = PolicyNames.AdminOnly)]
 [Route("Profile/Admin")]
 public class ProfileAdminController(
-    IUserService userService,
+    IUserServiceRead userService,
     IEmailProblemsService emailProblems,
     IAccountMergeService accountMerge,
     IUserEmailService userEmails,
     IUserService users,
     IAuditLogService audit,
     ILogger<ProfileAdminController> logger,
-    IProfileService profileService,
     ITeamServiceRead teamService,
     IRoleAssignmentService roleAssignmentService) : HumansControllerBase(userService)
 {
-    private readonly IProfileService _profileService = profileService;
-
     [HttpGet("EmailProblems")]
     public async Task<IActionResult> EmailProblems(CancellationToken ct)
     {

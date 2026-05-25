@@ -3,7 +3,6 @@ using System.Diagnostics;
 using Humans.Application.DTOs.Events;
 using Humans.Application.Interfaces.Caching;
 using Humans.Application.Interfaces.Events;
-using Humans.Application.Interfaces.Repositories;
 using Humans.Application.Interfaces.Shifts;
 using Humans.Domain.Entities;
 using Humans.Domain.Enums;
@@ -38,7 +37,6 @@ namespace Humans.Infrastructure.Services.Events;
 /// </para>
 /// </remarks>
 public sealed class CachingEventService(
-    IEventRepository repo,
     IServiceScopeFactory scopeFactory,
     ILogger<CachingEventService> logger) : IEventService, IEventViewInvalidator, IHostedService
 {
@@ -73,27 +71,8 @@ public sealed class CachingEventService(
     // Settings — singleton projection
     // ==========================================================================
 
-    public async Task<EventGuideSettings?> GetGuideSettingsAsync(CancellationToken ct = default)
-    {
-        // Public API still returns the domain entity for backward compatibility
-        // with existing callers. The cached *projection* is what the decorator
-        // owns; callers that want the projection should be migrated to a new
-        // method when this is refactored. For now, materialize on read.
-        var view = await GetSettingsViewAsync(ct);
-        if (view is null) return null;
-
-        return new EventGuideSettings
-        {
-            Id = view.Id,
-            EventSettingsId = view.EventSettingsId,
-            SubmissionOpenAt = view.SubmissionOpenAt,
-            SubmissionCloseAt = view.SubmissionCloseAt,
-            GuidePublishAt = view.GuidePublishAt,
-            MaxPrintSlots = view.MaxPrintSlots,
-            CreatedAt = view.CreatedAt,
-            UpdatedAt = view.UpdatedAt,
-        };
-    }
+    public Task<EventGuideSettingsView?> GetGuideSettingsAsync(CancellationToken ct = default) =>
+        GetSettingsViewAsync(ct);
 
     public async Task<bool> IsSubmissionOpenAsync(CancellationToken ct = default)
     {
@@ -126,28 +105,26 @@ public sealed class CachingEventService(
     // Categories — flat list projection
     // ==========================================================================
 
-    public async Task<IReadOnlyList<EventCategory>> GetActiveCategoriesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<EventCategoryView>> GetActiveCategoriesAsync(CancellationToken ct = default)
     {
         await EnsureLoadedAsync(ct);
         return _categories
             .Where(c => c.IsActive)
             .OrderBy(c => c.DisplayOrder)
-            .Select(CategoryViewToEntity)
             .ToList();
     }
 
-    public async Task<IReadOnlyList<EventCategory>> GetAllCategoriesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<EventCategoryManageInfo>> GetAllCategoriesAsync(CancellationToken ct = default)
     {
         // Inner method includes .Events for management UI counts — the cache
         // doesn't carry that, so pass through.
         return await WithInner(inner => inner.GetAllCategoriesAsync(ct));
     }
 
-    public async Task<EventCategory?> GetCategoryAsync(Guid id, CancellationToken ct = default)
+    public async Task<EventCategoryView?> GetCategoryAsync(Guid id, CancellationToken ct = default)
     {
         await EnsureLoadedAsync(ct);
-        var match = _categories.FirstOrDefault(c => c.Id == id);
-        return match is null ? null : CategoryViewToEntity(match);
+        return _categories.FirstOrDefault(c => c.Id == id);
     }
 
     public async Task<bool> CategorySlugExistsAsync(string slug, Guid? excludeId = null, CancellationToken ct = default)
@@ -197,27 +174,25 @@ public sealed class CachingEventService(
     // Venues — flat list projection
     // ==========================================================================
 
-    public async Task<IReadOnlyList<EventVenue>> GetActiveVenuesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<EventVenueView>> GetActiveVenuesAsync(CancellationToken ct = default)
     {
         await EnsureLoadedAsync(ct);
         return _venues
             .Where(v => v.IsActive)
             .OrderBy(v => v.DisplayOrder)
-            .Select(VenueViewToEntity)
             .ToList();
     }
 
-    public async Task<IReadOnlyList<EventVenue>> GetAllVenuesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<EventVenueManageInfo>> GetAllVenuesAsync(CancellationToken ct = default)
     {
         // Inner method includes .Events for management UI counts — pass through.
         return await WithInner(inner => inner.GetAllVenuesAsync(ct));
     }
 
-    public async Task<EventVenue?> GetVenueAsync(Guid id, CancellationToken ct = default)
+    public async Task<EventVenueView?> GetVenueAsync(Guid id, CancellationToken ct = default)
     {
         await EnsureLoadedAsync(ct);
-        var match = _venues.FirstOrDefault(v => v.Id == id);
-        return match is null ? null : VenueViewToEntity(match);
+        return _venues.FirstOrDefault(v => v.Id == id);
     }
 
     public async Task<int> GetNextVenueOrderAsync(CancellationToken ct = default)
@@ -258,13 +233,13 @@ public sealed class CachingEventService(
     // Submissions — pass-through (submitter scope, infrequent)
     // ==========================================================================
 
-    public Task<IReadOnlyList<Event>> GetUserSubmissionsAsync(Guid userId, CancellationToken ct = default) =>
+    public Task<IReadOnlyList<EventInfo>> GetUserSubmissionsAsync(Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetUserSubmissionsAsync(userId, ct));
 
     public Task<Event?> GetUserEventAsync(Guid eventId, Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetUserEventAsync(eventId, userId, ct));
 
-    public Task<IReadOnlyList<Event>> GetCampSubmissionsAsync(Guid campId, CancellationToken ct = default) =>
+    public Task<IReadOnlyList<EventInfo>> GetCampSubmissionsAsync(Guid campId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetCampSubmissionsAsync(campId, ct));
 
     public Task<Event?> GetCampEventAsync(Guid eventId, Guid campId, CancellationToken ct = default) =>
@@ -310,7 +285,7 @@ public sealed class CachingEventService(
     // Browse / API — cached snapshot with in-memory filter
     // ==========================================================================
 
-    public async Task<IReadOnlyList<Event>> GetApprovedEventsAsync(
+    public async Task<IReadOnlyList<ApprovedEventView>> GetApprovedEventsAsync(
         Guid? campId, Guid? venueId, Guid? categoryId, string? q,
         IReadOnlyList<string> excludedSlugs, CancellationToken ct = default)
     {
@@ -320,7 +295,7 @@ public sealed class CachingEventService(
             ? new HashSet<string>(excludedSlugs, StringComparer.Ordinal)
             : null;
 
-        var results = new List<Event>();
+        var results = new List<ApprovedEventView>();
         foreach (var view in _eventCache.Values)
         {
             if (excluded is not null && excluded.Contains(view.CategorySlug)) continue;
@@ -329,17 +304,17 @@ public sealed class CachingEventService(
             if (campId.HasValue && view.CampId != campId.Value) continue;
             if (!string.IsNullOrWhiteSpace(q) && !MatchesQuery(view, q)) continue;
 
-            results.Add(EventViewToEntity(view));
+            results.Add(view);
         }
 
         results.Sort((a, b) => a.StartAt.CompareTo(b.StartAt));
         return results;
     }
 
-    public async Task<Event?> GetApprovedEventByIdAsync(Guid id, CancellationToken ct = default)
+    public async Task<ApprovedEventView?> GetApprovedEventByIdAsync(Guid id, CancellationToken ct = default)
     {
         await EnsureLoadedAsync(ct);
-        return _eventCache.TryGet(id, out var view) ? EventViewToEntity(view) : null;
+        return _eventCache.TryGet(id, out var view) ? view : null;
     }
 
     private static bool MatchesQuery(ApprovedEventView view, string q) =>
@@ -353,7 +328,7 @@ public sealed class CachingEventService(
     public Task<HashSet<Guid>> GetFavouriteEventIdsAsync(Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetFavouriteEventIdsAsync(userId, ct));
 
-    public Task<IReadOnlyList<EventFavourite>> GetFavouritesWithEventsAsync(Guid userId, CancellationToken ct = default) =>
+    public Task<IReadOnlyList<EventFavouriteInfo>> GetFavouritesWithEventsAsync(Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetFavouritesWithEventsAsync(userId, ct));
 
     public Task ToggleFavouriteAsync(Guid userId, Guid eventId, CancellationToken ct = default) =>
@@ -372,7 +347,7 @@ public sealed class CachingEventService(
     public Task<List<string>> GetExcludedCategorySlugsAsync(Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetExcludedCategorySlugsAsync(userId, ct));
 
-    public Task<EventPreference?> GetPreferenceAsync(Guid userId, CancellationToken ct = default) =>
+    public Task<EventPreferenceInfo?> GetPreferenceAsync(Guid userId, CancellationToken ct = default) =>
         WithInner(inner => inner.GetPreferenceAsync(userId, ct));
 
     public Task SavePreferenceAsync(Guid userId, List<string> slugs, CancellationToken ct = default) =>
@@ -385,7 +360,7 @@ public sealed class CachingEventService(
     public Task<Dictionary<EventStatus, int>> GetEventStatusCountsAsync(CancellationToken ct = default) =>
         WithInner(inner => inner.GetEventStatusCountsAsync(ct));
 
-    public Task<IReadOnlyList<Event>> GetEventsByStatusAsync(EventStatus status, CancellationToken ct = default) =>
+    public Task<IReadOnlyList<EventInfo>> GetEventsByStatusAsync(EventStatus status, CancellationToken ct = default) =>
         WithInner(inner => inner.GetEventsByStatusAsync(status, ct));
 
     public Task<Event?> GetEventForModerationAsync(Guid eventId, CancellationToken ct = default) =>
@@ -410,12 +385,12 @@ public sealed class CachingEventService(
     // Dashboard / Export — moderator-only, must show fresh pending count
     // ==========================================================================
 
-    public Task<IReadOnlyList<Event>> GetAllEventsForDashboardAsync(CancellationToken ct = default) =>
+    public Task<IReadOnlyList<EventInfo>> GetAllEventsForDashboardAsync(CancellationToken ct = default) =>
         // STAYS DIRECT DB — moderation dashboard needs current pending/rejected
         // counts that the approved-only cache cannot answer.
         WithInner(inner => inner.GetAllEventsForDashboardAsync(ct));
 
-    public Task<(IReadOnlyList<Event> Events, EventGuideSettings? Settings)> GetApprovedEventsForExportAsync(CancellationToken ct = default) =>
+    public Task<ApprovedEventsExportInfo> GetApprovedEventsForExportAsync(CancellationToken ct = default) =>
         WithInner(inner => inner.GetApprovedEventsForExportAsync(ct));
 
     // ==========================================================================
@@ -472,20 +447,18 @@ public sealed class CachingEventService(
             // and slug-uniqueness must see inactive rows, matching the DB.
             // Active-only filtering happens at projection time in
             // GetActiveCategoriesAsync / GetActiveVenuesAsync.
-            var categories = await repo.GetAllCategoriesAsync(ct);
-            var venues = await repo.GetAllVenuesAsync(ct);
-            var settings = await repo.GetGuideSettingsAsync(ct);
-            var approved = await repo.GetApprovedEventsAsync(null, null, null, null, [], ct);
+            var categories = await WithInner(inner => inner.GetAllCategoriesAsync(ct));
+            var venues = await WithInner(inner => inner.GetAllVenuesAsync(ct));
+            var settings = await WithInner(inner => inner.GetGuideSettingsAsync(ct));
+            var approved = await WithInner(inner => inner.GetApprovedEventsAsync(null, null, null, null, [], ct));
 
-            var venuesById = venues.ToDictionary(v => v.Id);
-
-            _categories = categories.Select(CategoryEntityToView).ToList();
-            _venues = venues.Select(VenueEntityToView).ToList();
-            _settings = await BuildSettingsViewAsync(settings, ct);
+            _categories = categories.Select(ManageInfoToCategoryView).ToList();
+            _venues = venues.Select(ManageInfoToVenueView).ToList();
+            _settings = settings;
 
             _eventCache.Clear();
             foreach (var ev in approved)
-                _eventCache.Set(ev.Id, BuildEventView(ev, venuesById));
+                _eventCache.Set(ev.Id, ev);
 
             _isLoaded = true;
         }
@@ -513,71 +486,34 @@ public sealed class CachingEventService(
 
     private async Task RefreshSettingsAsync(CancellationToken ct)
     {
-        var fresh = await repo.GetGuideSettingsAsync(ct);
-        _settings = await BuildSettingsViewAsync(fresh, ct);
-    }
-
-    private async Task<EventGuideSettingsView?> BuildSettingsViewAsync(
-        EventGuideSettings? settings, CancellationToken ct)
-    {
-        if (settings is null) return null;
-
-        // Resolve TimeZoneId via the inner IEventService — the burn
-        // (event_settings row) is owned by the Shifts section and the inner
-        // service stitches it in via IBurnSettingsService as a
-        // BurnSettingsInfo DTO (nobodies-collective/Humans#719). Cached at
-        // warm/refresh time; stale-on-EventSettings-edit window is
-        // documented on EventGuideSettingsView.TimeZoneId.
-        string? timeZoneId = null;
-        try
-        {
-            var burn = await WithInner(inner => inner.GetEventSettingsByIdAsync(settings.EventSettingsId, ct));
-            timeZoneId = burn?.TimeZoneId;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogError(ex,
-                "CachingEventService: failed to load BurnSettings {EventSettingsId} for guide-settings cache; TimeZoneId left null",
-                settings.EventSettingsId);
-        }
-
-        return new EventGuideSettingsView(
-            Id: settings.Id,
-            EventSettingsId: settings.EventSettingsId,
-            SubmissionOpenAt: settings.SubmissionOpenAt,
-            SubmissionCloseAt: settings.SubmissionCloseAt,
-            GuidePublishAt: settings.GuidePublishAt,
-            MaxPrintSlots: settings.MaxPrintSlots,
-            TimeZoneId: timeZoneId,
-            CreatedAt: settings.CreatedAt,
-            UpdatedAt: settings.UpdatedAt);
+        // The inner service stitches TimeZoneId from the Shifts-owned
+        // event_settings row via IBurnSettingsService (#719) and returns the
+        // ready EventGuideSettingsView; cache it directly.
+        _settings = await WithInner(inner => inner.GetGuideSettingsAsync(ct));
     }
 
     private async Task RefreshCategoriesAsync(CancellationToken ct)
     {
-        var categories = await repo.GetAllCategoriesAsync(ct);
-        _categories = categories.Select(CategoryEntityToView).ToList();
+        var categories = await WithInner(inner => inner.GetAllCategoriesAsync(ct));
+        _categories = categories.Select(ManageInfoToCategoryView).ToList();
     }
 
     private async Task RefreshVenuesAsync(CancellationToken ct)
     {
-        var venues = await repo.GetAllVenuesAsync(ct);
-        _venues = venues.Select(VenueEntityToView).ToList();
+        var venues = await WithInner(inner => inner.GetAllVenuesAsync(ct));
+        _venues = venues.Select(ManageInfoToVenueView).ToList();
     }
 
     private async Task RefreshEventEntryAsync(Guid eventId, CancellationToken ct)
     {
-        var ev = await repo.GetApprovedEventByIdAsync(eventId, ct);
+        var ev = await WithInner(inner => inner.GetApprovedEventByIdAsync(eventId, ct));
         if (ev is null)
         {
             _eventCache.Invalidate(eventId);
             return;
         }
 
-        // All-rows lookup — an approved event can reference a now-inactive
-        // venue, and we still want its flattened fields populated.
-        var venuesById = (await repo.GetAllVenuesAsync(ct)).ToDictionary(v => v.Id);
-        _eventCache.Set(eventId, BuildEventView(ev, venuesById));
+        _eventCache.Set(eventId, ev);
     }
 
     private async Task RefreshAllEventsAsync(CancellationToken ct)
@@ -593,14 +529,13 @@ public sealed class CachingEventService(
             return;
         }
 
-        var approved = await repo.GetApprovedEventsAsync(null, null, null, null, [], ct);
-        var venuesById = (await repo.GetAllVenuesAsync(ct)).ToDictionary(v => v.Id);
+        var approved = await WithInner(inner => inner.GetApprovedEventsAsync(null, null, null, null, [], ct));
 
         // Rebuild the whole approved set — category / venue renames touch
         // every event row's flattened fields.
         var fresh = new ConcurrentDictionary<Guid, ApprovedEventView>();
         foreach (var ev in approved)
-            fresh[ev.Id] = BuildEventView(ev, venuesById);
+            fresh[ev.Id] = ev;
 
         // Replace via clear + set rather than swapping the underlying dict —
         // TrackedCache owns its dict and exposes only Clear / Set / Invalidate.
@@ -613,45 +548,7 @@ public sealed class CachingEventService(
     // Projection helpers
     // ==========================================================================
 
-    private static ApprovedEventView BuildEventView(
-        Event ev,
-        IReadOnlyDictionary<Guid, EventVenue> venuesById)
-    {
-        // The repo's approved query includes Category and EventVenue navs, so
-        // Event.Category (required EF nav) is populated. EventVenue is optional
-        // and is filled in from venuesById when the nav isn't loaded.
-        var category = ev.Category;
-        EventVenue? venue = ev.EventVenue;
-        if (venue is null && ev.GuideSharedVenueId is { } venueId
-            && venuesById.TryGetValue(venueId, out var v))
-        {
-            venue = v;
-        }
-
-        return new ApprovedEventView(
-            Id: ev.Id,
-            CampId: ev.CampId,
-            GuideSharedVenueId: ev.GuideSharedVenueId,
-            SubmitterUserId: ev.SubmitterUserId,
-            CategoryId: ev.CategoryId,
-            CategorySlug: category.Slug,
-            CategoryName: category.Name,
-            CategoryIsSensitive: category.IsSensitive,
-            VenueName: venue?.Name,
-            Title: ev.Title,
-            Description: ev.Description,
-            LocationNote: ev.LocationNote,
-            Host: ev.Host,
-            StartAt: ev.StartAt,
-            DurationMinutes: ev.DurationMinutes,
-            IsRecurring: ev.IsRecurring,
-            RecurrenceDays: ev.RecurrenceDays,
-            PriorityRank: ev.PriorityRank,
-            SubmittedAt: ev.SubmittedAt,
-            LastUpdatedAt: ev.LastUpdatedAt);
-    }
-
-    private static EventCategoryView CategoryEntityToView(EventCategory c) => new(
+    private static EventCategoryView ManageInfoToCategoryView(EventCategoryManageInfo c) => new(
         Id: c.Id,
         Name: c.Name,
         Slug: c.Slug,
@@ -659,66 +556,13 @@ public sealed class CachingEventService(
         DisplayOrder: c.DisplayOrder,
         IsActive: c.IsActive);
 
-    private static EventVenueView VenueEntityToView(EventVenue v) => new(
+    private static EventVenueView ManageInfoToVenueView(EventVenueManageInfo v) => new(
         Id: v.Id,
         Name: v.Name,
         Description: v.Description,
         LocationDescription: v.LocationDescription,
         DisplayOrder: v.DisplayOrder,
         IsActive: v.IsActive);
-
-    private static EventCategory CategoryViewToEntity(EventCategoryView v) => new()
-    {
-        Id = v.Id,
-        Name = v.Name,
-        Slug = v.Slug,
-        IsSensitive = v.IsSensitive,
-        DisplayOrder = v.DisplayOrder,
-        IsActive = v.IsActive,
-    };
-
-    private static EventVenue VenueViewToEntity(EventVenueView v) => new()
-    {
-        Id = v.Id,
-        Name = v.Name,
-        Description = v.Description,
-        LocationDescription = v.LocationDescription,
-        DisplayOrder = v.DisplayOrder,
-        IsActive = v.IsActive,
-    };
-
-    private static Event EventViewToEntity(ApprovedEventView v) => new()
-    {
-        Id = v.Id,
-        CampId = v.CampId,
-        GuideSharedVenueId = v.GuideSharedVenueId,
-        SubmitterUserId = v.SubmitterUserId,
-        CategoryId = v.CategoryId,
-        Title = v.Title,
-        Description = v.Description,
-        LocationNote = v.LocationNote,
-        Host = v.Host,
-        StartAt = v.StartAt,
-        DurationMinutes = v.DurationMinutes,
-        IsRecurring = v.IsRecurring,
-        RecurrenceDays = v.RecurrenceDays,
-        PriorityRank = v.PriorityRank,
-        Status = EventStatus.Approved,
-        SubmittedAt = v.SubmittedAt,
-        LastUpdatedAt = v.LastUpdatedAt,
-        Category = new EventCategory
-        {
-            Id = v.CategoryId,
-            Name = v.CategoryName,
-            Slug = v.CategorySlug,
-            IsSensitive = v.CategoryIsSensitive,
-        },
-        EventVenue = v.VenueName is null ? null : new EventVenue
-        {
-            Id = v.GuideSharedVenueId ?? Guid.Empty,
-            Name = v.VenueName,
-        },
-    };
 
     // ==========================================================================
     // Inner-service plumbing

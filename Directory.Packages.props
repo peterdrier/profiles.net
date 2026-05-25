@@ -5,8 +5,9 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- AI/LLM -->
-    <PackageVersion Include="Anthropic" Version="12.22.0" />
+    <PackageVersion Include="Anthropic" Version="12.23.0" />
     <!-- Core Framework -->
+    <PackageVersion Include="ClosedXML" Version="0.105.0" />
     <PackageVersion Include="HtmlSanitizer" Version="9.0.892" />
     <PackageVersion Include="Ical.Net" Version="5.2.2" />
     <PackageVersion Include="Markdig" Version="1.2.0" />
@@ -75,7 +76,7 @@
     <PackageVersion Include="MinVer" Version="7.0.0" />
     <!-- Analyzers -->
     <PackageVersion Include="Roslynator.Analyzers" Version="4.15.0" />
-    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.85" />
+    <PackageVersion Include="Meziantou.Analyzer" Version="3.0.94" />
     <PackageVersion Include="Microsoft.VisualStudio.Threading.Analyzers" Version="17.14.15" />
     <!-- Testing -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
