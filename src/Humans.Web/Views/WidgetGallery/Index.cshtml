@@ -479,12 +479,12 @@
                     </div>
                     <div class="wg-card-note">Renders one held ticket as a physical admission stub. Shared by the transfer wizard, the <code>/Profile/Me</code> ticket card, and the homepage. A pending outgoing transfer shows a diagonal "Transfer pending" stamp; voided tickets render muted with a struck name. The event label is currently a constant (open item to source from the active event).</div>
                     @ParamsBlock(
-                        ("stub", "<code>TicketStubInfo</code> — projection (attendee name + email, <code>VendorTicketId</code> serial, status, <code>HasPendingTransfer</code>, <code>PendingTransferRequestId</code>) from <code>ITicketServiceRead</code>")
+                        ("stub", "<code>TicketStubInfo</code> — projection (attendee name + email, <code>VendorTicketId</code> serial, status, <code>HasPendingTransfer</code>, <code>PendingTransferRequestId</code>, <code>EarlyEntryDate</code>) from <code>ITicketServiceRead</code>")
                     )
                     <div class="wg-card-example" style="display:flex; gap:16px; flex-wrap:wrap;">
-                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-001", Humans.Domain.Enums.TicketAttendeeStatus.Valid, false, null))" />
-                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-002", Humans.Domain.Enums.TicketAttendeeStatus.Valid, true, Guid.NewGuid()))" />
-                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-003", Humans.Domain.Enums.TicketAttendeeStatus.Void, false, null))" />
+                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-001", Humans.Domain.Enums.TicketAttendeeStatus.Valid, false, null, new NodaTime.LocalDate(2026, 8, 24)))" />
+                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-002", Humans.Domain.Enums.TicketAttendeeStatus.Valid, true, Guid.NewGuid(), null))" />
+                        <vc:ticket-stub stub="@(new Humans.Application.DTOs.TicketStubInfo("Sample Human", "sample@example.com", "TKT-DEMO-003", Humans.Domain.Enums.TicketAttendeeStatus.Void, false, null, null))" />
                     </div>
                 </div>
 
@@ -1080,6 +1080,7 @@
                     <li><strong>Infrastructure tag helper</strong> — <code>NonceTagHelper</code>: applies CSP nonces to <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code>; nothing visible to render.</li>
                     <li><strong>Volunteer-tracking heatmaps</strong> — <code>_VolunteerHeatmap</code>, <code>_VolunteerUnbookedHeatmap</code>: context-bound — requires full <code>VolunteerTrackingPageViewModel</code>, cannot render in isolation. See <a href="/Shifts/Dashboard/VolunteerTracking">/Shifts/Dashboard/VolunteerTracking</a>.</li>
                     <li><strong>Container card fragments</strong> — <code>_ContainerCardRow</code>, <code>_ContainerCardModals</code>, <code>_ContainerFormFields</code>: context-bound — render only as part of a populated <code>ContainerCardModel</code> on the container list/admin pages, with route values, placement state, and the parent modal-target form action. See <a href="/CityPlanning/BarrioMap/Admin/Containers/2026">/CityPlanning/BarrioMap/Admin/Containers/{year}</a>.</li>
+                    <li><strong>My ticket stubs</strong> — <code>MyTicketStubsViewComponent</code> (<code>&lt;vc:my-ticket-stubs&gt;</code>): can't render standalone — fetches the viewer's live visible attendees (<code>GetMyAttendeesAsync</code>) plus their cross-source Early Entry date, and renders nothing without them. The stub it draws is the <code>vc:ticket-stub</code> card above. See the homepage <a href="/">dashboard</a>.</li>
                 </ul>
             </section>
 

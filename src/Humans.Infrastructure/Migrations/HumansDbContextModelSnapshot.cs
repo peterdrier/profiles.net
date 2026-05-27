@@ -2414,9 +2414,16 @@ namespace Humans.Infrastructure.Migrations
                     b.Property<Instant>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("HoldedContactId")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
                     b.Property<string>("HoldedDocId")
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("HoldedSupplierAccountNum")
+                        .HasColumnType("integer");
 
                     b.Property<Instant?>("LastRejectedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2468,6 +2475,8 @@ namespace Humans.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BudgetCategoryId");
+
+                    b.HasIndex("HoldedContactId");
 
                     b.HasIndex("HoldedDocId");
 
@@ -2808,6 +2817,40 @@ namespace Humans.Infrastructure.Migrations
                     b.ToTable("holded_category_map", (string)null);
                 });
 
+            modelBuilder.Entity("Humans.Domain.Entities.HoldedCreditorBalance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Balance")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Instant>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<int>("SupplierAccountNum")
+                        .HasColumnType("integer");
+
+                    b.Property<Instant>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SupplierAccountNum")
+                        .IsUnique();
+
+                    b.ToTable("holded_creditor_balances", (string)null);
+                });
+
             modelBuilder.Entity("Humans.Domain.Entities.HoldedExpenseDoc", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2931,6 +2974,48 @@ namespace Humans.Infrastructure.Migrations
                     b.HasIndex("ProcessedAt", "FailedPermanently");
 
                     b.ToTable("holded_expense_outbox_events", (string)null);
+                });
+
+            modelBuilder.Entity("Humans.Domain.Entities.HoldedPayment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<Instant>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<LocalDate>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("DocumentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("HoldedContactId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("HoldedPaymentId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Instant>("LastSyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("HoldedContactId");
+
+                    b.HasIndex("HoldedPaymentId")
+                        .IsUnique();
+
+                    b.ToTable("holded_payments", (string)null);
                 });
 
             modelBuilder.Entity("Humans.Domain.Entities.HoldedSyncState", b =>
