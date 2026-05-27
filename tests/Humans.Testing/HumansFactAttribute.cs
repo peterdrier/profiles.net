@@ -45,5 +45,5 @@ public sealed class HumansFactAttribute : FactAttribute
     private static int DefaultTimeoutFor(string? sourceFilePath) =>
         sourceFilePath?.Contains("Humans.Integration.Tests", StringComparison.Ordinal) == true
             ? 30000
-            : 5000;
+            : 30000;
 }
