@@ -813,7 +813,7 @@ for cycle-breaking. Implements `IShiftAuthorizationInvalidator`,
 
 ### ShiftSignupService (Scoped)
 
-Repository: `IShiftSignupRepository`.
+Repositories: `IShiftSignupRepository`, `IVolunteerTrackingRepository`.
 
 | Table | R/W |
 |-------|-----|
@@ -822,12 +822,9 @@ Repository: `IShiftSignupRepository`.
 | Rotas | R (via repo) |
 | VolunteerEventProfiles | R/W (via repo) |
 | VolunteerTagPreferences | R (via repo) |
+| GeneralAvailability | R (via `IVolunteerTrackingRepository`, GDPR export) |
 
-> **Change since prior sweep:** `ShiftSignupRepository` no longer reads
-> `GeneralAvailability` directly — conflict-detection has been refactored
-> so cross-table availability checks go through the service layer.
-
-Cross-section calls via `IShiftManagementService`,
+Cross-section calls via `IShiftManagementService`, `IBurnSettingsService`,
 `IMembershipCalculator`, `IAuditLogService`, `INotificationService`,
 `IAdminAuthorizationService`, `IShiftViewInvalidator`,
 `IEarlyEntryInvalidator`, `IServiceProvider`. Implements
@@ -835,7 +832,7 @@ Cross-section calls via `IShiftManagementService`,
 
 ### GeneralAvailabilityService (Scoped)
 
-Repository: `IGeneralAvailabilityRepository`.
+Repository: `IVolunteerTrackingRepository`.
 
 | Table | R/W |
 |-------|-----|
@@ -846,8 +843,7 @@ No `IMemoryCache`.
 
 ### VolunteerTrackingService (Scoped)
 
-Repositories: `IVolunteerTrackingRepository`, `IShiftManagementRepository`,
-`IGeneralAvailabilityRepository`.
+Repositories: `IVolunteerTrackingRepository`, `IShiftManagementRepository`.
 
 | Table | R/W |
 |-------|-----|
@@ -882,7 +878,7 @@ direct DB access beyond the export query.
 ### ShiftViewService (Scoped — wrapped by CachingShiftViewService Singleton decorator)
 
 Repositories: `IShiftManagementRepository`, `IShiftSignupRepository`,
-`IGeneralAvailabilityRepository`, `IVolunteerTrackingRepository`.
+`IVolunteerTrackingRepository`.
 
 | Table | R/W |
 |-------|-----|

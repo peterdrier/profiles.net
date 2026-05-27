@@ -32,7 +32,6 @@ public class ServiceBoundaryArchitectureTests
             [typeof(IEventRepository)] = "Events",
             [typeof(IExpenseRepository)] = "Expenses",
             [typeof(IFeedbackRepository)] = "Feedback",
-            [typeof(IGeneralAvailabilityRepository)] = "Shifts",
             [typeof(IGoogleResourceRepository)] = "GoogleIntegration",
             [typeof(IGoogleSyncOutboxRepository)] = "GoogleIntegration",
             [typeof(IHoldedRepository)] = "Finance",
