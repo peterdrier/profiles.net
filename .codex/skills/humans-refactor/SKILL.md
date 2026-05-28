@@ -17,6 +17,20 @@ Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-
 
 If resuming, continue the existing refactor worktree/branch only when the user clearly refers to it.
 
+## Autonomy Floor
+
+For autonomous or end-of-day runs, do not stop after the first failed implementations. Unless the user gives a shorter budget, work for at least 60 minutes before declaring stasis. If an implementation is rejected, switch search strategy and continue.
+
+Before stasis is allowed, the run must have:
+
+- built a candidate ledger with at least eight researched opportunities
+- inspected at least three different categories of opportunity
+- attempted or explicitly rejected at least five candidates with concrete reasons
+- run Reforge on the target section after any accepted change
+- pushed every accepted stage
+
+Two failed patches in a row are a signal that the search strategy is too shallow, not proof that the section has no valuable work.
+
 ## Hard Limits
 
 - Avoid database/storage changes unless the user explicitly asks for them: no migrations, no schema configuration changes, no entity persistence-shape changes, no JSON serialization attribute changes.
@@ -44,12 +58,32 @@ Measure value as:
 - target-section total improvement: positive value
 - overall total improvement: useful context
 - internal-complexity increases: cost unless the architecture-review pass says the trade is justified
-- outside-target regressions: high cost
+- outside-target movement: compute `target improvement + 2 * outside-target improvement`, where improvement means score decrease; an outside-target regression of 5 cancels 10 target points
 - score-neutral changes: acceptable only when the reviewer says the architecture clearly improved
+- parameter DTOs, input bags, options bags, and command wrappers do not earn credit merely because they reduce public parameter count
 
 ## Work Loop
 
-Repeat until stasis:
+First build a candidate ledger. Do this before editing:
+
+1. Read the target section's Reforge report with `--all --top-symbols 200`.
+2. Inspect top symbols and also top rules; do not rely only on the first ten offenders.
+3. For key interfaces/services/repositories/controllers, use Reforge queries such as `members`, `dependencies`, `injected`, `callers`, `audit-surface`, `audit-downstream`, and `implementations`.
+4. Use `rg` to inspect call sites and duplicate call structures.
+5. List candidate ideas with expected score movement, likely files, risk, and architecture rationale.
+
+Search at least these categories before declaring stasis:
+
+- interface or repository methods with low caller counts, overlapping behavior, or one implementation
+- full-service dependencies that should be read DTO/read-service dependencies
+- methods where callers only need one or two scalar values from a heavier service path
+- duplicate query/include/call sequences that can become one cohesive read shape
+- large service/repository/controller clusters whose methods naturally split by workflow
+- stale public methods, DTO fields, or wrappers no longer used by production code
+- cross-section reads, entity returns, or persistence joins that bypass canonical read models
+- long parameter lists only when the fix is a real domain command/query object, not a parameter bag
+
+Then repeat until stasis:
 
 1. Inspect Reforge top symbols/rules for the target section.
 2. Read the surrounding code and call graph before editing.
@@ -60,7 +94,7 @@ Repeat until stasis:
 7. Run the architecture-review gate.
 8. If accepted, commit and push. If rework/reject, improve or abandon before committing.
 
-Stasis means at least two consecutive candidate ideas are rejected, score-negative without architectural upside, blocked by hard limits, or too speculative to change without user/product input.
+Stasis means the autonomy floor has been met and the remaining ledger is exhausted, blocked by hard limits, score-negative without architectural upside, or too speculative to change without user/product input. A run may stop early only when the user explicitly asks, the repo cannot build for reasons outside the branch, or continuing risks data/schema/contract changes the user did not authorize.
 
 ## Architecture Review Gate
 
@@ -71,6 +105,8 @@ Inputs to the reviewer:
 - target section and stated objective
 - git diff for the uncommitted stage
 - Reforge before/after deltas, including surface/internal/combined totals
+- weighted target/outside value and any suspicious improvements
+- candidate ledger entry and alternatives considered
 - build/test results
 - notes about behavior or ownership assumptions
 
@@ -92,6 +128,7 @@ Every accepted commit must include a score and review appendix:
 Reforge:
 - Target: <Section> <before> -> <after> (<delta>); surface <delta>, internal <delta>
 - Overall: <before> -> <after> (<delta>); surface <delta>, internal <delta>
+- Weighted value: <target improvement + 2x outside-target improvement>
 
 Architecture-review:
 - Verdict: accept
@@ -114,6 +151,8 @@ Push after each accepted commit. If a PR does not exist by the time the user ask
 - Prefer adding one or two scalar properties to an existing DTO over creating a new interface/service/repository path.
 - Prefer canonical read services such as `IUserServiceRead`, `ITeamServiceRead`, and section view DTOs for cross-section reads.
 - Keep controllers thin, but allow UI-specific finite sorting/filtering/paging at the controller/view boundary.
+- Reject parameter-object refactors whose primary effect is hiding a long method signature. Accept a new input/command object only when it has cohesive domain meaning, public readable semantics appropriate to its boundary, validation/invariants, reuse across related flows, or a materially simpler call site.
+- Treat `public` input types with mostly `internal` state as a smell on service interfaces; decorators and cross-assembly callers should not need result objects or side channels to recover data the input already contained.
 
 ## References
 

@@ -30,9 +30,18 @@ def metric_delta(before: dict[str, Any], after: dict[str, Any], key: str) -> int
     return int(after.get(key, 0)) - int(before.get(key, 0))
 
 
+def total(data: dict[str, Any]) -> int:
+    return int(data.get("total", 0))
+
+
+def improvement(before: dict[str, Any], after: dict[str, Any]) -> int:
+    """Positive means the score decreased."""
+    return total(before) - total(after)
+
+
 def line(label: str, before: dict[str, Any], after: dict[str, Any]) -> str:
-    total_before = int(before.get("total", 0))
-    total_after = int(after.get("total", 0))
+    total_before = total(before)
+    total_after = total(after)
     total_delta = total_after - total_before
     surface_delta = metric_delta(before, after, "surfaceTotal")
     internal_delta = metric_delta(before, after, "internalComplexityTotal")
@@ -69,6 +78,22 @@ def main() -> int:
     print("Reforge:")
     print(line(args.section, before_section, after_section))
     print(line("Overall", before_all, after_all))
+
+    target_improvement = improvement(before_section, after_section)
+    overall_improvement = improvement(before_all, after_all)
+    outside_improvement = overall_improvement - target_improvement
+    weighted_value = target_improvement + (2 * outside_improvement)
+    outside_before = total(before_all) - total(before_section)
+    outside_after = total(after_all) - total(after_section)
+    outside_delta = outside_after - outside_before
+    print(
+        f"- Outside target: {outside_before} -> {outside_after} ({outside_delta:+}); "
+        f"improvement {outside_improvement:+}"
+    )
+    print(
+        f"- Weighted value: {weighted_value:+} "
+        f"(target {target_improvement:+} + 2x outside {outside_improvement:+})"
+    )
 
     suspicious = after_all.get("suspiciousImprovements") or []
     if suspicious:
