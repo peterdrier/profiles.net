@@ -1,11 +1,11 @@
 ---
 name: humans-refactor
-description: Autonomous Reforge-guided refactor workflow for the Humans repository. Use when the user wants Codex to target a section such as Shifts, Users, Teams, Tickets, Camps, or Store, create a dedicated worktree/branch from origin/main, run iterative architecture-focused improvements, score each stage with Reforge, gate commits through a read-only architecture review, append score and verdict details to commit messages, push progress, and open a PR when the loop reaches stasis.
+description: Autonomous Reforge-guided refactor workflow for the Humans repository. Use when the user wants Codex to target a section such as Shifts, Users, Teams, Tickets, Camps, or Store, create a dedicated worktree/branch from origin/main, run iterative architecture-focused improvements, score each stage with Reforge, gate commits through a score-blind read-only architecture review, append score and verdict details to commit messages after review acceptance, push progress, and open a PR when the loop reaches stasis.
 ---
 
 # Humans Refactor
 
-Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-debt loop: Reforge supplies deterministic score pressure, and a separate architecture-review pass decides whether the score movement was worth the trade.
+Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-debt loop: Reforge supplies deterministic score pressure to the implementer/coordinator, and a separate score-blind architecture-review pass decides whether the change is worth keeping without seeing the metric movement.
 
 ## Start
 
@@ -157,7 +157,7 @@ Then repeat until stasis:
 4. Make the change.
 5. Run targeted tests and `dotnet build Humans.slnx --disable-build-servers -v q`.
 6. Run Reforge after the change.
-7. Run the architecture-review gate.
+7. Run the score-blind architecture-review gate.
 8. If accepted, commit and push. If rework/reject, improve or abandon before committing.
 
 Stasis means the autonomy floor has been met and the remaining ledger is exhausted, blocked by hard limits, score-negative without architectural upside, or too speculative to change without user/product input. A run may stop early only when the user explicitly asks, the repo cannot build for reasons outside the branch, or continuing risks data/schema/contract changes the user did not authorize.
@@ -166,12 +166,12 @@ Stasis means the autonomy floor has been met and the remaining ledger is exhaust
 
 Use a separate read-only pass after every candidate stage. Prefer a subagent when multi-agent tools are available; otherwise perform an explicit second-pass review without editing. Read [architecture-reviewer.md](references/architecture-reviewer.md) for the prompt and JSON contract.
 
+The architecture reviewer must be score-blind. Do not provide Reforge before/after scores, rule deltas, weighted values, point savings, "this improved score" framing, or suspicious-improvement labels to the reviewer. The implementer/coordinator still computes those values for candidate selection and commit messages, but the review verdict must be based on the diff and architecture rules alone.
+
 Inputs to the reviewer:
 
 - target section and stated objective
 - git diff for the uncommitted stage
-- Reforge before/after deltas, including surface/internal/combined totals
-- weighted target/outside value and any suspicious improvements
 - candidate ledger entry and alternatives considered
 - build/test results
 - notes about behavior or ownership assumptions
@@ -182,13 +182,18 @@ Reviewer verdicts:
 - `rework`: change the patch and rerun tests/Reforge/review.
 - `reject`: abandon the patch or redesign before committing.
 
-Treat Reforge as evidence, not judgment. Good consolidation removes duplicated call structures, uses canonical read DTOs, and replaces interfaces with small data where appropriate. Bad consolidation hides domain verbs behind generic action/mode dispatchers, grows god methods, moves complexity to private helpers, or shifts debt out of the target section.
+Treat Reforge as candidate-selection pressure, not review evidence. Good consolidation removes duplicated call structures, uses canonical read DTOs, and replaces interfaces with small data where appropriate. Bad consolidation hides domain verbs behind generic action/mode dispatchers, grows god methods, moves complexity to private helpers, or shifts debt out of the target section.
 
 The reviewer must reject patches whose main effect is moving methods into a new
 helper/static class, replacing parameters with a DTO bag, or reducing a score
 without deleting a concept. Acceptable read-model growth should usually add
 facts to the existing `<Section>Info`/read shard, not create another projection
 service.
+
+After the reviewer returns `accept`, attach the Reforge deltas and weighted value
+to the commit message. If the reviewer returns `rework` or `reject`, do not use
+score movement to argue with the verdict; fix, redesign, or abandon the patch and
+rerun tests/Reforge/review.
 
 ## Commit Messages
 
