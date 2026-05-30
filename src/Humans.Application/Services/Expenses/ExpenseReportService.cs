@@ -34,12 +34,13 @@ public sealed class ExpenseReportService(
     IHoldedClient holdedClient,
     IHoldedFinanceService holdedFinance,
     IClock clock,
-    ILogger<ExpenseReportService> logger) : IExpenseReportService, IUserDataContributor
+    ILogger<ExpenseReportService> logger) : IExpenseReportService,
+        IExpenseReportBackgroundProcessor, IUserDataContributor
 {
     // Stored for future Holded Finance integration tasks (creditor status polling etc.).
     private readonly IHoldedFinanceService _holdedFinance = holdedFinance;
 
-    public static string AttachmentKey(Guid id, string extension) =>
+    internal static string AttachmentKey(Guid id, string extension) =>
         $"uploads/expense-attachments/{id}{extension}";
 
     private static readonly HashSet<string> AllowedExtensions =
@@ -51,41 +52,13 @@ public sealed class ExpenseReportService(
     public Task<ExpenseReportDto?> GetAsync(Guid id, CancellationToken ct = default)
         => repo.GetByIdAsync(id, ct);
 
-    public async Task<ExpenseDetailViewData> GetDetailViewDataAsync(
-        Guid viewerUserId, ExpenseReportDto report, CancellationToken ct = default)
-    {
-        var category = await budgetService.GetCategoryByIdAsync(report.BudgetCategoryId);
-        var categoryName = category is not null
-            ? $"{category.BudgetGroup?.Name} / {category.Name}"
-            : "(unknown category)";
-
-        var isSubmitter = report.SubmitterUserId == viewerUserId;
-        var canWithdraw = report.Status is ExpenseReportStatus.Submitted
-            or ExpenseReportStatus.CoordinatorEndorsed
-            or ExpenseReportStatus.Approved;
-        var iban = await GetSubmitterIbanViewAsync(viewerUserId, ct);
-
-        var timeline = isSubmitter
-            ? await BuildHoldedTimelineAsync(report, ct)
-            : null;
-
-        return new ExpenseDetailViewData(
-            CategoryDisplayName: categoryName,
-            CanEdit: isSubmitter && report.Status == ExpenseReportStatus.Draft,
-            CanSubmit: isSubmitter && report.Status == ExpenseReportStatus.Draft,
-            CanWithdraw: isSubmitter && canWithdraw,
-            HasIban: iban.HasIban,
-            MaskedIban: iban.MaskedIban,
-            HoldedTimeline: timeline);
-    }
-
     /// <summary>
     /// Aggregates the submitter's owed/paid round-trip from the cached Holded creditor balance.
     /// The balance already sums all of a member's outstanding docs; when it exceeds the member's
     /// own registered-unpaid ER totals, the remainder is shown as fronted/adjustments (spec §3).
     /// </summary>
-    private async Task<ExpenseHoldedTimeline?> BuildHoldedTimelineAsync(
-        ExpenseReportDto report, CancellationToken ct)
+    public async Task<ExpenseHoldedTimeline?> GetHoldedTimelineAsync(
+        ExpenseReportDto report, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(report.HoldedContactId))
             return new ExpenseHoldedTimeline(
@@ -208,7 +181,7 @@ public sealed class ExpenseReportService(
         return report.Id;
     }
 
-    public async Task UpdateDraftAsync(
+    internal async Task UpdateDraftAsync(
         Guid reportId, Guid submitterUserId,
         Guid budgetCategoryId, string? note,
         CancellationToken ct = default)
@@ -254,7 +227,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task<Guid> AddLineAsync(
+    internal async Task<Guid> AddLineAsync(
         Guid reportId, Guid submitterUserId,
         string description, decimal amount,
         CancellationToken ct = default)
@@ -290,7 +263,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task UpdateLineAsync(
+    internal async Task UpdateLineAsync(
         Guid reportId, Guid submitterUserId,
         Guid lineId, string description, decimal amount,
         CancellationToken ct = default)
@@ -325,7 +298,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task RemoveLineAsync(
+    internal async Task RemoveLineAsync(
         Guid reportId, Guid submitterUserId, Guid lineId,
         CancellationToken ct = default)
     {
@@ -378,7 +351,7 @@ public sealed class ExpenseReportService(
         "application/pdf", "image/jpeg", "image/jpg", "image/png", "image/heic"
     };
 
-    public async Task<Guid> AttachFileToLineAsync(
+    internal async Task<Guid> AttachFileToLineAsync(
         Guid reportId, Guid submitterUserId,
         Guid lineId, string originalFileName, string contentType,
         Stream content, CancellationToken ct = default)
@@ -473,7 +446,7 @@ public sealed class ExpenseReportService(
             submitterUserId);
     }
 
-    public async Task<bool> SubmitAsync(
+    internal async Task<bool> SubmitAsync(
         Guid reportId, Guid submitterUserId, CancellationToken ct = default)
     {
         var report = await repo.GetByIdAsync(reportId, ct);
@@ -531,7 +504,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task<bool> WithdrawAsync(
+    internal async Task<bool> WithdrawAsync(
         Guid reportId, Guid submitterUserId, CancellationToken ct = default)
     {
         var report = await repo.GetByIdAsync(reportId, ct);
@@ -572,17 +545,16 @@ public sealed class ExpenseReportService(
         Guid submitterUserId, string? iban, CancellationToken ct = default)
     {
         var ibanValue = string.IsNullOrWhiteSpace(iban) ? null : iban.Trim();
-        var existingIban = (await userService.GetUserInfoAsync(submitterUserId, ct))?.Profile?.Iban;
 
         if (ibanValue is not null && !IbanValidator.IsValid(ibanValue))
-            return IbanFailure("Invalid IBAN format.", isValidationError: true, existingIban);
+            return IbanFailure("Invalid IBAN format.", isValidationError: true);
 
         var normalized = ibanValue is null ? null : IbanValidator.Normalize(ibanValue);
         try
         {
             var saved = await userService.SetProfileIbanAsync(submitterUserId, normalized, ct);
             if (!saved)
-                return IbanFailure("Failed to save IBAN.", isValidationError: false, existingIban);
+                return IbanFailure("Failed to save IBAN.", isValidationError: false);
 
             var isClearing = normalized is null;
             await auditLogService.LogAsync(
@@ -600,39 +572,19 @@ public sealed class ExpenseReportService(
             return new ExpenseIbanSaveResult(
                 Succeeded: true,
                 IsValidationError: false,
-                Message: normalized is null ? "IBAN removed." : "IBAN saved.",
-                HasIban: normalized is not null,
-                MaskedIban: normalized is null ? null : IbanFormatter.Mask(normalized));
+                Message: normalized is null ? "IBAN removed." : "IBAN saved.");
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error setting IBAN for user {UserId}", submitterUserId);
-            return IbanFailure("Failed to save IBAN.", isValidationError: false, existingIban);
+            return IbanFailure("Failed to save IBAN.", isValidationError: false);
         }
     }
 
-    public async Task<ExpenseIbanViewData> GetSubmitterIbanViewAsync(
-        Guid submitterUserId, CancellationToken ct = default)
-    {
-        var iban = (await userService.GetUserInfoAsync(submitterUserId, ct))?.Profile?.Iban;
-        var hasIban = !string.IsNullOrEmpty(iban);
-        return new ExpenseIbanViewData(
-            HasIban: hasIban,
-            MaskedIban: hasIban ? IbanFormatter.Mask(iban!) : null);
-    }
+    private static ExpenseIbanSaveResult IbanFailure(string message, bool isValidationError) =>
+        new(Succeeded: false, IsValidationError: isValidationError, Message: message);
 
-    private static ExpenseIbanSaveResult IbanFailure(string message, bool isValidationError, string? existingIban)
-    {
-        var hasIban = !string.IsNullOrEmpty(existingIban);
-        return new ExpenseIbanSaveResult(
-            Succeeded: false,
-            IsValidationError: isValidationError,
-            Message: message,
-            HasIban: hasIban,
-            MaskedIban: hasIban ? IbanFormatter.Mask(existingIban!) : null);
-    }
-
-    public async Task<bool> CoordinatorEndorseAsync(
+    internal async Task<bool> CoordinatorEndorseAsync(
         Guid reportId, Guid coordinatorUserId, CancellationToken ct = default)
     {
         var report = await repo.GetByIdAsync(reportId, ct);
@@ -670,7 +622,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task<bool> CoordinatorRejectAsync(
+    internal async Task<bool> CoordinatorRejectAsync(
         Guid reportId, Guid coordinatorUserId, string reason,
         CancellationToken ct = default)
     {
@@ -710,7 +662,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task<bool> ApproveAsync(
+    internal async Task<bool> ApproveAsync(
         Guid reportId, Guid actorUserId, Guid? overrideCategoryId,
         CancellationToken ct = default)
     {
@@ -758,7 +710,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    public async Task<bool> FinanceRejectAsync(
+    internal async Task<bool> FinanceRejectAsync(
         Guid reportId, Guid actorUserId, string reason,
         CancellationToken ct = default)
     {
@@ -818,7 +770,7 @@ public sealed class ExpenseReportService(
         return flippedIds;
     }
 
-    public async Task<bool> MarkPaidAsync(
+    internal async Task<bool> MarkPaidAsync(
         Guid reportId, Instant paidAt, CancellationToken ct = default)
     {
         var ok = await repo.MarkPaidAsync(reportId, paidAt, ct);
@@ -833,8 +785,8 @@ public sealed class ExpenseReportService(
         return true;
     }
 
-    /// <inheritdoc/>
-    public async Task<bool> CategoryRequiresCoordinatorEndorsementAsync(
+    /// <summary>True iff the category has at least one budget coordinator.</summary>
+    internal async Task<bool> CategoryRequiresCoordinatorEndorsementAsync(
         Guid categoryId, CancellationToken ct = default)
     {
         // True iff category's team has ≥1 active Coordinator (cache hit, no DB).
@@ -849,8 +801,15 @@ public sealed class ExpenseReportService(
         return team.Members.Any(m => m.Role == TeamMemberRole.Coordinator);
     }
 
-    /// <inheritdoc/>
-    public async Task DrainHoldedOutboxAsync(int batchSize, CancellationToken ct = default)
+    Task IExpenseReportBackgroundProcessor.DrainHoldedOutboxAsync(
+        int batchSize, CancellationToken ct)
+        => DrainHoldedOutboxAsync(batchSize, ct);
+
+    Task IExpenseReportBackgroundProcessor.PollHoldedPaidStatusAsync(
+        int batchSize, CancellationToken ct)
+        => PollHoldedPaidStatusAsync(batchSize, ct);
+
+    internal async Task DrainHoldedOutboxAsync(int batchSize, CancellationToken ct = default)
     {
         var events = await repo
             .GetUnprocessedOutboxAsync(batchSize, ct);
@@ -927,8 +886,7 @@ public sealed class ExpenseReportService(
         }
     }
 
-    /// <inheritdoc/>
-    public async Task PollHoldedPaidStatusAsync(int batchSize, CancellationToken ct = default)
+    internal async Task PollHoldedPaidStatusAsync(int batchSize, CancellationToken ct = default)
     {
         var reports = await repo.GetByStatusAsync(ExpenseReportStatus.SepaSent, ct);
 

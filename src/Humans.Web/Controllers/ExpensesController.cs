@@ -4,6 +4,7 @@ using Humans.Application.Interfaces.Expenses;
 using Humans.Application.Interfaces.Users;
 using Humans.Application.Services.Expenses.Dtos;
 using Humans.Domain.Enums;
+using Humans.Domain.Helpers;
 using Humans.Web.Authorization;
 using Humans.Web.Authorization.Requirements;
 using Humans.Web.Models;
@@ -18,6 +19,7 @@ namespace Humans.Web.Controllers;
 [Route("Expenses")]
 public sealed class ExpensesController(
     IUserServiceRead userService,
+    IExpenseReportServiceRead expenseReadService,
     IExpenseReportService service,
     IBudgetService budgetService,
     IClock clock,
@@ -36,7 +38,7 @@ public sealed class ExpensesController(
             var (errorResult, user) = await RequireCurrentUserAsync();
             if (errorResult is not null) return errorResult;
 
-            var reports = await service.GetForSubmitterAsync(user.Id);
+            var reports = await expenseReadService.GetForSubmitterAsync(user.Id);
             var activeYear = await budgetService.GetActiveYearAsync();
             var info = await _userService.GetUserInfoAsync(user.Id);
 
@@ -128,24 +130,36 @@ public sealed class ExpensesController(
             var (errorResult, user) = await RequireCurrentUserAsync();
             if (errorResult is not null) return errorResult;
 
-            var report = await service.GetAsync(id);
+            var report = await expenseReadService.GetAsync(id);
             if (report is null) return NotFound();
 
             var authResult = await authService.AuthorizeAsync(User, report,
                 new ExpenseReportOperationRequirement(ExpenseReportOperation.View));
             if (!authResult.Succeeded) return Forbid();
 
-            var detail = await service.GetDetailViewDataAsync(user.Id, report);
+            var category = await budgetService.GetCategoryByIdAsync(report.BudgetCategoryId);
+            var categoryName = category is not null
+                ? $"{category.BudgetGroup?.Name} / {category.Name}"
+                : "(unknown category)";
+            var isSubmitter = report.SubmitterUserId == user.Id;
+            var canWithdraw = report.Status is ExpenseReportStatus.Submitted
+                or ExpenseReportStatus.CoordinatorEndorsed
+                or ExpenseReportStatus.Approved;
+            var iban = await GetIbanViewAsync(user.Id);
+            var timeline = isSubmitter
+                ? await expenseReadService.GetHoldedTimelineAsync(report)
+                : null;
+
             var model = new ExpenseDetailViewModel
             {
                 Report = report,
-                CategoryDisplayName = detail.CategoryDisplayName,
-                CanEdit = detail.CanEdit,
-                CanSubmit = detail.CanSubmit,
-                CanWithdraw = detail.CanWithdraw,
-                HasIban = detail.HasIban,
-                MaskedIban = detail.MaskedIban,
-                HoldedTimeline = detail.HoldedTimeline
+                CategoryDisplayName = categoryName,
+                CanEdit = isSubmitter && report.Status == ExpenseReportStatus.Draft,
+                CanSubmit = isSubmitter && report.Status == ExpenseReportStatus.Draft,
+                CanWithdraw = isSubmitter && canWithdraw,
+                HasIban = iban.HasIban,
+                MaskedIban = iban.MaskedIban,
+                HoldedTimeline = timeline
             };
             return View(model);
         }
@@ -165,7 +179,7 @@ public sealed class ExpensesController(
             var (errorResult, user) = await RequireCurrentUserAsync();
             if (errorResult is not null) return errorResult;
 
-            var report = await service.GetAsync(id);
+            var report = await expenseReadService.GetAsync(id);
             if (report is null) return NotFound();
             if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -199,7 +213,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -228,7 +242,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -254,7 +268,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -280,7 +294,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -301,7 +315,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -330,7 +344,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -354,7 +368,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -374,7 +388,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid(); var result = await service.WithdrawWithResultAsync(id, user.Id);
         if (result.Succeeded)
@@ -392,11 +406,11 @@ public sealed class ExpensesController(
             var (errorResult, user) = await RequireCurrentUserAsync();
             if (errorResult is not null) return errorResult;
 
-            var report = await service.GetAsync(id);
+            var report = await expenseReadService.GetAsync(id);
             if (report is null) return NotFound();
             if (report.SubmitterUserId != user.Id) return Forbid();
 
-            var iban = await service.GetSubmitterIbanViewAsync(user.Id);
+            var iban = await GetIbanViewAsync(user.Id);
             var model = new ExpenseIbanViewModel
             {
                 ReportId = id,
@@ -420,7 +434,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
         if (report.SubmitterUserId != user.Id) return Forbid();
 
@@ -436,9 +450,10 @@ public sealed class ExpensesController(
         else
             SetError(result.Message);
 
+        var iban = await GetIbanViewAsync(user.Id);
         model.ReportId = id;
-        model.HasIban = result.HasIban;
-        model.MaskedIban = result.MaskedIban;
+        model.HasIban = iban.HasIban;
+        model.MaskedIban = iban.MaskedIban;
         return View(model);
     }
 
@@ -451,14 +466,14 @@ public sealed class ExpensesController(
             if (errorResult is not null) return errorResult;
 
             // Visibility = report's View handler grant. NotFound on both miss + denial (no leak).
-            var owningReport = await service.GetReportOwningAttachmentAsync(attachmentId);
+            var owningReport = await expenseReadService.GetReportOwningAttachmentAsync(attachmentId);
             if (owningReport is null) return NotFound();
 
             var authResult = await authService.AuthorizeAsync(User, owningReport,
                 new ExpenseReportOperationRequirement(ExpenseReportOperation.View));
             if (!authResult.Succeeded) return NotFound();
 
-            var attachment = await service.TryReadAttachmentAsync(owningReport, attachmentId);
+            var attachment = await expenseReadService.TryReadAttachmentAsync(owningReport, attachmentId);
             if (attachment is null) return NotFound();
 
             return File(attachment.Bytes, attachment.ContentType, attachment.OriginalFileName);
@@ -478,7 +493,7 @@ public sealed class ExpensesController(
             var (errorResult, user) = await RequireCurrentUserAsync();
             if (errorResult is not null) return errorResult;
 
-            var reports = await service.GetCoordinatorQueueAsync(user.Id);
+            var reports = await expenseReadService.GetCoordinatorQueueAsync(user.Id);
             var submitterNames = await ResolveSubmitterNamesAsync(reports);
             return View(new ExpenseCoordinatorViewModel { Reports = reports, SubmitterNames = submitterNames });
         }
@@ -497,7 +512,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
 
         var authResult = await authService.AuthorizeAsync(User, report,
@@ -520,7 +535,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
 
         var authResult = await authService.AuthorizeAsync(User, report,
@@ -548,7 +563,7 @@ public sealed class ExpensesController(
     {
         try
         {
-            var reports = await service.GetReviewQueueAsync();
+            var reports = await expenseReadService.GetReviewQueueAsync();
             var submitterNames = await ResolveSubmitterNamesAsync(reports);
             return View(new ExpenseReviewViewModel { Reports = reports, SubmitterNames = submitterNames });
         }
@@ -568,7 +583,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
 
         var authResult = await authService.AuthorizeAsync(User, report,
@@ -592,7 +607,7 @@ public sealed class ExpensesController(
         var (errorResult, user) = await RequireCurrentUserAsync();
         if (errorResult is not null) return errorResult;
 
-        var report = await service.GetAsync(id);
+        var report = await expenseReadService.GetAsync(id);
         if (report is null) return NotFound();
 
         var authResult = await authService.AuthorizeAsync(User, report,
@@ -679,7 +694,7 @@ public sealed class ExpensesController(
         var result = new List<ExpenseReportDto>();
         foreach (var id in ids)
         {
-            var report = await service.GetAsync(id, ct);
+            var report = await expenseReadService.GetAsync(id, ct);
             if (report is null || report.Status != ExpenseReportStatus.Approved) continue;
 
             var authResult = await authService.AuthorizeAsync(User, report,
@@ -722,6 +737,13 @@ public sealed class ExpensesController(
                 .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                 .Select(c => new BudgetCategoryOption(c.Id, g.Name, c.Name)))
             .ToList();
+    }
+
+    private async Task<(bool HasIban, string? MaskedIban)> GetIbanViewAsync(Guid userId)
+    {
+        var iban = (await _userService.GetUserInfoAsync(userId))?.Profile?.Iban;
+        var hasIban = !string.IsNullOrEmpty(iban);
+        return (hasIban, hasIban ? IbanFormatter.Mask(iban!) : null);
     }
 
 }
