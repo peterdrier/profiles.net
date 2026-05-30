@@ -60,17 +60,6 @@ public sealed class OutboxEmailService(
     }
 
     /// <inheritdoc />
-    public async Task SendReConsentRequiredAsync(
-        string userEmail,
-        string userName,
-        string documentName,
-        string? culture = null,
-        CancellationToken cancellationToken = default)
-    {
-        await SendReConsentsRequiredAsync(userEmail, userName, [documentName], culture, cancellationToken);
-    }
-
-    /// <inheritdoc />
     public async Task SendReConsentsRequiredAsync(
         string userEmail,
         string userName,
@@ -95,17 +84,6 @@ public sealed class OutboxEmailService(
         var docs = documentNames.ToList();
         var content = renderer.RenderReConsentReminder(userName, docs, daysRemaining, culture);
         await EnqueueAsync(userEmail, userName, content, "reconsent_reminder", cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public async Task SendWelcomeEmailAsync(
-        string userEmail,
-        string userName,
-        string? culture = null,
-        CancellationToken cancellationToken = default)
-    {
-        var content = renderer.RenderWelcome(userName, culture);
-        await EnqueueAsync(userEmail, userName, content, "welcome", cancellationToken);
     }
 
     /// <inheritdoc />
