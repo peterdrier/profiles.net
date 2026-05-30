@@ -52,6 +52,7 @@ public class ProfileController(
     IProfileEditorService profileEditorService,
     IContactFieldService contactFieldService,
     IEmailService emailService,
+    IEmailMessageFactory emailMessages,
     IUserEmailService userEmailService,
     ICommunicationPreferenceService commPrefService,
     IAuditLogService auditLogService,
@@ -69,7 +70,7 @@ public class ProfileController(
     ITicketServiceRead ticketQueryService,
     ITeamServiceRead teamService,
     ICampaignService campaignService,
-    IEmailOutboxService emailOutboxService,
+    IEmailOutboxServiceRead emailOutboxService,
     IClock clock,
     IAuthorizationService authorizationService,
     IConsentServiceRead consentService,
@@ -587,12 +588,12 @@ public class ProfileController(
 
         var info = await _userService.GetUserInfoAsync(user.Id);
 
-        await emailService.SendEmailVerificationAsync(
+        await emailService.SendAsync(emailMessages.EmailVerification(
             trimmedEmail,
             info?.BurnerName ?? string.Empty,
             verificationUrl!,
             result.IsConflict,
-            user.PreferredLanguage);
+            user.PreferredLanguage));
 
         logger.LogInformation(
             "Sent email verification to {Email} for user {UserId} (conflict: {IsConflict})",
@@ -1222,12 +1223,12 @@ public class ProfileController(
 
         var info = await _userService.GetUserInfoAsync(userId, ct);
 
-        await emailService.SendEmailVerificationAsync(
+        await emailService.SendAsync(emailMessages.EmailVerification(
             trimmedEmail,
             info?.BurnerName ?? string.Empty,
             verificationUrl!,
             result.IsConflict,
-            targetUser.PreferredLanguage,
+            targetUser.PreferredLanguage),
             ct);
 
         logger.LogInformation(
@@ -1660,7 +1661,10 @@ public class ProfileController(
                     {
                         var privileged = ShiftRoleChecks.IsPrivilegedSignupApprover(User);
                         var result = await shiftSignupService.SignUpAsync(
-                            user.Id, sid, actorUserId: null, isPrivileged: privileged);
+                            user.Id,
+                            sid,
+                            actorUserId: null,
+                            flags: privileged ? ShiftSignupRequestFlags.Privileged : ShiftSignupRequestFlags.None);
                         if (!result.Success)
                             SetError(result.Error ?? "Shift signup failed.");
                         else
@@ -1674,8 +1678,15 @@ public class ProfileController(
                                          && model.EndDayOffset is { } ed:
                     {
                         var privileged = ShiftRoleChecks.IsPrivilegedSignupApprover(User);
+                        var flags = ShiftSignupRequestFlags.SkipConflicts;
+                        if (privileged) flags |= ShiftSignupRequestFlags.Privileged;
                         var result = await shiftSignupService.SignUpRangeAsync(
-                            user.Id, rid, sd, ed, actorUserId: null, isPrivileged: privileged, skipConflicts: true);
+                            user.Id,
+                            rid,
+                            sd,
+                            ed,
+                            actorUserId: null,
+                            flags: flags);
                         if (!result.Success)
                             SetError(result.Error ?? "Shift range signup failed.");
                         else
@@ -2032,14 +2043,14 @@ public class ProfileController(
             return View(model);
         }
 
-        await emailService.SendFacilitatedMessageAsync(
+        await emailService.SendAsync(emailMessages.FacilitatedMessage(
             request.RecipientEmail,
             request.RecipientDisplayName,
             request.SenderDisplayName,
             request.CleanMessage,
             request.IncludeContactInfo,
             request.SenderEmail,
-            request.RecipientPreferredLanguage);
+            request.RecipientPreferredLanguage));
 
         await auditLogService.LogAsync(
             AuditAction.FacilitatedMessageSent,

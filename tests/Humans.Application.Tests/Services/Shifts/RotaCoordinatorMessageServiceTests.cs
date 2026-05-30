@@ -25,16 +25,16 @@ namespace Humans.Application.Tests.Services.Shifts;
 /// </summary>
 public sealed class RotaCoordinatorMessageServiceTests
 {
-    private readonly IShiftSignupRepository _signupRepo = Substitute.For<IShiftSignupRepository>();
-    private readonly IShiftManagementRepository _mgmtRepo = Substitute.For<IShiftManagementRepository>();
+    private readonly IShiftManagementRepository _repo = Substitute.For<IShiftManagementRepository>();
     private readonly ITeamServiceRead _teamService = Substitute.For<ITeamServiceRead>();
     private readonly IUserService _userService = Substitute.For<IUserService>();
     private readonly IEmailService _emailService = Substitute.For<IEmailService>();
+    private readonly IEmailMessageFactory _emailMessages = Substitute.For<IEmailMessageFactory>();
     private readonly IAuditLogService _auditLog = Substitute.For<IAuditLogService>();
     private readonly FakeClock _clock = new(Instant.FromUtc(2026, 6, 15, 12, 0));
 
     private RotaCoordinatorMessageService CreateSut() =>
-        new(_signupRepo, _mgmtRepo, _teamService, _userService, _emailService, _auditLog, _clock,
+        new(_repo, _teamService, _userService, _emailService, _emailMessages, _auditLog, _clock,
             NullLogger<RotaCoordinatorMessageService>.Instance);
 
     [HumansFact]
@@ -44,7 +44,7 @@ public sealed class RotaCoordinatorMessageServiceTests
 
         result.Succeeded.Should().BeFalse();
         result.Error.Should().Contain("required", "blank body must surface a clear error");
-        await _emailService.DidNotReceiveWithAnyArgs().SendCoordinatorRotaMessageAsync(null!);
+        _emailMessages.DidNotReceiveWithAnyArgs().CoordinatorRotaMessage(null!);
         await _auditLog.DidNotReceiveWithAnyArgs().LogAsync(
             default, null!, Guid.Empty, null!, Guid.Empty);
     }
@@ -53,23 +53,21 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendRotaMessageAsync_ReturnsFailure_WhenRotaMissing()
     {
         var rotaId = Guid.NewGuid();
-        _signupRepo.GetRotaWithShiftsAsync(rotaId, Arg.Any<CancellationToken>())
+        _repo.GetRotaAsync(rotaId, RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns((Rota?)null);
 
         var result = await CreateSut().SendRotaMessageAsync(rotaId, Guid.NewGuid(), "hello");
 
         result.Succeeded.Should().BeFalse();
         result.Error.Should().Contain("not found");
-        await _emailService.DidNotReceiveWithAnyArgs().SendCoordinatorRotaMessageAsync(null!);
+        _emailMessages.DidNotReceiveWithAnyArgs().CoordinatorRotaMessage(null!);
     }
 
     [HumansFact]
     public async Task SendRotaMessageAsync_ReturnsFailure_WhenNoActiveSignups()
     {
         var rota = MakeRota(out var eventSettings);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([]);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var result = await CreateSut().SendRotaMessageAsync(rota.Id, Guid.NewGuid(), "hello");
 
@@ -81,7 +79,7 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendRotaMessageAsync_FansOut_OneEmailPerDistinctUser()
     {
         var rota = MakeRota(out var es);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
@@ -91,30 +89,27 @@ public sealed class RotaCoordinatorMessageServiceTests
         var shift2 = MakeShift(rota.Id, dayOffset: 2, startHour: 14);
 
         // userA has two signups (same shift twice + another shift), userB has one.
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([
-                MakeSignup(userA, shift1),
-                MakeSignup(userA, shift2),
-                MakeSignup(userB, shift1)
-            ]);
+        AddSignups(rota, [
+            MakeSignup(userA, shift1),
+            MakeSignup(userA, shift2),
+            MakeSignup(userB, shift1)
+        ]);
 
         StubUsers(sender, userA, userB);
 
         await CreateSut().SendRotaMessageAsync(rota.Id, sender, "hello team");
 
-        await _emailService.Received(1).SendCoordinatorRotaMessageAsync(
-            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "a@example.com"),
-            Arg.Any<CancellationToken>());
-        await _emailService.Received(1).SendCoordinatorRotaMessageAsync(
-            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "b@example.com"),
-            Arg.Any<CancellationToken>());
+        _emailMessages.Received(1).CoordinatorRotaMessage(
+            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "a@example.com"));
+        _emailMessages.Received(1).CoordinatorRotaMessage(
+            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "b@example.com"));
     }
 
     [HumansFact]
     public async Task SendRotaMessageAsync_PersonalisesShiftListPerRecipient()
     {
         var rota = MakeRota(out var es);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
@@ -124,24 +119,22 @@ public sealed class RotaCoordinatorMessageServiceTests
         var lateShift = MakeShift(rota.Id, dayOffset: 3, startHour: 18);
         var midShift = MakeShift(rota.Id, dayOffset: 2, startHour: 12);
 
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([
-                MakeSignup(userA, lateShift),  // userA: late + early (should sort)
-                MakeSignup(userA, earlyShift),
-                MakeSignup(userB, midShift) // userB: only midShift
-            ]);
+        AddSignups(rota, [
+            MakeSignup(userA, lateShift),  // userA: late + early (should sort)
+            MakeSignup(userA, earlyShift),
+            MakeSignup(userB, midShift) // userB: only midShift
+        ]);
 
         StubUsers(sender, userA, userB);
 
         CoordinatorRotaMessageRequest? captured_A = null;
         CoordinatorRotaMessageRequest? captured_B = null;
-        await _emailService.SendCoordinatorRotaMessageAsync(
+        _emailMessages.CoordinatorRotaMessage(
             Arg.Do<CoordinatorRotaMessageRequest>(r =>
             {
                 if (string.Equals(r.RecipientEmail, "a@example.com", StringComparison.Ordinal)) captured_A = r;
                 else if (string.Equals(r.RecipientEmail, "b@example.com", StringComparison.Ordinal)) captured_B = r;
-            }),
-            Arg.Any<CancellationToken>());
+            }));
 
         await CreateSut().SendRotaMessageAsync(rota.Id, sender, "hello");
 
@@ -159,14 +152,13 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendRotaMessageAsync_WritesOneAuditEntry_WithSenderActor()
     {
         var rota = MakeRota(out _);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var userA = Guid.NewGuid();
         var sender = Guid.NewGuid();
         var shift = MakeShift(rota.Id, dayOffset: 1, startHour: 10);
 
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([MakeSignup(userA, shift)]);
+        AddSignups(rota, [MakeSignup(userA, shift)]);
 
         StubUsers(sender, userA);
 
@@ -190,18 +182,17 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendRotaMessageAsync_SkipsRecipientWithNoEmail_DoesNotFail()
     {
         var rota = MakeRota(out _);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var withEmail = Guid.NewGuid();
         var noEmail = Guid.NewGuid();
         var sender = Guid.NewGuid();
         var shift = MakeShift(rota.Id, dayOffset: 1, startHour: 10);
 
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([
-                MakeSignup(withEmail, shift),
-                MakeSignup(noEmail, shift)
-            ]);
+        AddSignups(rota, [
+            MakeSignup(withEmail, shift),
+            MakeSignup(noEmail, shift)
+        ]);
 
         // sender + withEmail have addresses; noEmail's UserInfo has an empty email.
         var dict = new Dictionary<Guid, UserInfo>
@@ -228,35 +219,33 @@ public sealed class RotaCoordinatorMessageServiceTests
 
         result.Succeeded.Should().BeTrue();
         result.RecipientCount.Should().Be(1, "only the recipient with an email is queued");
-        await _emailService.Received(1).SendCoordinatorRotaMessageAsync(
-            Arg.Any<CoordinatorRotaMessageRequest>(), Arg.Any<CancellationToken>());
+        _emailMessages.Received(1).CoordinatorRotaMessage(
+            Arg.Any<CoordinatorRotaMessageRequest>());
     }
 
     [HumansFact]
     public async Task SendRotaMessageAsync_IsolatesPerRecipientFailures_AndStillAudits()
     {
         var rota = MakeRota(out _);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
         var sender = Guid.NewGuid();
         var shift = MakeShift(rota.Id, dayOffset: 1, startHour: 10);
 
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([
-                MakeSignup(userA, shift),
-                MakeSignup(userB, shift)
-            ]);
+        AddSignups(rota, [
+            MakeSignup(userA, shift),
+            MakeSignup(userB, shift)
+        ]);
 
         StubUsers(sender, userA, userB);
 
         // First recipient throws (simulating a transient outbox-write failure);
         // the loop must continue, enqueue the second, and still write the audit row.
-        _emailService
-            .When(s => s.SendCoordinatorRotaMessageAsync(
-                Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "a@example.com"),
-                Arg.Any<CancellationToken>()))
+        _emailMessages
+            .When(f => f.CoordinatorRotaMessage(
+                Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "a@example.com")))
             .Do(_ => throw new InvalidOperationException("simulated outbox blip"));
 
         var result = await CreateSut().SendRotaMessageAsync(rota.Id, sender, "schedule change");
@@ -264,9 +253,8 @@ public sealed class RotaCoordinatorMessageServiceTests
         result.Succeeded.Should().BeTrue("partial dispatch still returns success");
         result.RecipientCount.Should().Be(1, "only the surviving enqueue counts as queued");
 
-        await _emailService.Received(1).SendCoordinatorRotaMessageAsync(
-            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "b@example.com"),
-            Arg.Any<CancellationToken>());
+        _emailMessages.Received(1).CoordinatorRotaMessage(
+            Arg.Is<CoordinatorRotaMessageRequest>(r => r.RecipientEmail == "b@example.com"));
 
         await _auditLog.Received(1).LogAsync(
             AuditAction.CoordinatorRotaMessageSent,
@@ -282,25 +270,24 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendRotaMessageAsync_ReturnsFailure_WhenAllRecipientEnqueuesThrow()
     {
         var rota = MakeRota(out _);
-        _signupRepo.GetRotaWithShiftsAsync(rota.Id, Arg.Any<CancellationToken>()).Returns(rota);
+        _repo.GetRotaAsync(rota.Id, RotaReadShape.View, Arg.Any<CancellationToken>()).Returns(rota);
 
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
         var sender = Guid.NewGuid();
         var shift = MakeShift(rota.Id, dayOffset: 1, startHour: 10);
 
-        _signupRepo.GetActiveByRotaAsync(rota.Id, Arg.Any<CancellationToken>())
-            .Returns([
-                MakeSignup(userA, shift),
-                MakeSignup(userB, shift)
-            ]);
+        AddSignups(rota, [
+            MakeSignup(userA, shift),
+            MakeSignup(userB, shift)
+        ]);
 
         StubUsers(sender, userA, userB);
 
         // Every recipient's enqueue throws — no email gets queued.
-        _emailService
-            .When(s => s.SendCoordinatorRotaMessageAsync(
-                Arg.Any<CoordinatorRotaMessageRequest>(), Arg.Any<CancellationToken>()))
+        _emailMessages
+            .When(f => f.CoordinatorRotaMessage(
+                Arg.Any<CoordinatorRotaMessageRequest>()))
             .Do(_ => throw new InvalidOperationException("simulated outbox outage"));
 
         var result = await CreateSut().SendRotaMessageAsync(rota.Id, sender, "schedule change");
@@ -332,7 +319,7 @@ public sealed class RotaCoordinatorMessageServiceTests
 
         result.Succeeded.Should().BeFalse();
         result.Error.Should().Contain("required");
-        await _emailService.DidNotReceiveWithAnyArgs().SendCoordinatorTeamRotasMessageAsync(null!);
+        _emailMessages.DidNotReceiveWithAnyArgs().CoordinatorTeamRotasMessage(null!);
     }
 
     [HumansFact]
@@ -351,7 +338,7 @@ public sealed class RotaCoordinatorMessageServiceTests
     public async Task SendTeamRotasMessageAsync_ReturnsFailure_WhenNoActiveEvent()
     {
         var (teamId, _) = StubTeam();
-        _mgmtRepo.GetActiveEventSettingsAsync(Arg.Any<CancellationToken>())
+        _repo.GetActiveEventSettingsAsync(Arg.Any<CancellationToken>())
             .Returns((EventSettings?)null);
 
         var result = await CreateSut().SendTeamRotasMessageAsync(teamId, Guid.NewGuid(), "hello");
@@ -375,7 +362,7 @@ public sealed class RotaCoordinatorMessageServiceTests
         var pastOnlyRota = MakeTeamRota(teamId, es, "PastOnly", [(pastShift, [userA])]);
         var futureRota = MakeTeamRota(teamId, es, "Future", [(futureShift, [userB])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([pastOnlyRota, futureRota]);
 
         var sender = Guid.NewGuid();
@@ -388,9 +375,8 @@ public sealed class RotaCoordinatorMessageServiceTests
         await CreateSut().SendTeamRotasMessageAsync(teamId, sender, "hello");
 
         // Exactly one email queued, to userB; past-only rota produced no work.
-        await _emailService.Received(1).SendCoordinatorTeamRotasMessageAsync(
-            Arg.Any<CoordinatorTeamRotasMessageRequest>(),
-            Arg.Any<CancellationToken>());
+        _emailMessages.Received(1).CoordinatorTeamRotasMessage(
+            Arg.Any<CoordinatorTeamRotasMessageRequest>());
     }
 
     [HumansFact]
@@ -410,7 +396,7 @@ public sealed class RotaCoordinatorMessageServiceTests
         rota.Shifts.First().ShiftSignups.First(s => s.UserId == pending).Status = SignupStatus.Pending;
         rota.Shifts.First().ShiftSignups.First(s => s.UserId == bailed).Status = SignupStatus.Bailed;
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([rota]);
 
         // Bailed user is filtered before user lookup, so only the two active
@@ -422,9 +408,8 @@ public sealed class RotaCoordinatorMessageServiceTests
 
         result.Succeeded.Should().BeTrue();
         result.RecipientCount.Should().Be(2, "bailed is excluded; pending + confirmed are kept");
-        await _emailService.Received(2).SendCoordinatorTeamRotasMessageAsync(
-            Arg.Any<CoordinatorTeamRotasMessageRequest>(),
-            Arg.Any<CancellationToken>());
+        _emailMessages.Received(2).CoordinatorTeamRotasMessage(
+            Arg.Any<CoordinatorTeamRotasMessageRequest>());
     }
 
     [HumansFact]
@@ -442,7 +427,7 @@ public sealed class RotaCoordinatorMessageServiceTests
         var rotaA = MakeTeamRota(teamId, es, "Aardvark", [(shiftR1, [userA])]);
         var rotaB = MakeTeamRota(teamId, es, "Beaver", [(shiftR2, [userA])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([rotaA, rotaB]);
 
         StubUsers(sender, userA);
@@ -453,13 +438,12 @@ public sealed class RotaCoordinatorMessageServiceTests
         result.RecipientCount.Should().Be(1, "user appears in two rotas but should receive exactly one email");
         result.RotaCount.Should().Be(2);
 
-        await _emailService.Received(1).SendCoordinatorTeamRotasMessageAsync(
+        _emailMessages.Received(1).CoordinatorTeamRotasMessage(
             Arg.Is<CoordinatorTeamRotasMessageRequest>(r =>
                 r.RecipientEmail == "a@example.com"
                 && r.ShiftGroups.Count == 2
                 && r.ShiftGroups.Any(g => g.RotaName == "Aardvark")
-                && r.ShiftGroups.Any(g => g.RotaName == "Beaver")),
-            Arg.Any<CancellationToken>());
+                && r.ShiftGroups.Any(g => g.RotaName == "Beaver")));
     }
 
     [HumansFact]
@@ -476,15 +460,14 @@ public sealed class RotaCoordinatorMessageServiceTests
         var zRota = MakeTeamRota(teamId, es, "Zebra", [(shiftZ, [userA])]);
         var aRota = MakeTeamRota(teamId, es, "Antelope", [(shiftA, [userA])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([zRota, aRota]);
 
         StubUsers(sender, userA);
 
         CoordinatorTeamRotasMessageRequest? captured = null;
-        await _emailService.SendCoordinatorTeamRotasMessageAsync(
-            Arg.Do<CoordinatorTeamRotasMessageRequest>(r => captured = r),
-            Arg.Any<CancellationToken>());
+        _emailMessages.CoordinatorTeamRotasMessage(
+            Arg.Do<CoordinatorTeamRotasMessageRequest>(r => captured = r));
 
         await CreateSut().SendTeamRotasMessageAsync(teamId, sender, "hello");
 
@@ -504,7 +487,7 @@ public sealed class RotaCoordinatorMessageServiceTests
         var shift = MakeShift(Guid.Empty, dayOffset: 30, startHour: 10);
         var rota = MakeTeamRota(teamId, es, "Rota1", [(shift, [userA])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([rota]);
         StubUsers(sender, userA);
 
@@ -532,23 +515,21 @@ public sealed class RotaCoordinatorMessageServiceTests
         var shift = MakeShift(Guid.Empty, dayOffset: 30, startHour: 10);
         var rota = MakeTeamRota(teamId, es, "Rota1", [(shift, [userA, userB])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([rota]);
         StubUsers(sender, userA, userB);
 
-        _emailService
-            .When(s => s.SendCoordinatorTeamRotasMessageAsync(
-                Arg.Is<CoordinatorTeamRotasMessageRequest>(r => r.RecipientEmail == "a@example.com"),
-                Arg.Any<CancellationToken>()))
+        _emailMessages
+            .When(f => f.CoordinatorTeamRotasMessage(
+                Arg.Is<CoordinatorTeamRotasMessageRequest>(r => r.RecipientEmail == "a@example.com")))
             .Do(_ => throw new InvalidOperationException("simulated outbox blip"));
 
         var result = await CreateSut().SendTeamRotasMessageAsync(teamId, sender, "hi");
 
         result.Succeeded.Should().BeTrue("partial dispatch returns success");
         result.RecipientCount.Should().Be(1);
-        await _emailService.Received(1).SendCoordinatorTeamRotasMessageAsync(
-            Arg.Is<CoordinatorTeamRotasMessageRequest>(r => r.RecipientEmail == "b@example.com"),
-            Arg.Any<CancellationToken>());
+        _emailMessages.Received(1).CoordinatorTeamRotasMessage(
+            Arg.Is<CoordinatorTeamRotasMessageRequest>(r => r.RecipientEmail == "b@example.com"));
     }
 
     [HumansFact]
@@ -564,7 +545,7 @@ public sealed class RotaCoordinatorMessageServiceTests
         var rota1 = MakeTeamRota(teamId, es, "R1", [(shift1, [userA, userB])]);
         var rota2 = MakeTeamRota(teamId, es, "R2", [(shift2, [userA])]);
 
-        _mgmtRepo.GetRotasByDepartmentAsync(teamId, es.Id, Arg.Any<CancellationToken>())
+        _repo.GetRotasAsync(es.Id, Arg.Any<IReadOnlyCollection<Guid>>(), RotaReadShape.View, Arg.Any<CancellationToken>())
             .Returns([rota1, rota2]);
 
         _userService.GetUserInfosAsync(
@@ -612,7 +593,7 @@ public sealed class RotaCoordinatorMessageServiceTests
             CreatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
             UpdatedAt = Instant.FromUtc(2026, 1, 1, 0, 0),
         };
-        _mgmtRepo.GetActiveEventSettingsAsync(Arg.Any<CancellationToken>())
+        _repo.GetActiveEventSettingsAsync(Arg.Any<CancellationToken>())
             .Returns(es);
         return es;
     }
@@ -623,6 +604,19 @@ public sealed class RotaCoordinatorMessageServiceTests
     /// Shift.ShiftSignups). Each tuple is (shift, recipient user ids); all signups
     /// default to Confirmed status.
     /// </summary>
+    private static void AddSignups(Rota rota, IReadOnlyList<ShiftSignup> signups)
+    {
+        foreach (var signup in signups)
+        {
+            var shift = signup.Shift;
+            shift.RotaId = rota.Id;
+            if (rota.Shifts.All(existing => existing.Id != shift.Id))
+                rota.Shifts.Add(shift);
+            if (shift.ShiftSignups.All(existing => existing.Id != signup.Id))
+                shift.ShiftSignups.Add(signup);
+        }
+    }
+
     private static Rota MakeTeamRota(
         Guid teamId,
         EventSettings es,

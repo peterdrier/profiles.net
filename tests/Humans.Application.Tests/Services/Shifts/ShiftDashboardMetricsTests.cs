@@ -32,14 +32,16 @@ public sealed class ShiftDashboardMetricsTests : ServiceTestHarness
         : base(TestNow)
     {
         // The dashboard compute methods now reach cross-domain data through
-        // ITicketService / ITeamService / IUserService. Wire thin fakes that
+        // ITicketServiceRead / ITeamServiceRead / IUserServiceRead. Wire thin fakes that
         // read from the same in-memory DbContext so existing DbContext-based
         // test seed helpers still drive the scenarios end-to-end. The repository
         // is backed by the same in-memory options via TestDbContextFactory.
         var fakeUserService = new FakeUserService(Db);
         var fakeTicketService = new FakeTicketQueryService(Db);
+        var fakeTeamService = new FakeTeamService(Db);
         var serviceProvider = new ServiceLocatorBuilder()
-            .With<ITeamService>(new FakeTeamService(Db))
+            .With<ITeamService>(fakeTeamService)
+            .With<ITeamServiceRead>(fakeTeamService)
             .With<ITicketService>(fakeTicketService)
             .With<ITicketServiceRead>(fakeTicketService)
             .With<IUserService>(fakeUserService)
@@ -975,7 +977,6 @@ public sealed class ShiftDashboardMetricsTests : ServiceTestHarness
         public Task<WhoHasntBoughtResult> GetWhoHasntBoughtAsync(string? search, string? filterTeam, string? filterTier, string? filterTicketStatus, int page, int pageSize) => throw new NotSupportedException();
         public Task<List<AttendeeExportRow>> GetAttendeeExportDataAsync() => throw new NotSupportedException();
         public Task<List<OrderExportRow>> GetOrderExportDataAsync() => throw new NotSupportedException();
-        public Task<UserTicketExportData> GetUserTicketExportDataAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<UserTicketHoldings> GetUserTicketHoldingsAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<OrderDriftRow>> GetOrderDriftAsync(CancellationToken ct = default) => throw new NotSupportedException();
     }
@@ -1008,9 +1009,6 @@ public sealed class ShiftDashboardMetricsTests : ServiceTestHarness
             string query, Humans.Application.Services.Profiles.PersonSearchFields fields,
             int limit = 10, CancellationToken ct = default) => throw new NotSupportedException();
 
-        public async Task<User?> GetByIdAsync(Guid userId, CancellationToken ct = default)
-            => await db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
-
         public async Task<IReadOnlyDictionary<Guid, User>> GetByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
         {
             if (userIds.Count == 0) return new Dictionary<Guid, User>();
@@ -1039,14 +1037,13 @@ public sealed class ShiftDashboardMetricsTests : ServiceTestHarness
 
         // Members below are unused by the dashboard compute paths under test.
         public Task<EventParticipation?> GetParticipationAsync(Guid userId, int year, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<List<EventParticipation>> GetAllParticipationsForYearAsync(int year, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<EventParticipation> DeclareNotAttendingAsync(Guid userId, int year, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<UserParticipationRow>> GetAllParticipationsForYearAsync(int year, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task DeclareNotAttendingAsync(Guid userId, int year, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> UndoNotAttendingAsync(Guid userId, int year, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetParticipationFromTicketSyncAsync(Guid userId, int year, ParticipationStatus status, Instant? checkedInAt, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<OnsiteUserRow>> GetOnsiteUsersAsync(int year, CancellationToken ct = default) => throw new NotSupportedException();
         public Task RemoveTicketSyncParticipationAsync(Guid userId, int year, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> BackfillParticipationsAsync(int year, List<(Guid UserId, ParticipationStatus Status)> entries, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<IReadOnlyList<User>> GetAllUsersAsync(CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> TrySetGoogleEmailAsync(Guid userId, string email, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> SetGoogleEmailAsync(Guid userId, string email, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> TrySetGoogleEmailStatusFromSyncAsync(Guid userId, GoogleEmailStatus status, CancellationToken ct = default) => throw new NotSupportedException();
@@ -1070,9 +1067,8 @@ public sealed class ShiftDashboardMetricsTests : ServiceTestHarness
         public Task<bool> UpdateUserEmailAsync(Guid userId, Guid emailId, UserEmailUpdateCommand command, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> RemoveUserEmailAsync(Guid userId, Guid emailId, UserEmailRemoveCommand command, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<UserEmailReconcilePlanResult> ApplyUserEmailReconcilePlanAsync(Guid userId, UserEmailReconcilePlanCommand command, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<User?> GetByEmailOrAlternateAsync(string email, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<UserInfo?> GetByEmailOrAlternateAsync(string email, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<User>> GetContactUsersAsync(string? search, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<Guid?> GetOtherUserIdHavingGoogleEmailAsync(string email, Guid excludeUserId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<string?> PurgeOwnDataAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ExpiredDeletionAnonymizationResult?> ApplyExpiredDeletionAnonymizationAsync(Guid userId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task SetLastConsentReminderSentAsync(Guid userId, Instant sentAt, CancellationToken ct = default) => throw new NotSupportedException();

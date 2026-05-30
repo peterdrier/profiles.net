@@ -3,6 +3,7 @@ using Humans.Infrastructure.Configuration;
 using Humans.Infrastructure.Jobs;
 using Humans.Infrastructure.Services;
 using EmailOutboxService = Humans.Application.Services.Email.EmailOutboxService;
+using EmailMessageFactory = Humans.Application.Services.Email.EmailMessageFactory;
 using OutboxEmailService = Humans.Application.Services.Email.OutboxEmailService;
 using InfrastructureEmailBodyComposer = Humans.Infrastructure.Services.BrandedEmailBodyComposer;
 using Humans.Application.Interfaces.Email;
@@ -56,8 +57,11 @@ internal static class EmailInfrastructureExtensions
         services.AddSingleton<IEmailOutboxRepository, EmailOutboxRepository>();
         services.AddSingleton<IEmailBodyComposer, InfrastructureEmailBodyComposer>();
         services.AddScoped<IImmediateOutboxProcessor, HangfireImmediateOutboxProcessor>();
+        services.AddScoped<IEmailMessageFactory, EmailMessageFactory>();
         services.AddScoped<IEmailService, OutboxEmailService>();
-        services.AddScoped<IEmailOutboxService, EmailOutboxService>();
+        services.AddScoped<EmailOutboxService>();
+        services.AddScoped<IEmailOutboxService>(sp => sp.GetRequiredService<EmailOutboxService>());
+        services.AddScoped<IEmailOutboxServiceRead>(sp => sp.GetRequiredService<EmailOutboxService>());
 
         services.AddScoped<ProcessEmailOutboxJob>();
         services.AddScoped<CleanupEmailOutboxJob>();

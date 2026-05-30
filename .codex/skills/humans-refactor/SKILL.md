@@ -1,11 +1,11 @@
 ---
 name: humans-refactor
-description: Autonomous Reforge-guided refactor workflow for the Humans repository. Use when the user wants Codex to target a section such as Shifts, Users, Teams, Tickets, Camps, or Store, create a dedicated worktree/branch from origin/main, run iterative architecture-focused improvements, score each stage with Reforge, gate commits through a read-only architecture review, append score and verdict details to commit messages, push progress, and open a PR when the loop reaches stasis.
+description: Autonomous Reforge-guided refactor workflow for the Humans repository. Use when the user wants Codex to target a section such as Shifts, Users, Teams, Tickets, Camps, or Store, create a dedicated worktree/branch from origin/main, run iterative architecture-focused improvements, score each stage with Reforge, gate commits through a score-blind read-only architecture review, append score and verdict details to commit messages after review acceptance, push progress, and open a PR when the loop reaches stasis.
 ---
 
 # Humans Refactor
 
-Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-debt loop: Reforge supplies deterministic score pressure, and a separate architecture-review pass decides whether the score movement was worth the trade.
+Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-debt loop: Reforge supplies deterministic score pressure to the implementer/coordinator, and a separate score-blind architecture-review pass decides whether the change is worth keeping without seeing the metric movement.
 
 ## Start
 
@@ -16,6 +16,48 @@ Run a higher-autonomy refactor pass for one Humans section. This is the v2 tech-
 5. Run `reforge stop` before and after every Reforge call. Do not use daemon mode.
 
 If resuming, continue the existing refactor worktree/branch only when the user clearly refers to it.
+
+## Section Architecture Discovery
+
+Before editing, spend a short, bounded pass (about five minutes for a familiar
+section) identifying the section's intended shape. Do this even when Reforge has
+obvious point targets; the score is secondary to the section architecture.
+
+Build a section thesis with:
+
+- repository ownership: which repositories exist for the section, and whether
+  the section is repo-backed or only controller/orchestrator logic
+- primary read model: the existing or intended `<Section>Info` DTO; if a cache
+  exists, the cached value is usually the primary read model (`UserInfo`,
+  `TeamInfo`, `CampInfo`, etc.)
+- read shards: any justified secondary read models keyed differently, such as
+  Shifts by rota and by user; name the shard and its key
+- read surface: `I<Section>ServiceRead` or equivalent, with a goal of a small
+  primitive surface: primary read(s), settings, search, and occasionally one
+  narrow lookup; projections and predicates are deletion candidates
+- write surface: the mutation/full service for commands; cross-section callers
+  should not depend on this unless they are truly orchestrating a mutation
+- settings shape: a single `<Section>SettingsInfo` when section settings are
+  read externally; avoid scattered settings scalar methods
+- cache semantics: which DTO facts are warm/cached, invalidation responsibilities,
+  and which reads may fall back to the inner service for cold keys
+- cross-section links: any cross-section dependency on a write/full service,
+  repository, or entity graph; these are high-priority debt and usually need a
+  grandfathered exception until removed
+
+Before starting the meat of the refactor, share the thesis and candidate
+direction with the user when they are available. For explicitly autonomous or
+overnight runs, write the thesis to the run notes/PR and proceed without
+blocking, but let that thesis govern the candidate ledger.
+
+Default repo-backed-section target:
+
+```text
+Repository-backed section => read surface + write surface + primary <Section>Info.
+Cross-section reads use I<Section>ServiceRead and DTO facts.
+Cross-section writes/orchestration use the write/full surface only when the
+caller is intentionally performing a command.
+```
 
 ## Autonomy Floor
 
@@ -61,19 +103,43 @@ Measure value as:
 - outside-target movement: compute `target improvement + 2 * outside-target improvement`, where improvement means score decrease; an outside-target regression of 5 cancels 10 target points
 - score-neutral changes: acceptable only when the reviewer says the architecture clearly improved
 - parameter DTOs, input bags, options bags, and command wrappers do not earn credit merely because they reduce public parameter count
+- adding facts to an existing canonical `<Section>Info`/read DTO is not the same
+  as creating a new DTO; it is often the preferred move when it lets callers
+  derive projections/predicates without DB or service-specific reads
 
 ## Work Loop
 
-First build a candidate ledger. Do this before editing:
+First build a candidate ledger from the section thesis. Do this before editing:
 
 1. Read the target section's Reforge report with `--all --top-symbols 200`.
 2. Inspect top symbols and also top rules; do not rely only on the first ten offenders.
-3. For key interfaces/services/repositories/controllers, use Reforge queries such as `members`, `dependencies`, `injected`, `callers`, `audit-surface`, `audit-downstream`, and `implementations`.
-4. Use `rg` to inspect call sites and duplicate call structures.
-5. List candidate ideas with expected score movement, likely files, risk, and architecture rationale.
+3. Print and classify the section's read and write/full service interfaces.
+   For each method, label it as primitive read, settings read, search, command,
+   projection, predicate, scalar fact, UI view-model builder, or migration/admin
+   escape hatch.
+4. For every projection, predicate, scalar fact, or UI builder, ask whether it
+   should be derived from the primary `<Section>Info`/read shard. If not, name
+   the missing fact and decide whether that fact belongs on the canonical read
+   model.
+5. For key interfaces/services/repositories/controllers, use Reforge queries such
+   as `members`, `dependencies`, `injected`, `callers`, `audit-surface`,
+   `audit-downstream`, and `implementations`.
+6. Use `rg` to inspect call sites and duplicate call structures.
+7. List candidate ideas with expected score movement, likely files, risk,
+   architecture rationale, and the concept deleted/added.
 
 Search at least these categories before declaring stasis:
 
+- repo-backed sections missing a clear read surface, write surface, or primary
+  `<Section>Info` DTO
+- read surface methods that are really LINQ projections/predicates over the
+  primary read model, especially `Is...`, `Get...Summary`, `Build...Data`, and
+  scalar lookup methods
+- facts read through repositories/full services that should live on the
+  canonical read DTO or read shard
+- cross-section dependencies on write/full services when a read surface or DTO
+  fact would suffice; these should be penalized heavily and usually need a
+  grandfathered exception until removed
 - interface or repository methods with low caller counts, overlapping behavior, or one implementation
 - full-service dependencies that should be read DTO/read-service dependencies
 - methods where callers only need one or two scalar values from a heavier service path
@@ -91,7 +157,7 @@ Then repeat until stasis:
 4. Make the change.
 5. Run targeted tests and `dotnet build Humans.slnx --disable-build-servers -v q`.
 6. Run Reforge after the change.
-7. Run the architecture-review gate.
+7. Run the score-blind architecture-review gate.
 8. If accepted, commit and push. If rework/reject, improve or abandon before committing.
 
 Stasis means the autonomy floor has been met and the remaining ledger is exhausted, blocked by hard limits, score-negative without architectural upside, or too speculative to change without user/product input. A run may stop early only when the user explicitly asks, the repo cannot build for reasons outside the branch, or continuing risks data/schema/contract changes the user did not authorize.
@@ -100,12 +166,12 @@ Stasis means the autonomy floor has been met and the remaining ledger is exhaust
 
 Use a separate read-only pass after every candidate stage. Prefer a subagent when multi-agent tools are available; otherwise perform an explicit second-pass review without editing. Read [architecture-reviewer.md](references/architecture-reviewer.md) for the prompt and JSON contract.
 
+The architecture reviewer must be score-blind. Do not provide Reforge before/after scores, rule deltas, weighted values, point savings, "this improved score" framing, or suspicious-improvement labels to the reviewer. The implementer/coordinator still computes those values for candidate selection and commit messages, but the review verdict must be based on the diff and architecture rules alone.
+
 Inputs to the reviewer:
 
 - target section and stated objective
 - git diff for the uncommitted stage
-- Reforge before/after deltas, including surface/internal/combined totals
-- weighted target/outside value and any suspicious improvements
 - candidate ledger entry and alternatives considered
 - build/test results
 - notes about behavior or ownership assumptions
@@ -116,7 +182,18 @@ Reviewer verdicts:
 - `rework`: change the patch and rerun tests/Reforge/review.
 - `reject`: abandon the patch or redesign before committing.
 
-Treat Reforge as evidence, not judgment. Good consolidation removes duplicated call structures, uses canonical read DTOs, and replaces interfaces with small data where appropriate. Bad consolidation hides domain verbs behind generic action/mode dispatchers, grows god methods, moves complexity to private helpers, or shifts debt out of the target section.
+Treat Reforge as candidate-selection pressure, not review evidence. Good consolidation removes duplicated call structures, uses canonical read DTOs, and replaces interfaces with small data where appropriate. Bad consolidation hides domain verbs behind generic action/mode dispatchers, grows god methods, moves complexity to private helpers, or shifts debt out of the target section.
+
+The reviewer must reject patches whose main effect is moving methods into a new
+helper/static class, replacing parameters with a DTO bag, or reducing a score
+without deleting a concept. Acceptable read-model growth should usually add
+facts to the existing `<Section>Info`/read shard, not create another projection
+service.
+
+After the reviewer returns `accept`, attach the Reforge deltas and weighted value
+to the commit message. If the reviewer returns `rework` or `reject`, do not use
+score movement to argue with the verdict; fix, redesign, or abandon the patch and
+rerun tests/Reforge/review.
 
 ## Commit Messages
 
@@ -148,11 +225,20 @@ Push after each accepted commit. If a PR does not exist by the time the user ask
 - Prefer a real state engine for lifecycle transitions.
 - Penalize generic action/mode methods that are neither explicit domain verbs nor a real state engine.
 - Treat read/query shape objects differently from mutation mode dispatchers; shaped reads are acceptable when they collapse duplicated include/query shapes without growing unbounded.
-- Prefer adding one or two scalar properties to an existing DTO over creating a new interface/service/repository path.
+- For repo-backed sections, prefer a small `I<Section>ServiceRead`, a mutation/full write surface, and a primary `<Section>Info` DTO. Some sections may have explicit read shards keyed differently; document the shard and keep it cohesive.
+- Treat the cached DTO as the source of truth for read facts. If a fact about the section is stable enough to be cached and broadly useful, prefer adding it to the existing `<Section>Info`/read shard over adding a service predicate/projection/scalar lookup.
+- Prefer adding properties/behavior to an existing canonical read DTO over creating a new interface/service/repository path. Do not treat this as DTO-bag score gaming when it removes service surface and DB reads.
 - Prefer canonical read services such as `IUserServiceRead`, `ITeamServiceRead`, and section view DTOs for cross-section reads.
+- Penalize cross-section dependencies on write/full services. If unavoidable,
+  call out the mutation/orchestration reason; otherwise move the caller to the
+  read surface and DTO facts. Existing exceptions should be explicit and
+  grandfathered, not silently normalized.
 - Keep controllers thin, but allow UI-specific finite sorting/filtering/paging at the controller/view boundary.
 - Reject parameter-object refactors whose primary effect is hiding a long method signature. Accept a new input/command object only when it has cohesive domain meaning, public readable semantics appropriate to its boundary, validation/invariants, reuse across related flows, or a materially simpler call site.
 - Treat `public` input types with mostly `internal` state as a smell on service interfaces; decorators and cross-assembly callers should not need result objects or side channels to recover data the input already contained.
+- For read-surface pruning, ask: "Could the caller express this as a LINQ query
+  over `<Section>Info` or a known read shard?" If yes, add missing facts to the
+  read model if needed, update callers, and delete the method.
 
 ## References
 

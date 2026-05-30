@@ -44,6 +44,9 @@ public sealed class TeamService(
     private IEmailService EmailService
         => serviceProvider.GetRequiredService<IEmailService>();
 
+    private IEmailMessageFactory EmailMessages
+        => serviceProvider.GetRequiredService<IEmailMessageFactory>();
+
     private ISystemTeamSync SystemTeamSync
         => serviceProvider.GetRequiredService<ISystemTeamSync>();
 
@@ -1736,13 +1739,8 @@ public sealed class TeamService(
     {
         var (items, totalCount) = await repo.GetAllForAdminAsync(page, pageSize, cancellationToken);
 
-        var activeEvent = await shiftManagementService.GetActiveAsync();
-        var activeEventId = activeEvent?.Id ?? Guid.Empty;
-
-        var pendingShiftCounts = activeEventId == Guid.Empty
-            ? new Dictionary<Guid, int>()
-            : await shiftManagementService.GetPendingShiftSignupCountsByTeamAsync(
-                activeEventId, cancellationToken);
+        var pendingShiftCounts = await shiftManagementService
+            .GetActivePendingShiftSignupCountsByTeamAsync(cancellationToken);
 
         var teamIds = items.Select(t => t.Id).ToList();
         var resourceSummaries = await TeamResourceService
@@ -2104,10 +2102,10 @@ public sealed class TeamService(
             {
                 var resources = await TeamResourceService.GetTeamResourcesAsync(team.Id, cancellationToken);
 
-                await EmailService.SendAddedToTeamAsync(
+                await EmailService.SendAsync(EmailMessages.AddedToTeam(
                     email, user.BurnerName, team.Name, team.Slug,
                     resources.Select(r => (r.Name, r.Url)),
-                    user.PreferredLanguage,
+                    user.PreferredLanguage),
                     cancellationToken);
             }
         }
